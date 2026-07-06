@@ -424,7 +424,7 @@ onBeforeUnmount(() => {
 .sheet-viewer {
   display: flex;
   flex-direction: column;
-  height: 520px;
+  height: 100%;
   background: rgba(26, 26, 36, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
