@@ -44,8 +44,8 @@
         <span v-if="isLoadingSoundfont" class="status-badge loading">
           <span class="spinner"></span> Đang tải nhạc cụ...
         </span>
-        <span v-else-if="initializationFailed" class="status-badge error">
-          <AlertCircle class="status-icon" /> Lỗi âm thanh
+        <span v-else-if="initializationFailed" class="status-badge error clickable" @click="initializeEngine" title="Nhấp để thử khởi tạo lại Audio Engine">
+          <AlertCircle class="status-icon" /> Lỗi âm thanh (Nhấp để thử lại)
         </span>
         <span v-else-if="!isInitialized" class="status-badge loading">
           <span class="spinner"></span> Đang khởi tạo...
@@ -109,7 +109,6 @@ import { parseMxl } from './services/mxlParser';
 import { getCachedSong, cacheSong } from './services/appCache';
 import { songLibrary } from './data/songLibrary';
 import type { SongEntry } from './data/songLibrary';
-import abcjs from 'abcjs';
 
 const isInitialized = ref(false);
 const isReady = ref(false);
@@ -227,7 +226,8 @@ async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xm
   } 
   else { // abc
     const abcText = payload.data as string;
-    const midiBin = abcjs.synth.getMidiFile(abcText, { midiOutputType: 'binary' }) as any;
+    const abcjs = await import('abcjs');
+    const midiBin = abcjs.default.synth.getMidiFile(abcText, { midiOutputType: 'binary' }) as any;
     midiBytes = new Uint8Array(midiBin);
     fileData.value = midiBytes;
     fileType.value = 'abc';
@@ -417,6 +417,22 @@ async function loadFromLibrary(song: SongEntry) {
   font-weight: 700;
   padding: 6px 12px;
   border-radius: 8px;
+}
+
+.status-badge.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.status-badge.clickable:hover {
+  filter: brightness(1.2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 59, 48, 0.2);
+}
+
+.status-badge.clickable:active {
+  transform: translateY(0);
 }
 
 .status-badge.error {

@@ -51,8 +51,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue';
-import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
-import abcjs from 'abcjs';
+import type { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
 import { Midi } from '@tonejs/midi';
 import { Music, Layers } from 'lucide-vue-next';
 import { AudioEngine } from '../services/audioEngine';
@@ -155,6 +154,7 @@ async function renderMusic() {
   clearRender();
 
   if (props.fileType === 'xml' && props.rawText && osmdContainer.value) {
+    const { OpenSheetMusicDisplay } = await import('opensheetmusicdisplay');
     osmd = new OpenSheetMusicDisplay(osmdContainer.value, {
       autoResize: true,
       backend: 'svg',
@@ -170,7 +170,8 @@ async function renderMusic() {
     osmd.cursor.reset();
   } 
   else if (props.fileType === 'abc' && props.rawText) {
-    abcjs.renderAbc('abc-container', props.rawText, {
+    const abcjs = await import('abcjs');
+    abcjs.default.renderAbc('abc-container', props.rawText, {
       responsive: 'resize',
       add_classes: true,
     });
@@ -210,7 +211,8 @@ async function parseMidiForVisualizer() {
     } else {
       // Trường hợp tệp là text (ABC/XML), chuyển đổi thành MIDI bằng parser của chúng ta
       if (props.fileType === 'abc') {
-        const midiBin = abcjs.synth.getMidiFile(props.rawText || '', { midiOutputType: 'binary' }) as any;
+        const abcjs = await import('abcjs');
+        const midiBin = abcjs.default.synth.getMidiFile(props.rawText || '', { midiOutputType: 'binary' }) as any;
         arrayBuffer = midiBin.buffer as ArrayBuffer;
       } else {
         // XML

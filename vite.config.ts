@@ -5,6 +5,33 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   base: '/SynthScore/',
   plugins: [vue()],
+  build: {
+    chunkSizeWarningLimit: 1500,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-osmd',
+              test: /[\\/]node_modules[\\/]opensheetmusicdisplay[\\/]/,
+            },
+            {
+              name: 'vendor-abcjs',
+              test: /[\\/]node_modules[\\/]abcjs[\\/]/,
+            },
+            {
+              name: 'vendor-audio',
+              test: /[\\/]node_modules[\\/](spessasynth_lib|@tonejs)[\\/]/,
+            },
+            {
+              name: 'vendor-core',
+              test: /[\\/]node_modules[\\/]/,
+            }
+          ]
+        }
+      }
+    }
+  },
   server: {
     proxy: {
       '/github-releases': {

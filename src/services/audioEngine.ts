@@ -75,8 +75,10 @@ class AudioEngineService {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       this.audioContext = new AudioCtx();
 
-      // 2. Đăng ký AudioWorklet Processor từ thư mục public
-      await this.audioContext.audioWorklet.addModule('/spessasynth_processor.min.js');
+      // 2. Đăng ký AudioWorklet Processor từ thư mục public (tự động thêm base path từ Vite)
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+      await this.audioContext.audioWorklet.addModule(`${normalizedBaseUrl}spessasynth_processor.min.js`);
 
       // 3. Khởi tạo Synthesizer
       this.synth = new WorkletSynthesizer(this.audioContext);
