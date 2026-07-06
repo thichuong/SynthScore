@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Soundfonts (tự động tải ở build-time hoặc local dev)
+public/soundfonts/
+

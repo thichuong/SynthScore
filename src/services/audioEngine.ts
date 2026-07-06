@@ -180,7 +180,7 @@ class AudioEngineService {
     this.triggerStateChange();
 
     try {
-      let buffer: ArrayBuffer;
+      let buffer!: ArrayBuffer;
       if (this.soundfontCache.has(id)) {
         buffer = this.soundfontCache.get(id)!;
       } else {
@@ -189,19 +189,45 @@ class AudioEngineService {
           buffer = cachedDbBuffer;
           this.soundfontCache.set(id, buffer);
         } else {
-          let fetchUrl = sf.url;
-          // Sử dụng proxy cục bộ trong môi trường localhost để vượt qua CORS
-          if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-            if (fetchUrl.startsWith('https://github.com/')) {
-              fetchUrl = fetchUrl.replace('https://github.com/', '/github-releases/');
-            } else if (fetchUrl.startsWith('https://raw.githubusercontent.com/')) {
-              fetchUrl = fetchUrl.replace('https://raw.githubusercontent.com/', '/raw-github/');
+          const fileName = sf.url.substring(sf.url.lastIndexOf('/') + 1);
+          const baseUrl = import.meta.env.BASE_URL || '/';
+          const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+          const localUrl = `${normalizedBaseUrl}soundfonts/${fileName}`;
+          
+          let fetchedSuccessfully = false;
+
+          // Thử tải từ local (same-origin, tránh CORS trên GitHub Pages/localhost)
+          try {
+            console.log(`Đang thử nạp Soundfont từ local URL: ${localUrl}`);
+            const localRes = await fetch(localUrl);
+            if (localRes.ok) {
+              buffer = await localRes.arrayBuffer();
+              fetchedSuccessfully = true;
+              console.log(`Nạp thành công Soundfont ${sf.name} từ local!`);
+            } else {
+              console.warn(`Local fetch trả về mã lỗi: ${localRes.status}. Chuyển sang tải từ GitHub...`);
             }
+          } catch (localErr) {
+            console.warn(`Không thể nạp Soundfont từ local (${localErr}). Chuyển sang tải từ GitHub...`);
           }
 
-          const res = await fetch(fetchUrl);
-          if (!res.ok) throw new Error(`Không thể fetch Soundfont từ URL: ${fetchUrl} (status: ${res.status})`);
-          buffer = await res.arrayBuffer();
+          // Fallback tải từ mạng (GitHub/Proxy) nếu local fetch không thành công
+          if (!fetchedSuccessfully) {
+            let fetchUrl = sf.url;
+            // Sử dụng proxy cục bộ trong môi trường localhost để vượt qua CORS
+            if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+              if (fetchUrl.startsWith('https://github.com/')) {
+                fetchUrl = fetchUrl.replace('https://github.com/', '/github-releases/');
+              } else if (fetchUrl.startsWith('https://raw.githubusercontent.com/')) {
+                fetchUrl = fetchUrl.replace('https://raw.githubusercontent.com/', '/raw-github/');
+              }
+            }
+
+            console.log(`Đang tải Soundfont từ mạng: ${fetchUrl}`);
+            const res = await fetch(fetchUrl);
+            if (!res.ok) throw new Error(`Không thể fetch Soundfont từ URL: ${fetchUrl} (status: ${res.status})`);
+            buffer = await res.arrayBuffer();
+          }
 
           // Lưu cache
           this.soundfontCache.set(id, buffer);
