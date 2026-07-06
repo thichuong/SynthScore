@@ -51,9 +51,9 @@ class AudioEngineService {
   public currentSoundfontId = 'timgm';
 
   public readonly SOUNDFONTS = [
-    { id: 'timgm', name: 'TimGM6mb (Nhẹ - 6MB)', url: 'https://cdn.jsdelivr.net/gh/craffel/pretty-midi@master/pretty_midi/TimGM6mb.sf2' },
-    { id: 'chorium', name: 'ChoriumRevA (Tốt - 27MB)', url: 'https://raw.githubusercontent.com/namin/metasolfeggio/master/mingus/ChoriumRevA.SF2' },
-    { id: 'fluid', name: 'FluidR3_GM (Nặng - 148MB)', url: 'https://github.com/pianobooster/fluid-soundfont/releases/download/v3.1/FluidR3_GM.sf2' }
+    { id: 'timgm', name: 'TimGM6mb (Nhẹ - 6MB)', url: 'https://github.com/thichuong/SynthScore/releases/download/v1.0.0/TimGM6mb.sf2' },
+    { id: 'chorium', name: 'ChoriumRevA (Tốt - 27MB)', url: 'https://github.com/thichuong/SynthScore/releases/download/v1.0.0/ChoriumRevA.SF2' },
+    { id: 'fluid', name: 'FluidR3_GM (Nặng - 148MB)', url: 'https://github.com/thichuong/SynthScore/releases/download/v1.0.0/FluidR3_GM.sf2' }
   ];
 
   private timeUpdateInterval: any = null;
