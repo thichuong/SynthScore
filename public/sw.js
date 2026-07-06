@@ -1,10 +1,10 @@
 const CACHE_NAME = 'synthscore-pwa-v1';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/favicon.svg',
-  '/icons.svg',
-  '/spessasynth_processor.min.js'
+  './',
+  './index.html',
+  './favicon.svg',
+  './icons.svg',
+  './spessasynth_processor.min.js'
 ];
 
 self.addEventListener('install', (event) => {
