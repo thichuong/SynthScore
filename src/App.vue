@@ -8,25 +8,17 @@
         </div>
         <div class="logo-text">
           <h1>SynthScore</h1>
-          <p>Trình chơi nhạc tự động & Xem bản nhạc tương tác cao cấp</p>
+          <p>Trình chơi nhạc tự động &amp; Xem bản nhạc tương tác cao cấp</p>
         </div>
       </div>
 
-      <!-- Presets Nhạc mẫu của Beethoven -->
-      <div class="presets-section">
-        <span class="presets-label">Nhạc mẫu Beethoven:</span>
-        <div class="presets-buttons">
-          <button class="preset-btn" @click="loadPreset('symphony5')" :disabled="isLoadingSoundfont">
-            🎻 Symphony No. 5
-          </button>
-          <button class="preset-btn" @click="loadPreset('moonlight')" :disabled="isLoadingSoundfont">
-            🎹 Moonlight Sonata
-          </button>
-          <button class="preset-btn" @click="loadPreset('elise')" :disabled="isLoadingSoundfont">
-            🎹 Für Elise
-          </button>
-        </div>
-      </div>
+      <!-- Thư viện bản nhạc -->
+      <SongLibraryPicker 
+        :playingIndex="selectedSongIndex" 
+        :isLoading="isLoadingLibrarySong"
+        :disabled="isLoadingSoundfont"
+        @select="handleSongSelect"
+      />
 
       <!-- Trạng thái Audio Engine -->
       <div class="engine-status">
@@ -87,16 +79,22 @@ import AudioVisualizer from './components/AudioVisualizer.vue';
 import OrchestraMixer from './components/OrchestraMixer.vue';
 import SheetViewer from './components/SheetViewer.vue';
 import PlaybackControls from './components/PlaybackControls.vue';
+import SongLibraryPicker from './components/SongLibraryPicker.vue';
 
 import { AudioEngine } from './services/audioEngine';
 import type { TrackInfo } from './services/audioEngine';
 import { parseMusicXmlToMidiBytes } from './services/musicXmlParser';
+import { parseMxl } from './services/mxlParser';
+import { getCachedMxl, cacheMxl } from './services/songCache';
+import { songLibrary } from './data/songLibrary';
+import type { SongEntry } from './data/songLibrary';
 import abcjs from 'abcjs';
 
 const isInitialized = ref(false);
 const isReady = ref(false);
 const isLoadingSoundfont = ref(false);
 const isPlaying = ref(false);
+const isLoadingLibrarySong = ref(false);
 
 const currentTime = ref(0);
 const duration = ref(0);
@@ -107,6 +105,8 @@ const tracks = ref<TrackInfo[]>([]);
 const fileData = ref<Uint8Array | string | null>(null);
 const fileType = ref<'xml' | 'abc' | 'midi' | null>(null);
 const rawText = ref<string | null>(null);
+
+const selectedSongIndex = ref(-1);
 
 // Lắng nghe trạng thái thay đổi từ AudioEngine
 onMounted(() => {
@@ -168,48 +168,57 @@ async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xm
   await AudioEngine.loadSong(midiBytes, payload.name);
 }
 
-// Xử lý tải nhạc mẫu Beethoven
-async function loadPreset(presetKey: 'symphony5' | 'moonlight' | 'elise') {
+// Xử lý chọn bản nhạc từ SongLibraryPicker
+async function handleSongSelect(index: number) {
+  selectedSongIndex.value = index;
+  const song: SongEntry = songLibrary[index];
+  await loadFromLibrary(song);
+}
+
+async function loadFromLibrary(song: SongEntry) {
   if (!isInitialized.value) {
     await initializeEngine();
   }
 
-  let midiBytes: Uint8Array;
-  let name = '';
+  isLoadingLibrarySong.value = true;
 
   try {
-    if (presetKey === 'symphony5') {
-      const response = await fetch('/presets/beethoven_symphony_5.mid');
-      const buffer = await response.arrayBuffer();
-      midiBytes = new Uint8Array(buffer);
-      name = 'Beethoven - Symphony No. 5 (Complete First Movement)';
-      fileData.value = midiBytes;
-      fileType.value = 'midi';
-      rawText.value = null;
-    } 
-    else if (presetKey === 'moonlight') {
-      const response = await fetch('/presets/beethoven_moonlight.musicxml');
-      const xmlText = await response.text();
-      midiBytes = parseMusicXmlToMidiBytes(xmlText);
-      name = 'Beethoven - Moonlight Sonata (First Movement)';
-      fileData.value = midiBytes;
-      fileType.value = 'xml';
-      rawText.value = xmlText;
-    } 
-    else { // elise
-      const response = await fetch('/presets/beethoven_elise.abc');
-      const abcText = await response.text();
-      const midiBin = abcjs.synth.getMidiFile(abcText, { midiOutputType: 'binary' }) as any;
-      midiBytes = new Uint8Array(midiBin);
-      name = 'Beethoven - Für Elise (Complete)';
-      fileData.value = midiBytes;
-      fileType.value = 'abc';
-      rawText.value = abcText;
-    }
+    let buffer: ArrayBuffer;
 
-    await AudioEngine.loadSong(midiBytes, name);
+    // Kiểm tra cache trước
+    const cached = await getCachedMxl(song.url);
+    if (cached) {
+      buffer = cached;
+    } else {
+      // Tải từ mạng và lưu cache
+      const response = await fetch(song.url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      buffer = await response.arrayBuffer();
+      // Lưu vào IndexedDB để lần sau không cần tải lại
+      await cacheMxl(song.url, buffer);
+    }
+    
+    // Giải nén MXL → MusicXML text
+    const xmlText = await parseMxl(buffer);
+
+    // Chuyển đổi MusicXML → MIDI bytes
+    const midiBytes = parseMusicXmlToMidiBytes(xmlText);
+
+    const displayName = song.composer 
+      ? `${song.composer} — ${song.name}` 
+      : song.name;
+
+    fileData.value = midiBytes;
+    fileType.value = 'xml';
+    rawText.value = xmlText;
+
+    await AudioEngine.loadSong(midiBytes, displayName);
   } catch (error) {
-    console.error('Lỗi khi nạp bản nhạc mẫu:', error);
+    console.error('Lỗi khi nạp bản nhạc từ thư viện:', error);
+  } finally {
+    isLoadingLibrarySong.value = false;
   }
 }
 </script>
@@ -238,6 +247,8 @@ async function loadPreset(presetKey: 'symphony5' | 'moonlight' | 'elise') {
   padding: 12px 24px;
   border-radius: 16px;
   backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 100;
 }
 
 .logo-area {
@@ -280,52 +291,6 @@ async function loadPreset(presetKey: 'symphony5' | 'moonlight' | 'elise') {
   font-weight: 500;
 }
 
-/* Presets */
-.presets-section {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 6px 16px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.presets-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #8c8c9e;
-}
-
-.presets-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.preset-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #e2e2e9;
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.preset-btn:hover:not(:disabled) {
-  background: rgba(0, 240, 255, 0.1);
-  border-color: #00f0ff;
-  color: #00f0ff;
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
-  transform: translateY(-1px);
-}
-
-.preset-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 
 /* Engine Status */
 .status-badge {

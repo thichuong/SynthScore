@@ -41,6 +41,7 @@
 import { ref } from 'vue';
 import { UploadCloud, Music, FileAudio } from 'lucide-vue-next';
 import { AudioEngine } from '../services/audioEngine';
+import { parseMxl } from '../services/mxlParser';
 import confetti from 'canvas-confetti';
 
 const emit = defineEmits<{
@@ -118,8 +119,28 @@ async function processFile(file: File) {
     };
     reader.readAsArrayBuffer(file);
   } 
-  else if (ext === 'xml' || ext === 'musicxml' || ext === 'mxl') {
-    // 3. XỬ LÝ TỆP MUSICXML (Lưu dưới dạng String)
+  else if (ext === 'mxl') {
+    // 3a. XỬ LÝ TỆP MXL (Compressed MusicXML — cần giải nén ZIP)
+    reader.onload = async (e) => {
+      try {
+        const buffer = e.target?.result as ArrayBuffer;
+        const xmlText = await parseMxl(buffer);
+        emit('musicLoaded', {
+          data: xmlText,
+          type: 'xml',
+          name: fileName
+        });
+        uploadMsg.value = `Đã nạp bản nhạc: ${fileName}`;
+        statusType.value = 'success';
+      } catch (err) {
+        uploadMsg.value = 'Không thể giải nén file MXL. Định dạng có thể bị lỗi.';
+        statusType.value = 'error';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } 
+  else if (ext === 'xml' || ext === 'musicxml') {
+    // 3b. XỬ LÝ TỆP MUSICXML THUẦN (Lưu dưới dạng String)
     reader.onload = (e) => {
       const text = e.target?.result as string;
       emit('musicLoaded', {
