@@ -156,7 +156,7 @@ class AudioEngineService {
             await this.synth.soundBankManager.deleteSoundBank('custom');
           } catch (e) {}
 
-          await this.synth.soundBankManager.addSoundBank(buffer, 'custom');
+          await this.synth.soundBankManager.addSoundBank(buffer.slice(0), 'custom');
           await this.synth.isReady;
           this.currentSoundfontId = 'custom';
           this.isLoadingSoundfont = false;
@@ -243,7 +243,7 @@ class AudioEngineService {
         await this.synth.soundBankManager.deleteSoundBank('custom');
       } catch (e) {}
 
-      await this.synth.soundBankManager.addSoundBank(buffer, 'default');
+      await this.synth.soundBankManager.addSoundBank(buffer.slice(0), 'default');
       await this.synth.isReady;
 
       this.currentSoundfontId = id;
@@ -276,7 +276,7 @@ class AudioEngineService {
         await this.synth.soundBankManager.deleteSoundBank('custom');
       } catch (e) {}
 
-      await this.synth.soundBankManager.addSoundBank(arrayBuffer, 'custom');
+      await this.synth.soundBankManager.addSoundBank(arrayBuffer.slice(0), 'custom');
       await this.synth.isReady;
       
       this.soundfontCache.set('custom', arrayBuffer);
