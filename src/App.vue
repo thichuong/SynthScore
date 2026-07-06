@@ -12,13 +12,17 @@
         </div>
       </div>
 
-      <!-- Thư viện bản nhạc -->
-      <SongLibraryPicker 
-        :playingIndex="selectedSongIndex" 
-        :isLoading="isLoadingLibrarySong"
-        :disabled="isLoadingSoundfont"
-        @select="handleSongSelect"
-      />
+      <div class="header-controls">
+        <!-- Thư viện bản nhạc -->
+        <SongLibraryPicker 
+          :playingIndex="selectedSongIndex" 
+          :isLoading="isLoadingLibrarySong"
+          :disabled="isLoadingSoundfont"
+          @select="handleSongSelect"
+        />
+
+        <FileUploader @musicLoaded="handleMusicLoaded" />
+      </div>
 
       <!-- Trạng thái Audio Engine -->
       <div class="engine-status">
@@ -36,13 +40,13 @@
 
     <!-- Nội dung chính Dashboard -->
     <main class="dashboard-grid">
-      <!-- Cột trái: Điều khiển, Visualizer và Bàn trộn Mixer -->
+      <!-- Cột trái: Bàn trộn Mixer -->
       <div class="dashboard-sidebar">
-        <FileUploader @musicLoaded="handleMusicLoaded" />
-        
-        <AudioVisualizer :isPlaying="isPlaying" />
-        
-        <OrchestraMixer :tracks="tracks" />
+        <OrchestraMixer 
+          :tracks="tracks" 
+          :currentMode="playbackMode"
+          @changeMode="handleModeChange"
+        />
       </div>
 
       <!-- Cột phải: Khung hiển thị bản nhạc (Sheet Viewer / Piano Roll) -->
@@ -75,7 +79,6 @@
 import { ref, onMounted } from 'vue';
 import { Music, Power, CheckCircle } from 'lucide-vue-next';
 import FileUploader from './components/FileUploader.vue';
-import AudioVisualizer from './components/AudioVisualizer.vue';
 import OrchestraMixer from './components/OrchestraMixer.vue';
 import SheetViewer from './components/SheetViewer.vue';
 import PlaybackControls from './components/PlaybackControls.vue';
@@ -101,6 +104,7 @@ const duration = ref(0);
 const bpm = ref(120);
 const songName = ref('');
 const tracks = ref<TrackInfo[]>([]);
+const playbackMode = ref<'default' | 'symphony' | 'concerto'>('default');
 
 const fileData = ref<Uint8Array | string | null>(null);
 const fileType = ref<'xml' | 'abc' | 'midi' | null>(null);
@@ -119,6 +123,10 @@ onMounted(() => {
     bpm.value = AudioEngine.bpm;
     songName.value = AudioEngine.currentSongName;
     tracks.value = [...AudioEngine.tracks];
+    playbackMode.value = AudioEngine.playbackMode;
+    if (AudioEngine.activeMidiBytes && fileData.value !== AudioEngine.activeMidiBytes) {
+      fileData.value = AudioEngine.activeMidiBytes;
+    }
   });
 
   AudioEngine.onTimeUpdate((time) => {
@@ -132,6 +140,10 @@ async function initializeEngine() {
   } catch (e) {
     console.error('Không thể kích hoạt Audio Engine:', e);
   }
+}
+
+async function handleModeChange(mode: 'default' | 'symphony' | 'concerto') {
+  await AudioEngine.setPlaybackMode(mode);
 }
 
 // Xử lý nạp nhạc từ người dùng tải lên
@@ -249,6 +261,12 @@ async function loadFromLibrary(song: SongEntry) {
   backdrop-filter: blur(10px);
   position: relative;
   z-index: 100;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .logo-area {

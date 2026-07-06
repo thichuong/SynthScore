@@ -6,9 +6,32 @@
         <h3>Bàn Trộn Âm Thanh Dàn Nhạc (Orchestra Mixer)</h3>
       </div>
       <div class="mixer-actions">
-        <button class="reset-btn" @click="resetAll" title="Khôi phục mặc định">
-          Reset Mixer
-        </button>
+        <div class="mode-selector">
+          <button 
+            class="mode-btn" 
+            :class="{ active: currentMode === 'default' }" 
+            @click="$emit('changeMode', 'default')"
+            title="Khôi phục/Đặt lại bản phối mặc định gốc"
+          >
+            Mặc định
+          </button>
+          <button 
+            class="mode-btn" 
+            :class="{ active: currentMode === 'symphony' }" 
+            @click="$emit('changeMode', 'symphony')"
+            title="Khôi phục/Đặt lại bản phối giao hưởng chuẩn"
+          >
+            Giao hưởng
+          </button>
+          <button 
+            class="mode-btn" 
+            :class="{ active: currentMode === 'concerto' }" 
+            @click="$emit('changeMode', 'concerto')"
+            title="Khôi phục/Đặt lại bản phối Piano Concerto"
+          >
+            Concerto
+          </button>
+        </div>
       </div>
     </div>
 
@@ -18,69 +41,95 @@
         <p>Không có thông tin kênh nhạc cụ. Hãy tải lên một tệp tin nhạc.</p>
       </div>
 
-      <div v-else class="tracks-grid">
-        <div 
-          v-for="track in tracks" 
-          :key="track.channel" 
-          class="track-card"
-          :class="{ muted: track.isMuted, soloed: track.isSoloed, active: liveVoices[track.channel] > 0 }"
-        >
-          <!-- Cột hiển thị đèn tín hiệu nốt nhạc (Vũ đạo nốt nhạc) -->
-          <div class="meter-container">
-            <div class="meter-label">CH {{ track.channel + 1 }}</div>
-            <div class="meter-bar-wrapper">
-              <div 
-                class="meter-bar-fill"
-                :style="{ height: `${Math.min(100, liveVoices[track.channel] * 12)}%` }"
-              ></div>
-            </div>
-          </div>
-
-          <div class="track-details">
-            <div class="track-name-row">
-              <span class="track-name" :title="track.name">{{ track.name }}</span>
-              <span class="voice-count-badge" v-if="liveVoices[track.channel] > 0">
-                {{ liveVoices[track.channel] }} v
-              </span>
-            </div>
-            
-            <div class="instrument-name">
-              {{ getInstrumentCategory(track.instrumentNumber) }} ({{ track.instrumentName }})
+      <div v-else class="tracks-list-container">
+        <div class="tracks-grid">
+          <div 
+            v-for="track in tracks" 
+            :key="track.channel" 
+            class="track-card"
+            :class="{ muted: track.isMuted, soloed: track.isSoloed, active: liveVoices[track.channel] > 0 }"
+          >
+            <!-- Cột hiển thị đèn tín hiệu nốt nhạc (Vũ đạo nốt nhạc) -->
+            <div class="meter-container">
+              <div class="meter-label">CH {{ track.channel + 1 }}</div>
+              <div class="meter-bar-wrapper">
+                <div 
+                  class="meter-bar-fill"
+                  :style="{ height: `${Math.min(100, liveVoices[track.channel] * 12)}%` }"
+                ></div>
+              </div>
             </div>
 
-            <!-- Điều khiển Volume -->
-            <div class="volume-slider-container">
-              <Volume2 class="vol-icon" />
-              <input 
-                type="range" 
-                min="0" 
-                max="100" 
-                v-model.number="track.volume" 
-                @input="updateVolume(track.channel, track.volume)"
-                class="vol-slider"
-              />
-              <span class="vol-value">{{ track.volume }}%</span>
-            </div>
+            <div class="track-details">
+              <div class="track-name-row">
+                <span class="track-name" :title="track.name">{{ track.name }}</span>
+                <span class="voice-count-badge" v-if="liveVoices[track.channel] > 0">
+                  {{ liveVoices[track.channel] }} v
+                </span>
+              </div>
+              
+              <div class="instrument-selector-container">
+                <select 
+                  :value="track.instrumentNumber" 
+                  @change="changeInstrument(track.channel, parseInt(($event.target as HTMLSelectElement).value))"
+                  class="instrument-select"
+                >
+                  <optgroup v-for="group in instrumentGroups" :key="group.name" :label="group.name">
+                    <option 
+                      v-for="inst in group.instruments" 
+                      :key="inst.number" 
+                      :value="inst.number"
+                    >
+                      {{ inst.name }}
+                    </option>
+                  </optgroup>
+                </select>
+              </div>
 
-            <!-- Điều khiển Mute/Solo -->
-            <div class="mixer-buttons">
-              <button 
-                class="btn-mute" 
-                :class="{ active: track.isMuted }"
-                @click="toggleMute(track.channel)"
-              >
-                <VolumeX class="btn-icon" /> MUTE
-              </button>
-              <button 
-                class="btn-solo" 
-                :class="{ active: track.isSoloed }"
-                @click="toggleSolo(track.channel)"
-              >
-                SOLO
-              </button>
+              <!-- Điều khiển Volume -->
+              <div class="volume-slider-container">
+                <Volume2 class="vol-icon" />
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="100" 
+                  v-model.number="track.volume" 
+                  @input="updateVolume(track.channel, track.volume)"
+                  class="vol-slider"
+                />
+                <span class="vol-value">{{ track.volume }}%</span>
+              </div>
+
+              <!-- Điều khiển Mute/Solo & Xóa -->
+              <div class="mixer-buttons">
+                <button 
+                  class="btn-mute" 
+                  :class="{ active: track.isMuted }"
+                  @click="toggleMute(track.channel)"
+                >
+                  <VolumeX class="btn-icon" /> MUTE
+                </button>
+                <button 
+                  class="btn-solo" 
+                  :class="{ active: track.isSoloed }"
+                  @click="toggleSolo(track.channel)"
+                >
+                  SOLO
+                </button>
+                <button 
+                  class="btn-delete" 
+                  @click="deleteTrack(track.channel)"
+                  title="Xóa nhạc cụ này"
+                >
+                  <Trash2 class="btn-icon delete-icon" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
+        <button class="add-track-btn-bottom" @click="addTrack" title="Thêm nhạc cụ mới">
+          <Plus class="add-icon" /> Thêm nhạc cụ mới
+        </button>
       </div>
     </div>
   </div>
@@ -88,35 +137,26 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-import { Sliders, Volume2, VolumeX, Music } from 'lucide-vue-next';
+import { Sliders, Volume2, VolumeX, Music, Trash2, Plus } from 'lucide-vue-next';
 import { AudioEngine } from '../services/audioEngine';
 import type { TrackInfo } from '../services/audioEngine';
+import { instrumentGroups } from '../data/instruments';
 
 defineProps<{
   tracks: TrackInfo[];
+  currentMode: 'default' | 'symphony' | 'concerto';
+}>();
+
+defineEmits<{
+  (e: 'changeMode', mode: 'default' | 'symphony' | 'concerto'): void;
 }>();
 
 const liveVoices = ref<Record<number, number>>({});
 let voicesInterval: number | null = null;
 
-// Lấy danh mục nhạc cụ General MIDI
-function getInstrumentCategory(programNum: number): string {
-  if (programNum >= 0 && programNum <= 7) return '🎹 Piano';
-  if (programNum >= 8 && programNum <= 15) return '🔔 Percussion';
-  if (programNum >= 16 && programNum <= 23) return '💨 Organ';
-  if (programNum >= 24 && programNum <= 31) return '🎸 Guitar';
-  if (programNum >= 32 && programNum <= 39) return '🎸 Bass';
-  if (programNum >= 40 && programNum <= 47) return '🎻 Strings';
-  if (programNum >= 48 && programNum <= 55) return '🎻 Ensemble';
-  if (programNum >= 56 && programNum <= 63) return '🎺 Brass';
-  if (programNum >= 64 && programNum <= 71) return '💨 Reed';
-  if (programNum >= 72 && programNum <= 79) return '💨 Pipe (Sáo)';
-  if (programNum >= 80 && programNum <= 87) return '⚡ Synth Lead';
-  if (programNum >= 88 && programNum <= 95) return '⚡ Synth Pad';
-  if (programNum >= 96 && programNum <= 103) return '⚡ Synth FX';
-  if (programNum >= 104 && programNum <= 111) return '🌏 Ethnic';
-  if (programNum >= 112 && programNum <= 119) return '🥁 Percussive';
-  return '🥁 Sound FX / Drums';
+
+function changeInstrument(channel: number, programNum: number) {
+  AudioEngine.setTrackInstrument(channel, programNum);
 }
 
 function updateVolume(channel: number, vol: number) {
@@ -137,15 +177,12 @@ function toggleSolo(channel: number) {
   }
 }
 
-function resetAll() {
-  AudioEngine.tracks.forEach(track => {
-    track.volume = 80;
-    track.isMuted = false;
-    track.isSoloed = false;
-    AudioEngine.setTrackVolume(track.channel, 80);
-    AudioEngine.setTrackMute(track.channel, false);
-    AudioEngine.setTrackSolo(track.channel, false);
-  });
+function addTrack() {
+  AudioEngine.addTrack();
+}
+
+function deleteTrack(channelIndex: number) {
+  AudioEngine.deleteTrack(channelIndex);
 }
 
 // Cập nhật số lượng nốt nhạc (voice) đang kêu thời gian thực để nháy đèn LED
@@ -183,7 +220,7 @@ onBeforeUnmount(() => {
 .orchestra-mixer {
   display: flex;
   flex-direction: column;
-  height: 290px;
+  height: 100%;
   background: rgba(26, 26, 36, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
@@ -219,22 +256,73 @@ onBeforeUnmount(() => {
   color: #00f0ff;
 }
 
-.reset-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #a0a0b0;
-  padding: 4px 12px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.mixer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.reset-btn:hover {
-  background: rgba(255, 0, 127, 0.1);
-  border-color: rgba(255, 0, 127, 0.3);
-  color: #ff007f;
+.mode-selector {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 2px;
+  border-radius: 8px;
+}
+
+.mode-btn {
+  background: transparent;
+  border: none;
+  color: #a0a0b0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mode-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mode-btn.active {
+  background: linear-gradient(135deg, #00f0ff 0%, #0072ff 100%);
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.25);
+}
+
+.add-track-btn-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px;
+  background: rgba(0, 240, 255, 0.04);
+  border: 1px dashed rgba(0, 240, 255, 0.25);
+  border-radius: 12px;
+  color: #00f0ff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.add-track-btn-bottom:hover {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: #00f0ff;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 240, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.add-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .mixer-body {
@@ -371,6 +459,46 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 
+.instrument-selector-container {
+  margin-bottom: 8px;
+}
+
+.instrument-select {
+  width: 100%;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #e2e2e9;
+  font-size: 0.72rem;
+  font-family: inherit;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.instrument-select:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(0, 240, 255, 0.3);
+}
+
+.instrument-select:focus {
+  border-color: #00f0ff;
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.2);
+}
+
+.instrument-select optgroup {
+  background: #111115;
+  color: #8c8c9e;
+  font-weight: bold;
+}
+
+.instrument-select option {
+  background: #181824;
+  color: #f1f1f7;
+}
+
 /* Thanh trượt Volume */
 .volume-slider-container {
   display: flex;
@@ -458,6 +586,27 @@ onBeforeUnmount(() => {
 }
 
 .btn-icon {
+  width: 10px;
+  height: 10px;
+}
+
+.btn-delete {
+  flex-shrink: 0;
+  width: 26px;
+  background: rgba(255, 59, 48, 0.05) !important;
+  border: 1px solid rgba(255, 59, 48, 0.1) !important;
+  color: #ff3b30 !important;
+  transition: all 0.2s ease;
+}
+
+.btn-delete:hover {
+  background: rgba(255, 59, 48, 0.15) !important;
+  border-color: rgba(255, 59, 48, 0.4) !important;
+  color: #ff453a !important;
+  box-shadow: 0 0 8px rgba(255, 59, 48, 0.25);
+}
+
+.delete-icon {
   width: 10px;
   height: 10px;
 }
