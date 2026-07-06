@@ -22,21 +22,30 @@ SynthScore là một ứng dụng web hiện đại được xây dựng trên *
     *   *Giao hưởng (Symphony):* Bản phối tối ưu hóa cho dàn nhạc giao hưởng đầy đủ.
     *   *Concerto:* Bản phối tôn vinh nhạc cụ độc tấu (như Piano) và dàn nhạc nền.
 
-### 3. 🔊 Bộ Phát Âm Thanh Chất Lượng Cao (High-Performance Audio Engine)
+### 3. 🔊 Bộ Phát Âm Thanh Chất Lượng Cao & Tùy Chọn SoundFont
 *   **Bộ tổng hợp SoundFont:** Sử dụng `spessasynth_lib` hoạt động dựa trên Web Audio API và `AudioWorklet` giúp xử lý âm thanh luồng nền mượt mà, không gây giật lag UI.
-*   **Âm thanh thực tế:** Sử dụng SoundFont General MIDI chất lượng cao (.sf2).
+*   **Đa dạng tùy chọn SoundFont:** Hỗ trợ lựa chọn bộ tiếng phù hợp với nhu cầu:
+    *   *TimGM6mb (Nhẹ - 6MB):* Khởi động tức thì, tối ưu băng thông.
+    *   *ChoriumRevA (Tốt - 27MB):* Cân bằng tốt giữa dung lượng và chất lượng nhạc cụ.
+    *   *FluidR3_GM (Nặng - 148MB):* Bộ General MIDI chuyên nghiệp chất lượng cao bậc nhất.
+    *   *Tùy chỉnh:* Cho phép người dùng kéo thả file `.sf2` cá nhân để phát trực tiếp.
+*   **Bộ nhớ đệm thông minh (IndexedDB Cache):** Các file SoundFont và bản nhạc khi tải lần đầu sẽ được lưu vào cơ sở dữ liệu IndexedDB của ứng dụng giúp khởi động và phát ngay lập tức ở lần chạy kế tiếp, đồng thời cho phép sử dụng ngoại tuyến (offline).
 *   **Điều khiển phát nhạc đầy đủ:** Phát (Play), Tạm dừng (Pause), Dừng lại (Stop), Tua nhanh/Tua lại (Seeking), Thay đổi tốc độ phát (Playback Rate), và điều chỉnh Âm lượng Tổng (Master Volume).
 *   **Tự động khởi tạo:** Khởi động và chuẩn bị bộ tổng hợp ngay khi trang được tải.
 
 ### 4. 📚 Thư viện Bản nhạc Mẫu Tích hợp
 *   Tích hợp sẵn danh sách phong phú các kiệt tác cổ điển từ Bach, Beethoven, Mozart, Chopin, Vivaldi... được tải trực tiếp từ thư viện MuseTrainer.
-*   **Bộ nhớ đệm thông minh (Smart Caching):** Sử dụng Cache API của trình duyệt để lưu trữ các bài hát đã tải, giúp tải nhanh tức thì và hoạt động ngoại tuyến (offline) cho các bài hát đã mở.
 
 ### 5. 📂 Tải lên File Tùy chỉnh
 *   Hỗ trợ tải lên các tệp tin nhạc của riêng bạn chỉ bằng thao tác kéo thả hoặc chọn tệp. Các định dạng được hỗ trợ:
     *   `.mid`, `.midi` (File nhạc MIDI)
     *   `.xml`, `.mxl` (Bản nhạc MusicXML/Compressed)
     *   `.abc` (Bản nhạc ký âm ABC)
+    *   `.sf2` (Bộ nhạc cụ SoundFont tùy chỉnh)
+
+### 6. 📱 Hỗ trợ Progressive Web App (PWA)
+*   Cung cấp cấu hình manifest đầy đủ cho phép cài đặt trực tiếp ứng dụng lên điện thoại, máy tính bảng và PC.
+*   Tích hợp Service Worker với chiến lược **Stale-While-Revalidate** giúp tải tài nguyên tĩnh siêu tốc và chạy ngoại tuyến hoàn toàn khi không có mạng.
 
 ---
 
@@ -93,7 +102,8 @@ SynthScore là một ứng dụng web hiện đại được xây dựng trên *
 SynthScore/
 ├── public/                     # Tài nguyên tĩnh
 │   ├── spessasynth_processor.min.js # File xử lý AudioWorklet của SpessaSynth
-│   └── soundfonts/             # Chứa file Soundfont .sf2 mặc định (nếu có)
+│   ├── manifest.json           # Cấu hình PWA Web Manifest
+│   └── sw.js                   # Service Worker hỗ trợ chạy offline
 ├── src/
 │   ├── assets/                 # Hình ảnh, font chữ, css chung
 │   ├── components/             # Các thành phần giao diện Vue
@@ -109,7 +119,7 @@ SynthScore/
 │   │   ├── audioEngine.ts      # Lớp Singleton quản lý synthesizer, sequencer và âm thanh
 │   │   ├── musicXmlParser.ts   # Chuyển đổi tệp tin xml thô sang dữ liệu nhị phân MIDI
 │   │   ├── mxlParser.ts        # Giải nén tệp tin mxl để lấy xml thô
-│   │   └── songCache.ts        # Quản lý lưu trữ đệm bài hát ngoại tuyến
+│   │   └── appCache.ts         # Quản lý lưu trữ đệm bài hát và SoundFonts ngoại tuyến (IndexedDB)
 │   ├── App.vue                 # Giao diện chính ráp nối các bộ phận (Dashboard)
 │   ├── main.ts                 # Điểm khởi tạo ứng dụng Vue
 │   └── style.css               # Định nghĩa các biến CSS màu sắc, giao diện Glassmorphism

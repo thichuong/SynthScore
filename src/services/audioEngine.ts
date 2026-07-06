@@ -1,6 +1,7 @@
 import { WorkletSynthesizer, Sequencer } from 'spessasynth_lib';
 import { Midi } from '@tonejs/midi';
 import { GM_INSTRUMENTS } from '../data/instruments';
+import { getCachedSoundfont, cacheSoundfont } from './appCache';
 
 export interface TrackInfo {
   channel: number;
@@ -45,7 +46,16 @@ class AudioEngineService {
   private onSongEndedCallback: (() => void) | null = null;
 
   // Cache Soundfont để tránh tải lại
-  private defaultSoundfontBuffer: ArrayBuffer | null = null;
+  public soundfontCache: Map<string, ArrayBuffer> = new Map();
+  public customSoundfontName = '';
+  public currentSoundfontId = 'timgm';
+
+  public readonly SOUNDFONTS = [
+    { id: 'timgm', name: 'TimGM6mb (Nhẹ - 6MB)', url: 'https://cdn.jsdelivr.net/gh/craffel/pretty-midi@master/pretty_midi/TimGM6mb.sf2' },
+    { id: 'chorium', name: 'ChoriumRevA (Tốt - 27MB)', url: 'https://raw.githubusercontent.com/namin/metasolfeggio/master/mingus/ChoriumRevA.SF2' },
+    { id: 'fluid', name: 'FluidR3_GM (Nặng - 148MB)', url: 'https://github.com/pianobooster/fluid-soundfont/releases/download/v3.1/FluidR3_GM.sf2' }
+  ];
+
   private timeUpdateInterval: any = null;
 
   constructor() {
@@ -109,8 +119,8 @@ class AudioEngineService {
         }
       });
 
-      // 7. Tải Soundfont mặc định (.sf3 cho dung lượng nhẹ)
-      await this.loadDefaultSoundfont();
+      // 7. Tải Soundfont mặc định
+      await this.loadSoundfont('timgm');
 
       this.isReady = true;
       this.isLoadingSoundfont = false;
@@ -124,32 +134,103 @@ class AudioEngineService {
     }
   }
 
-  // Tải Soundfont mặc định
-  private async loadDefaultSoundfont(): Promise<void> {
+  // Nạp Soundfont theo ID
+  public async loadSoundfont(id: string): Promise<void> {
+    if (!this.synth) {
+      await this.init();
+    }
     if (!this.synth) return;
 
-    const url = 'https://cdn.jsdelivr.net/gh/craffel/pretty-midi@master/pretty_midi/TimGM6mb.sf2';
+    if (id === 'custom') {
+      const buffer = this.soundfontCache.get('custom');
+      if (buffer) {
+        this.isLoadingSoundfont = true;
+        this.triggerStateChange();
+        try {
+          try {
+            await this.synth.soundBankManager.deleteSoundBank('default');
+          } catch (e) {}
+          try {
+            await this.synth.soundBankManager.deleteSoundBank('custom');
+          } catch (e) {}
+
+          await this.synth.soundBankManager.addSoundBank(buffer, 'custom');
+          await this.synth.isReady;
+          this.currentSoundfontId = 'custom';
+          this.isLoadingSoundfont = false;
+          this.triggerStateChange();
+          return;
+        } catch (err) {
+          this.isLoadingSoundfont = false;
+          this.triggerStateChange();
+          console.error('Không thể nạp lại Soundfont tùy chỉnh từ cache:', err);
+          throw err;
+        }
+      } else {
+        throw new Error('Chưa có Soundfont tùy chỉnh nào được tải lên.');
+      }
+    }
+
+    const sf = this.SOUNDFONTS.find(s => s.id === id);
+    if (!sf) return;
+
+    this.isLoadingSoundfont = true;
+    this.triggerStateChange();
+
     try {
       let buffer: ArrayBuffer;
-      if (this.defaultSoundfontBuffer) {
-        buffer = this.defaultSoundfontBuffer;
+      if (this.soundfontCache.has(id)) {
+        buffer = this.soundfontCache.get(id)!;
       } else {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        buffer = await res.arrayBuffer();
-        this.defaultSoundfontBuffer = buffer;
+        const cachedDbBuffer = await getCachedSoundfont(sf.url);
+        if (cachedDbBuffer) {
+          buffer = cachedDbBuffer;
+          this.soundfontCache.set(id, buffer);
+        } else {
+          let fetchUrl = sf.url;
+          // Sử dụng proxy cục bộ trong môi trường localhost để vượt qua CORS
+          if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            if (fetchUrl.startsWith('https://github.com/')) {
+              fetchUrl = fetchUrl.replace('https://github.com/', '/github-releases/');
+            } else if (fetchUrl.startsWith('https://raw.githubusercontent.com/')) {
+              fetchUrl = fetchUrl.replace('https://raw.githubusercontent.com/', '/raw-github/');
+            }
+          }
+
+          const res = await fetch(fetchUrl);
+          if (!res.ok) throw new Error(`Không thể fetch Soundfont từ URL: ${fetchUrl} (status: ${res.status})`);
+          buffer = await res.arrayBuffer();
+
+          // Lưu cache
+          this.soundfontCache.set(id, buffer);
+          await cacheSoundfont(sf.url, buffer);
+        }
       }
+
+      // Xóa tất cả các soundbank để đảm bảo nạp mới hoàn toàn
+      try {
+        await this.synth.soundBankManager.deleteSoundBank('default');
+      } catch (e) {}
+      try {
+        await this.synth.soundBankManager.deleteSoundBank('custom');
+      } catch (e) {}
 
       await this.synth.soundBankManager.addSoundBank(buffer, 'default');
       await this.synth.isReady;
+
+      this.currentSoundfontId = id;
+      this.isLoadingSoundfont = false;
+      this.triggerStateChange();
     } catch (err) {
-      console.error('Không thể tải Soundfont mặc định từ CDN, thử tải file dự phòng:', err);
-      // Bạn có thể tải file dự phòng cục bộ ở đây nếu có
+      this.isLoadingSoundfont = false;
+      this.triggerStateChange();
+      console.error(`Không thể nạp Soundfont ${sf.name}:`, err);
+      throw err;
     }
   }
 
   // Cho phép người dùng tải lên Soundfont .sf2 của riêng họ
-  public async loadCustomSoundfont(arrayBuffer: ArrayBuffer, _name: string): Promise<void> {
+  public async loadCustomSoundfont(arrayBuffer: ArrayBuffer, name: string): Promise<void> {
     if (!this.synth) {
       await this.init();
     }
@@ -160,14 +241,20 @@ class AudioEngineService {
 
     try {
       // Xóa soundbank cũ
-      await this.synth.soundBankManager.deleteSoundBank('custom');
-    } catch (e) {
-      // Bỏ qua nếu chưa tồn tại
-    }
+      try {
+        await this.synth.soundBankManager.deleteSoundBank('default');
+      } catch (e) {}
+      try {
+        await this.synth.soundBankManager.deleteSoundBank('custom');
+      } catch (e) {}
 
-    try {
       await this.synth.soundBankManager.addSoundBank(arrayBuffer, 'custom');
       await this.synth.isReady;
+      
+      this.soundfontCache.set('custom', arrayBuffer);
+      this.customSoundfontName = name;
+      this.currentSoundfontId = 'custom';
+      
       this.isLoadingSoundfont = false;
       this.triggerStateChange();
     } catch (err) {

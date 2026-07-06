@@ -1,0 +1,17 @@
+{
+  "name": "SynthScore - Interactive Sheet Music",
+  "short_name": "SynthScore",
+  "description": "Trình chơi nhạc tự động & Xem bản nhạc tương tác cao cấp",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#09090e",
+  "theme_color": "#1d1b26",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
