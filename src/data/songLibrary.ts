@@ -49,6 +49,18 @@ export const songLibrary: SongEntry[] = [
     url: 'https://musetrainer.github.io/library/scores/G_Minor_Bach.mxl',
     composer: 'J. S. Bach',
   },
+  {
+    name: 'Prelude I in C Major BWV 846',
+    url: 'https://musetrainer.github.io/library/scores/Prelude_I_in_C_major_BWV_846_-_Well_Tempered_Clavier_First_Book.mxl',
+    composer: 'J. S. Bach',
+    difficulty: 'intermediate',
+  },
+  {
+    name: 'Prelude No. 2 in C Minor BWV 847',
+    url: 'https://musetrainer.github.io/library/scores/Prelude_No._2_BWV_847_in_C_Minor.mxl',
+    composer: 'J. S. Bach',
+    difficulty: 'advanced',
+  },
 
   // --- Beethoven ---
   {
@@ -93,6 +105,30 @@ export const songLibrary: SongEntry[] = [
     composer: 'L. v. Beethoven',
     difficulty: 'easy',
   },
+  {
+    name: 'Ode to Joy (Easy Variation)',
+    url: 'https://musetrainer.github.io/library/scores/Ode_to_Joy_Easy_variation.mxl',
+    composer: 'L. v. Beethoven',
+    difficulty: 'easy',
+  },
+  {
+    name: 'Moonlight Sonata (1st Movement)',
+    url: 'https://musetrainer.github.io/library/scores/Sonate_No._14_Moonlight_1st_Movement.mxl',
+    composer: 'L. v. Beethoven',
+    difficulty: 'intermediate',
+  },
+  {
+    name: 'Moonlight Sonata (3rd Movement - Alternative)',
+    url: 'https://musetrainer.github.io/library/scores/Sonate_No._14_Moonlight_3rd_Movement.mxl',
+    composer: 'L. v. Beethoven',
+    difficulty: 'expert',
+  },
+  {
+    name: 'Pathétique Sonata No. 8 (2nd Movement)',
+    url: 'https://musetrainer.github.io/library/scores/Sonate_No._8_Pathetique_2nd_Movement.mxl',
+    composer: 'L. v. Beethoven',
+    difficulty: 'intermediate',
+  },
 
   // --- Chopin ---
   {
@@ -117,6 +153,48 @@ export const songLibrary: SongEntry[] = [
     name: 'Spring Waltz (Marriage d\'Amour)',
     url: 'https://musetrainer.github.io/library/scores/Chopin_-_Spring_Waltz.mxl',
     composer: 'Paul de Senneville',
+  },
+  {
+    name: 'Nocturne Op. 9 No. 2 (Original)',
+    url: 'https://musetrainer.github.io/library/scores/Chopin_-_Nocturne_Op_9_No_2_E_Flat_Major.mxl',
+    composer: 'F. Chopin',
+    difficulty: 'advanced',
+  },
+  {
+    name: 'Nocturne No. 20 in C Minor',
+    url: 'https://musetrainer.github.io/library/scores/Nocturne_No._20_in_C_Minor.mxl',
+    composer: 'F. Chopin',
+    difficulty: 'advanced',
+  },
+  {
+    name: 'Nocturne in C-sharp Minor',
+    url: 'https://musetrainer.github.io/library/scores/Nocturne_in_C_sharp_Minor.mxl',
+    composer: 'F. Chopin',
+    difficulty: 'advanced',
+  },
+  {
+    name: 'Prélude in E Minor Op. 28 No. 4',
+    url: 'https://musetrainer.github.io/library/scores/Prlude_Opus_28_No._4_in_E_Minor__Chopin.mxl',
+    composer: 'F. Chopin',
+    difficulty: 'intermediate',
+  },
+  {
+    name: 'Prélude in E Minor Op. 28 No. 4 (Alternative)',
+    url: 'https://musetrainer.github.io/library/scores/Prlude_No._4_in_E_Minor_Op._28_-_Frdric_Chopin.mxl',
+    composer: 'F. Chopin',
+    difficulty: 'intermediate',
+  },
+  {
+    name: 'Waltz in C-sharp Minor Op. 64 No. 2',
+    url: 'https://musetrainer.github.io/library/scores/Waltz_Opus_64_No._2_in_C_Minor.mxl',
+    composer: 'F. Chopin',
+    difficulty: 'advanced',
+  },
+  {
+    name: 'Waltz in A Minor',
+    url: 'https://musetrainer.github.io/library/scores/Waltz_in_A_MinorChopin.mxl',
+    composer: 'F. Chopin',
+    difficulty: 'intermediate',
   },
 
   // --- Debussy ---
@@ -186,6 +264,12 @@ export const songLibrary: SongEntry[] = [
     composer: 'F. Schubert',
     difficulty: 'intermediate',
   },
+  {
+    name: 'Ständchen (Serenade) - Arr. Liszt',
+    url: 'https://musetrainer.github.io/library/scores/Schubert_Serenade_-_Standchen_-_By_Lizst.mxl',
+    composer: 'F. Schubert',
+    difficulty: 'advanced',
+  },
 
   // --- Mozart ---
   {
@@ -197,6 +281,30 @@ export const songLibrary: SongEntry[] = [
   {
     name: 'Lacrimosa - Requiem',
     url: 'https://musetrainer.github.io/library/scores/Lacrimosa_-_Requiem.mxl',
+    composer: 'W. A. Mozart',
+    difficulty: 'advanced',
+  },
+  {
+    name: 'Piano Sonata No. 11 - Rondo alla Turca',
+    url: 'https://musetrainer.github.io/library/scores/Piano_Sonata_No._11_K._331_3rd_Movement_Rondo_alla_Turca.mxl',
+    composer: 'W. A. Mozart',
+    difficulty: 'advanced',
+  },
+  {
+    name: 'Piano Sonata No. 16 (1st Movement - K. 545)',
+    url: 'https://musetrainer.github.io/library/scores/Sonata_No._16_1st_Movement_K._545.mxl',
+    composer: 'W. A. Mozart',
+    difficulty: 'intermediate',
+  },
+  {
+    name: '12 Variations on "Ah vous dirai-je, Maman"',
+    url: 'https://musetrainer.github.io/library/scores/12_Variations_of_Twinkle_Twinkle_Little_Star.mxl',
+    composer: 'W. A. Mozart',
+    difficulty: 'advanced',
+  },
+  {
+    name: 'Turkish March (Fingered)',
+    url: 'https://musetrainer.github.io/library/scores/WA_Mozart_Marche_Turque_Turkish_March_fingered.mxl',
     composer: 'W. A. Mozart',
     difficulty: 'advanced',
   },
@@ -215,6 +323,18 @@ export const songLibrary: SongEntry[] = [
     url: 'https://musetrainer.github.io/library/scores/Dance_of_the_sugar_plum_fairy.mxl',
     composer: 'P. I. Tchaikovsky',
     difficulty: 'intermediate',
+  },
+  {
+    name: 'Swan Lake (Theme)',
+    url: 'https://musetrainer.github.io/library/scores/Swan_Lake.mxl',
+    composer: 'P. I. Tchaikovsky',
+    difficulty: 'intermediate',
+  },
+  {
+    name: 'Waltz of the Flowers',
+    url: 'https://musetrainer.github.io/library/scores/Waltz_of_the_Flowers.mxl',
+    composer: 'P. I. Tchaikovsky',
+    difficulty: 'advanced',
   },
 
   // --- Rimsky-Korsakov ---
@@ -252,11 +372,29 @@ export const songLibrary: SongEntry[] = [
     composer: 'S. Joplin',
     difficulty: 'advanced',
   },
+  {
+    name: 'The Entertainer',
+    url: 'https://musetrainer.github.io/library/scores/The_Entertainer_-_Scott_Joplin.mxl',
+    composer: 'S. Joplin',
+    difficulty: 'advanced',
+  },
+  {
+    name: 'The Entertainer (1902 Original)',
+    url: 'https://musetrainer.github.io/library/scores/The_Entertainer_-_Scott_Joplin_-_1902.mxl',
+    composer: 'S. Joplin',
+    difficulty: 'advanced',
+  },
 
   // --- Paul de Senneville ---
   {
     name: 'Mariage d\'Amour',
     url: 'https://musetrainer.github.io/library/scores/Mariage_dAmour.mxl',
+    composer: 'Paul de Senneville',
+    difficulty: 'intermediate',
+  },
+  {
+    name: "Spring Waltz (Mariage d'Amour - Chopin Arr.)",
+    url: 'https://musetrainer.github.io/library/scores/Spring_Waltz_Mariage_dAmour_-_Chopin.mxl',
     composer: 'Paul de Senneville',
     difficulty: 'intermediate',
   },
@@ -303,6 +441,20 @@ export const songLibrary: SongEntry[] = [
     url: 'https://musetrainer.github.io/library/scores/Bella_Ciao.mxl',
     composer: 'Traditional (Italian)',
     difficulty: 'easy',
+  },
+
+  // --- Handel / Halvorsen ---
+  {
+    name: 'Passacaglia',
+    url: 'https://musetrainer.github.io/library/scores/Passacaglia.mxl',
+    composer: 'Handel/Halvorsen',
+    difficulty: 'advanced',
+  },
+  {
+    name: 'Passacaglia (Alternative)',
+    url: 'https://musetrainer.github.io/library/scores/Passacaglia2.mxl',
+    composer: 'Handel/Halvorsen',
+    difficulty: 'advanced',
   },
 ];
 

@@ -29,8 +29,11 @@
         <span v-if="isLoadingSoundfont" class="status-badge loading">
           <span class="spinner"></span> Đang tải nhạc cụ...
         </span>
-        <span v-else-if="!isInitialized" class="status-badge inactive" @click="initializeEngine">
-          <Power class="status-icon" /> Nhấn để kích hoạt Audio
+        <span v-else-if="initializationFailed" class="status-badge error">
+          <AlertCircle class="status-icon" /> Lỗi âm thanh
+        </span>
+        <span v-else-if="!isInitialized" class="status-badge loading">
+          <span class="spinner"></span> Đang khởi tạo...
         </span>
         <span v-else class="status-badge active">
           <CheckCircle class="status-icon" /> Sẵn sàng (GM Synth)
@@ -77,7 +80,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Music, Power, CheckCircle } from 'lucide-vue-next';
+import { Music, CheckCircle, AlertCircle } from 'lucide-vue-next';
 import FileUploader from './components/FileUploader.vue';
 import OrchestraMixer from './components/OrchestraMixer.vue';
 import SheetViewer from './components/SheetViewer.vue';
@@ -98,6 +101,7 @@ const isReady = ref(false);
 const isLoadingSoundfont = ref(false);
 const isPlaying = ref(false);
 const isLoadingLibrarySong = ref(false);
+const initializationFailed = ref(false);
 
 const currentTime = ref(0);
 const duration = ref(0);
@@ -132,13 +136,18 @@ onMounted(() => {
   AudioEngine.onTimeUpdate((time) => {
     currentTime.value = time;
   });
+
+  // Tự động kích hoạt Audio Engine khi mount
+  initializeEngine();
 });
 
 async function initializeEngine() {
   try {
+    initializationFailed.value = false;
     await AudioEngine.init();
   } catch (e) {
     console.error('Không thể kích hoạt Audio Engine:', e);
+    initializationFailed.value = true;
   }
 }
 
@@ -321,17 +330,10 @@ async function loadFromLibrary(song: SongEntry) {
   border-radius: 8px;
 }
 
-.status-badge.inactive {
-  background: rgba(255, 170, 0, 0.1);
-  border: 1px solid rgba(255, 170, 0, 0.2);
-  color: #ffaa00;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.status-badge.inactive:hover {
-  background: rgba(255, 170, 0, 0.15);
-  box-shadow: 0 0 10px rgba(255, 170, 0, 0.2);
+.status-badge.error {
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.2);
+  color: #ff3b30;
 }
 
 .status-badge.loading {
