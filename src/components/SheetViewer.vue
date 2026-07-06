@@ -1,0 +1,538 @@
+<template>
+  <div class="sheet-viewer glass-card">
+    <div class="viewer-header">
+      <div class="viewer-tabs">
+        <button 
+          v-if="hasSheet"
+          class="tab-btn" 
+          :class="{ active: activeTab === 'sheet' }"
+          @click="activeTab = 'sheet'"
+        >
+          <Music class="icon" /> Bản Nhạc (Sheet Music)
+        </button>
+        <button 
+          class="tab-btn" 
+          :class="{ active: activeTab === 'visualizer' }"
+          @click="activeTab = 'visualizer'"
+        >
+          <Layers class="icon" /> Thác Nốt Nhạc (Falling Notes)
+        </button>
+      </div>
+      <div class="viewer-status" v-if="loading">
+        <span class="spinner"></span> Đang tải bản nhạc...
+      </div>
+    </div>
+
+    <div class="viewer-body">
+      <!-- Container hiển thị Sheet Music (MusicXML) -->
+      <div 
+        v-show="activeTab === 'sheet' && fileType === 'xml'" 
+        ref="osmdContainer" 
+        class="osmd-container"
+      ></div>
+
+      <!-- Container hiển thị ABC Notation -->
+      <div 
+        v-show="activeTab === 'sheet' && fileType === 'abc'" 
+        id="abc-container" 
+        class="abc-container"
+      ></div>
+
+      <!-- Container hiển thị Falling Notes Visualizer -->
+      <div 
+        v-show="activeTab === 'visualizer' || !hasSheet" 
+        class="canvas-container"
+      >
+        <canvas ref="visualizerCanvas" class="visualizer-canvas"></canvas>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue';
+import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
+import abcjs from 'abcjs';
+import { Midi } from '@tonejs/midi';
+import { Music, Layers } from 'lucide-vue-next';
+import { AudioEngine } from '../services/audioEngine';
+
+const props = defineProps<{
+  fileData: Uint8Array | string | null;
+  fileType: 'xml' | 'abc' | 'midi' | null;
+  rawText: string | null;
+  isPlaying: boolean;
+  currentTime: number;
+}>();
+
+const osmdContainer = ref<HTMLDivElement | null>(null);
+const visualizerCanvas = ref<HTMLCanvasElement | null>(null);
+
+const activeTab = ref<'sheet' | 'visualizer'>('visualizer');
+const loading = ref(false);
+let osmd: OpenSheetMusicDisplay | null = null;
+let animationFrameId: number | null = null;
+
+// Kiểm tra xem bài hát hiện tại có hỗ trợ hiển thị bản nhạc nốt nhạc không
+const hasSheet = computed(() => {
+  return props.fileType === 'xml' || props.fileType === 'abc';
+});
+
+// Watch thay đổi dữ liệu tệp tin để render lại
+watch(() => props.fileData, async (newData) => {
+  if (!newData) {
+    clearRender();
+    return;
+  }
+  
+  if (hasSheet.value) {
+    activeTab.value = 'sheet';
+  } else {
+    activeTab.value = 'visualizer';
+  }
+
+  loading.value = true;
+  // Cho phép Vue cập nhật DOM trước khi render
+  setTimeout(async () => {
+    try {
+      await renderMusic();
+    } catch (e) {
+      console.error('Lỗi khi hiển thị bản nhạc:', e);
+    } finally {
+      loading.value = false;
+    }
+  }, 100);
+}, { deep: true });
+
+// Khởi chạy vòng lặp hoạt ảnh vẽ Falling Notes
+watch(() => activeTab.value, (newTab) => {
+  if (newTab === 'visualizer') {
+    startAnimation();
+  } else {
+    stopAnimation();
+  }
+});
+
+// Watch thay đổi tiến trình thời gian để đồng bộ cursor
+watch(() => props.currentTime, (newTime) => {
+  if (activeTab.value === 'sheet' && props.fileType === 'xml' && osmd) {
+    syncOsmdCursor(newTime);
+  }
+});
+
+// Đồng bộ vị trí Cursor của OpenSheetMusicDisplay
+function syncOsmdCursor(timeInSeconds: number) {
+  if (!osmd || !osmd.cursor) return;
+  
+  const bpm = AudioEngine.bpm || 120;
+  const currentBeat = timeInSeconds * (bpm / 60);
+
+  // Nếu thời gian chạy lùi lại (tua lại), reset cursor
+  if (osmd.cursor.iterator && osmd.cursor.iterator.currentTimeStamp.RealValue * 4 > currentBeat + 0.1) {
+    osmd.cursor.reset();
+  }
+
+  // Tiến hành di chuyển cursor cho tới vị trí nhịp hiện tại
+  while (
+    osmd.cursor.iterator &&
+    !osmd.cursor.iterator.EndReached &&
+    osmd.cursor.iterator.currentTimeStamp.RealValue * 4 <= currentBeat
+  ) {
+    osmd.cursor.next();
+  }
+}
+
+// Xóa trắng bản nhạc cũ
+function clearRender() {
+  if (osmdContainer.value) osmdContainer.value.innerHTML = '';
+  const abcContainer = document.getElementById('abc-container');
+  if (abcContainer) abcContainer.innerHTML = '';
+  stopAnimation();
+}
+
+// Render bản nhạc dựa trên định dạng
+async function renderMusic() {
+  clearRender();
+
+  if (props.fileType === 'xml' && props.rawText && osmdContainer.value) {
+    osmd = new OpenSheetMusicDisplay(osmdContainer.value, {
+      autoResize: true,
+      backend: 'svg',
+      drawTitle: true,
+      drawSubtitle: true,
+      drawComposer: true,
+      drawCredits: true
+    });
+
+    await osmd.load(props.rawText);
+    osmd.render();
+    osmd.cursor.show();
+    osmd.cursor.reset();
+  } 
+  else if (props.fileType === 'abc' && props.rawText) {
+    abcjs.renderAbc('abc-container', props.rawText, {
+      responsive: 'resize',
+      add_classes: true,
+    });
+  }
+
+  // Chuẩn bị dữ liệu nốt nhạc cho Falling Notes canvas
+  if (visualizerCanvas.value) {
+    initCanvas();
+    startAnimation();
+  }
+}
+
+// --- LOGIC PHÁT NỐT NHẠC RƠI (FALLING NOTES PIANO ROLL) ---
+interface RenderNote {
+  midi: number;
+  time: number;
+  duration: number;
+  trackIndex: number;
+}
+
+let midiNotes: RenderNote[] = [];
+let maxMidi = 88;
+let minMidi = 36;
+
+// Phân tích tệp MIDI để lấy danh sách nốt nhạc vẽ lên canvas
+async function parseMidiForVisualizer() {
+  midiNotes = [];
+  if (!props.fileData) return;
+
+  try {
+    let arrayBuffer: ArrayBuffer;
+    if (props.fileData instanceof Uint8Array) {
+      arrayBuffer = (props.fileData.buffer as ArrayBuffer).slice(
+        props.fileData.byteOffset,
+        props.fileData.byteOffset + props.fileData.byteLength
+      );
+    } else {
+      // Trường hợp tệp là text (ABC/XML), chuyển đổi thành MIDI bằng parser của chúng ta
+      if (props.fileType === 'abc') {
+        const midiBin = abcjs.synth.getMidiFile(props.rawText || '', { midiOutputType: 'binary' }) as any;
+        arrayBuffer = midiBin.buffer as ArrayBuffer;
+      } else {
+        // XML
+        return; 
+      }
+    }
+
+    const midi = new Midi(arrayBuffer);
+    let tempMin = 127;
+    let tempMax = 0;
+
+    midi.tracks.forEach((track, trackIndex) => {
+      track.notes.forEach(note => {
+        midiNotes.push({
+          midi: note.midi,
+          time: note.time,
+          duration: note.duration,
+          trackIndex: trackIndex
+        });
+
+        if (note.midi < tempMin) tempMin = note.midi;
+        if (note.midi > tempMax) tempMax = note.midi;
+      });
+    });
+
+    // Căn chuẩn phím đàn
+    minMidi = Math.max(21, tempMin - 5);
+    maxMidi = Math.min(108, tempMax + 5);
+    if (minMidi >= maxMidi) {
+      minMidi = 36;
+      maxMidi = 88;
+    }
+  } catch (e) {
+    console.error('Không thể parse dữ liệu nốt nhạc vẽ Canvas:', e);
+  }
+}
+
+function initCanvas() {
+  const canvas = visualizerCanvas.value;
+  if (!canvas) return;
+
+  const rect = canvas.parentElement?.getBoundingClientRect();
+  canvas.width = (rect?.width || 800) * window.devicePixelRatio;
+  canvas.height = (rect?.height || 500) * window.devicePixelRatio;
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+}
+
+// Bảng màu Neon cho các track nhạc cụ khác nhau
+const NEON_COLORS = [
+  '#00f0ff', // Cyan
+  '#ff007f', // Pink
+  '#ffaa00', // Gold/Orange
+  '#39ff14', // Neon Green
+  '#8a2be2', // Neon Purple
+  '#ff3b30', // Neon Red
+  '#00ffcc', // Mint
+  '#e2f105', // Neon Yellow
+];
+
+function startAnimation() {
+  parseMidiForVisualizer();
+  stopAnimation();
+  
+  const canvas = visualizerCanvas.value;
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const renderLoop = () => {
+    drawVisualizer(canvas, ctx);
+    animationFrameId = requestAnimationFrame(renderLoop);
+  };
+  animationFrameId = requestAnimationFrame(renderLoop);
+}
+
+function stopAnimation() {
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+}
+
+// Vẽ Thác Nốt Nhạc (Falling Notes Piano Roll)
+function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
+  const w = canvas.width;
+  const h = canvas.height;
+  const pianoHeight = h * 0.18;
+  const playAreaHeight = h - pianoHeight;
+
+  // Xóa màn hình với màu tối dịu
+  ctx.fillStyle = '#0f0f15';
+  ctx.fillRect(0, 0, w, h);
+
+  // Vẽ các đường ngăn cách phím dọc nền mờ ảo
+  const keyCount = maxMidi - minMidi + 1;
+  const keyWidth = w / keyCount;
+
+  ctx.strokeStyle = '#1e1e2d';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= keyCount; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * keyWidth, 0);
+    ctx.lineTo(i * keyWidth, playAreaHeight);
+    ctx.stroke();
+  }
+
+  // Tốc độ trôi của nốt nhạc (pixels mỗi giây)
+  const speed = h / 4.0; // Hiển thị 4 giây bài hát trên màn hình
+  const curTime = props.currentTime;
+
+  // Mảng lưu trạng thái phím piano đang kích hoạt
+  const activeKeys = new Set<number>();
+
+  // Vẽ các nốt nhạc rơi tự do
+  midiNotes.forEach(note => {
+    // Chỉ vẽ các nốt chuẩn bị phát hoặc đang phát
+    // Nốt nhạc chạm vạch phát nhạc ở playAreaHeight khi note.time == curTime
+    const yStart = playAreaHeight - (note.time - curTime) * speed - note.duration * speed;
+    const yEnd = playAreaHeight - (note.time - curTime) * speed;
+
+    if (yEnd < 0 || yStart > playAreaHeight) return; // Nằm ngoài màn hình vẽ
+
+    // Xác định xem nốt có đang nhấn hay không
+    if (curTime >= note.time && curTime <= note.time + note.duration) {
+      activeKeys.add(note.midi);
+    }
+
+    const noteX = (note.midi - minMidi) * keyWidth;
+    const noteY = Math.max(0, yStart);
+    const noteW = keyWidth - 2;
+    const noteH = yEnd - Math.max(0, yStart);
+
+    // Vẽ nốt với dải màu Neon phát sáng nhẹ
+    const colorIndex = note.trackIndex % NEON_COLORS.length;
+    const color = NEON_COLORS[colorIndex];
+
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10;
+    
+    // Bo góc nốt nhạc
+    const radius = Math.min(noteW / 2, 5);
+    ctx.beginPath();
+    ctx.roundRect(noteX, noteY, noteW, noteH, radius);
+    ctx.fill();
+    
+    ctx.shadowBlur = 0; // Tắt phát sáng để tối ưu vẽ tiếp
+  });
+
+  // Vẽ phím Piano Keyboard ở đáy canvas
+  ctx.fillStyle = '#161622';
+  ctx.fillRect(0, playAreaHeight, w, pianoHeight);
+
+  // Phân biệt phím trắng đen
+  const blackKeys = [1, 3, 6, 8, 10]; // C#, D#, F#, G#, A#
+
+  for (let m = minMidi; m <= maxMidi; m++) {
+    const isBlack = blackKeys.includes(m % 12);
+    const x = (m - minMidi) * keyWidth;
+    const isActive = activeKeys.has(m);
+
+    if (isBlack) {
+      ctx.fillStyle = isActive ? '#ff007f' : '#000000';
+      ctx.fillRect(x + 1, playAreaHeight, keyWidth - 2, pianoHeight * 0.65);
+    } else {
+      ctx.fillStyle = isActive ? '#00f0ff' : '#ffffff';
+      ctx.fillRect(x + 1, playAreaHeight + 2, keyWidth - 2, pianoHeight - 4);
+      
+      // Vẽ viền đen phân chia
+      ctx.strokeStyle = '#d0d0d8';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 1, playAreaHeight + 2, keyWidth - 2, pianoHeight - 4);
+    }
+
+    // Hiệu ứng phát sáng trên phím đang nhấn
+    if (isActive) {
+      const color = isBlack ? '#ff007f' : '#00f0ff';
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = color + '40'; // Độ trong suốt
+      ctx.fillRect(x, playAreaHeight, keyWidth, pianoHeight);
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  // Vẽ vạch ngăn tuyến phát nhạc
+  ctx.strokeStyle = '#ff0055';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, playAreaHeight);
+  ctx.lineTo(w, playAreaHeight);
+  ctx.stroke();
+}
+
+onMounted(() => {
+  window.addEventListener('resize', initCanvas);
+  if (props.fileData) {
+    renderMusic();
+  }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', initCanvas);
+  stopAnimation();
+});
+</script>
+
+<style scoped>
+.sheet-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 520px;
+  background: rgba(26, 26, 36, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: rgba(18, 18, 24, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.viewer-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #a0a0b0;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, #00f0ff 0%, #0072ff 100%);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+}
+
+.tab-btn .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.viewer-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #00f0ff;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0, 240, 255, 0.3);
+  border-top-color: #00f0ff;
+  border-radius: 50%;
+  animation: spin 1s infinite linear;
+}
+
+.viewer-body {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+  background: #111115;
+}
+
+.osmd-container {
+  padding: 24px;
+  background: #ffffff;
+  min-height: 100%;
+  border-radius: 0 0 16px 16px;
+}
+
+.abc-container {
+  padding: 24px;
+  background: #ffffff;
+  min-height: 100%;
+  color: #000;
+}
+
+.canvas-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.visualizer-canvas {
+  display: block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Định dạng bản nhạc in trong OSMD/ABCJS */
+:deep(svg) {
+  max-width: 100%;
+  height: auto;
+}
+</style>
