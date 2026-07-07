@@ -73,6 +73,8 @@
         :duration="duration"
         :bpm="bpm"
         :songName="songName"
+        @prev="handlePrevSong"
+        @next="handleNextSong"
       />
     </footer>
   </div>
@@ -136,6 +138,15 @@ onMounted(() => {
     currentTime.value = time;
   });
 
+  // Tự động chuyển bài khi kết thúc bài hát
+  AudioEngine.onSongEnded(async () => {
+    if (selectedSongIndex.value >= 0 && songLibrary.length > 0) {
+      const nextIndex = (selectedSongIndex.value + 1) % songLibrary.length;
+      await handleSongSelect(nextIndex);
+      AudioEngine.play();
+    }
+  });
+
   // Tự động kích hoạt Audio Engine khi mount
   initializeEngine();
 });
@@ -161,6 +172,9 @@ async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xm
   if (!isInitialized.value) {
     await initializeEngine();
   }
+
+  // Reset chỉ số bài hát trong thư viện về -1 khi người dùng tải tệp tin nhạc riêng
+  selectedSongIndex.value = -1;
 
   let midiBytes: Uint8Array;
   
@@ -195,6 +209,38 @@ async function handleSongSelect(index: number) {
   selectedSongIndex.value = index;
   const song: SongEntry = songLibrary[index];
   await loadFromLibrary(song);
+}
+
+// Xử lý chuyển sang bài hát phía trước
+async function handlePrevSong() {
+  if (songLibrary.length === 0) return;
+  let newIndex = selectedSongIndex.value - 1;
+  if (selectedSongIndex.value === -1) {
+    newIndex = songLibrary.length - 1;
+  } else if (newIndex < 0) {
+    newIndex = songLibrary.length - 1;
+  }
+  const wasPlaying = isPlaying.value;
+  await handleSongSelect(newIndex);
+  if (wasPlaying) {
+    AudioEngine.play();
+  }
+}
+
+// Xử lý chuyển sang bài hát kế tiếp
+async function handleNextSong() {
+  if (songLibrary.length === 0) return;
+  let newIndex = selectedSongIndex.value + 1;
+  if (selectedSongIndex.value === -1) {
+    newIndex = 0;
+  } else if (newIndex >= songLibrary.length) {
+    newIndex = 0;
+  }
+  const wasPlaying = isPlaying.value;
+  await handleSongSelect(newIndex);
+  if (wasPlaying) {
+    AudioEngine.play();
+  }
 }
 
 async function loadFromLibrary(song: SongEntry) {

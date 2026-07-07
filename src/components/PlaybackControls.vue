@@ -2,6 +2,15 @@
   <div class="playback-controls glass-card">
     <!-- Hàng 1: Tiến độ và tua thời gian -->
     <div class="progress-row">
+      <button 
+        class="nav-btn prev-btn" 
+        @click="emit('prev')" 
+        title="Bài trước"
+        :disabled="!isReady"
+      >
+        <SkipBack class="nav-icon" />
+      </button>
+
       <span class="time-label">{{ formatTime(currentTime) }}</span>
       
       <div class="progress-bar-container" @click="handleProgressClick" ref="progressBarRef">
@@ -17,6 +26,15 @@
       </div>
 
       <span class="time-label">{{ formatTime(duration) }}</span>
+
+      <button 
+        class="nav-btn next-btn" 
+        @click="emit('next')" 
+        title="Bài tiếp theo"
+        :disabled="!isReady"
+      >
+        <SkipForward class="nav-icon" />
+      </button>
     </div>
 
     <!-- Hàng 2: Nút bấm và các thanh trượt -->
@@ -91,7 +109,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
-import { Play, Pause, Square, Volume2, Gauge, Music } from 'lucide-vue-next';
+import { Play, Pause, Square, Volume2, Gauge, Music, SkipBack, SkipForward } from 'lucide-vue-next';
 import { AudioEngine } from '../services/audioEngine';
 
 const props = defineProps<{
@@ -101,6 +119,11 @@ const props = defineProps<{
   duration: number;
   bpm: number;
   songName: string;
+}>();
+
+const emit = defineEmits<{
+  (e: 'prev'): void;
+  (e: 'next'): void;
 }>();
 
 const progressBarRef = ref<HTMLDivElement | null>(null);
@@ -518,5 +541,44 @@ onBeforeUnmount(() => {
 
 .volume-control .slider-value {
   width: 40px;
+}
+
+.nav-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a0a0b0;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.nav-btn:hover:not(:disabled) {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: rgba(0, 240, 255, 0.35);
+  color: #00f0ff;
+  transform: scale(1.08);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.nav-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.nav-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.nav-icon {
+  width: 14px;
+  height: 14px;
 }
 </style>

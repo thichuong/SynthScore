@@ -227,9 +227,21 @@ class AudioEngineService {
     // Lưu trữ dữ liệu gốc
     this.originalMidiBytes = midiBytes;
     this.originalSongName = songName;
-    this.playbackMode = 'default';
 
-    await this.loadMidiBytesForPlayback(midiBytes, songName);
+    // Giữ nguyên chế độ phát nhạc hiện tại
+    const mode = this.playbackMode || 'default';
+
+    if (mode === 'default') {
+      await this.loadMidiBytesForPlayback(midiBytes, songName);
+    } 
+    else if (mode === 'symphony') {
+      const symMidiBytes = this.generateSymphonyMidi(midiBytes);
+      await this.loadMidiBytesForPlayback(symMidiBytes, `${songName} (Giao Hưởng)`);
+    }
+    else if (mode === 'concerto') {
+      const concertoMidiBytes = this.generateConcertoMidi(midiBytes);
+      await this.loadMidiBytesForPlayback(concertoMidiBytes, `${songName} (Concerto)`);
+    }
   }
 
   // Helper nạp MIDI nhị phân thực tế vào sequencer
