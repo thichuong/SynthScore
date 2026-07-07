@@ -24,11 +24,6 @@ SynthScore là một ứng dụng web hiện đại được xây dựng trên *
 
 ### 3. 🔊 Bộ Phát Âm Thanh Chất Lượng Cao & Tùy Chọn SoundFont
 *   **Bộ tổng hợp SoundFont:** Sử dụng `spessasynth_lib` hoạt động dựa trên Web Audio API và `AudioWorklet` giúp xử lý âm thanh luồng nền mượt mà, không gây giật lag UI.
-*   **Đa dạng tùy chọn SoundFont:** Hỗ trợ lựa chọn bộ tiếng phù hợp với nhu cầu:
-    *   *TimGM6mb (Nhẹ - 6MB):* Khởi động tức thì, tối ưu băng thông.
-    *   *ChoriumRevA (Tốt - 27MB):* Cân bằng tốt giữa dung lượng và chất lượng nhạc cụ.
-    *   *FluidR3_GM (Nặng - 148MB):* Bộ General MIDI chuyên nghiệp chất lượng cao bậc nhất.
-    *   *Tùy chỉnh:* Cho phép người dùng kéo thả file `.sf2` cá nhân để phát trực tiếp.
 *   **Bộ nhớ đệm thông minh (IndexedDB Cache):** Các file SoundFont và bản nhạc khi tải lần đầu sẽ được lưu vào cơ sở dữ liệu IndexedDB của ứng dụng giúp khởi động và phát ngay lập tức ở lần chạy kế tiếp, đồng thời cho phép sử dụng ngoại tuyến (offline).
 *   **Điều khiển phát nhạc đầy đủ:** Phát (Play), Tạm dừng (Pause), Dừng lại (Stop), Tua nhanh/Tua lại (Seeking), Thay đổi tốc độ phát (Playback Rate), và điều chỉnh Âm lượng Tổng (Master Volume).
 *   **Tự động khởi tạo:** Khởi động và chuẩn bị bộ tổng hợp ngay khi trang được tải.
