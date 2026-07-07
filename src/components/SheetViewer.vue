@@ -297,7 +297,23 @@ function stopAnimation() {
   }
 }
 
-// Vẽ Thác Nốt Nhạc (Falling Notes Piano Roll)
+// === TỐI ƯU: Binary Search tìm nốt trong cửa sổ hiển thị ===
+// Tìm chỉ mục đầu tiên trong midiNotes có time >= targetTime
+function binarySearchFirstNoteIndex(targetTime: number): number {
+  let lo = 0, hi = midiNotes.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    // Nốt kết thúc trước targetTime → bỏ qua
+    if (midiNotes[mid].time + midiNotes[mid].duration < targetTime) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo;
+}
+
+// Vẽ Thác Nốt Nhạc (Falling Notes Piano Roll) — Phiên bản tối ưu
 function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
   const w = canvas.width;
   const h = canvas.height;
@@ -322,20 +338,44 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
   }
 
   // Tốc độ trôi của nốt nhạc (pixels mỗi giây)
-  const speed = h / 4.0; // Hiển thị 4 giây bài hát trên màn hình
+  const VISIBLE_SECONDS = 4.0;
+  const speed = h / VISIBLE_SECONDS; // Hiển thị 4 giây bài hát trên màn hình
   const curTime = props.currentTime;
 
   // Mảng lưu trạng thái phím piano đang kích hoạt
   const activeKeys = new Set<number>();
 
-  // Vẽ các nốt nhạc rơi tự do
-  midiNotes.forEach(note => {
-    // Chỉ vẽ các nốt chuẩn bị phát hoặc đang phát
-    // Nốt nhạc chạm vạch phát nhạc ở playAreaHeight khi note.time == curTime
+  // === TỐI ƯU: Chỉ duyệt nốt trong cửa sổ thời gian hiển thị ===
+  // Cửa sổ hiển thị: [curTime - marginBehind, curTime + VISIBLE_SECONDS]
+  const marginBehind = 1.0; // Hiển thị thêm 1 giây phía sau (nốt đang phát)
+  const windowStart = curTime - marginBehind;
+  const windowEnd = curTime + VISIBLE_SECONDS;
+
+  // Binary search tìm chỉ mục bắt đầu
+  const startIdx = binarySearchFirstNoteIndex(windowStart);
+
+  // Đếm số nốt visible trước để quyết định bật/tắt shadow
+  let visibleCount = 0;
+  for (let i = startIdx; i < midiNotes.length; i++) {
+    const note = midiNotes[i];
+    if (note.time > windowEnd) break;
+    visibleCount++;
+  }
+
+  // Tắt shadowBlur khi quá nhiều nốt hiển thị đồng thời (> 200) → giảm tải GPU
+  const useShadow = visibleCount <= 200;
+
+  // Vẽ các nốt nhạc rơi tự do — chỉ duyệt phạm vi [startIdx, ...]
+  for (let i = startIdx; i < midiNotes.length; i++) {
+    const note = midiNotes[i];
+    // Nốt bắt đầu sau cửa sổ hiển thị → dừng duyệt
+    if (note.time > windowEnd) break;
+
+    // Tính tọa độ Y
     const yStart = playAreaHeight - (note.time - curTime) * speed - note.duration * speed;
     const yEnd = playAreaHeight - (note.time - curTime) * speed;
 
-    if (yEnd < 0 || yStart > playAreaHeight) return; // Nằm ngoài màn hình vẽ
+    if (yEnd < 0 || yStart > playAreaHeight) continue; // Nằm ngoài màn hình vẽ
 
     // Xác định xem nốt có đang nhấn hay không
     if (curTime >= note.time && curTime <= note.time + note.duration) {
@@ -352,8 +392,10 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
     const color = NEON_COLORS[colorIndex];
 
     ctx.fillStyle = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 10;
+    if (useShadow) {
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10;
+    }
     
     // Bo góc nốt nhạc
     const radius = Math.min(noteW / 2, 5);
@@ -361,8 +403,13 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
     ctx.roundRect(noteX, noteY, noteW, noteH, radius);
     ctx.fill();
     
-    ctx.shadowBlur = 0; // Tắt phát sáng để tối ưu vẽ tiếp
-  });
+    if (useShadow) {
+      ctx.shadowBlur = 0; // Tắt phát sáng để tối ưu vẽ tiếp
+    }
+  }
+
+  // Đảm bảo shadow đã tắt trước khi vẽ phím piano
+  ctx.shadowBlur = 0;
 
   // Vẽ phím Piano Keyboard ở đáy canvas
   ctx.fillStyle = '#161622';

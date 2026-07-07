@@ -72,6 +72,40 @@ class AudioEngineService {
   }
 
   private timeUpdateInterval: any = null;
+  private worker: Worker | null = null;
+  private workerCallbacks: Map<string, { resolve: (val: any) => void; reject: (err: any) => void }> = new Map();
+
+  private postToWorker<T>(type: 'parseTracks' | 'generateSymphony' | 'generateConcerto', payload: any, transfer?: Transferable[]): Promise<T> {
+    if (!this.worker) {
+      // Lazy initialization of Web Worker using Vite URL syntax
+      this.worker = new Worker(new URL('./midiWorker.ts', import.meta.url), { type: 'module' });
+      this.worker.onmessage = (e) => {
+        const { id, success, payload, error } = e.data;
+        const cb = this.workerCallbacks.get(id);
+        if (cb) {
+          this.workerCallbacks.delete(id);
+          if (success) {
+            cb.resolve(payload);
+          } else {
+            cb.reject(new Error(error));
+          }
+        }
+      };
+      this.worker.onerror = (e) => {
+        console.error('[AudioEngine] Worker error:', e);
+      };
+    }
+
+    const id = Math.random().toString(36).substring(2, 9) + Date.now();
+    return new Promise<T>((resolve, reject) => {
+      this.workerCallbacks.set(id, { resolve, reject });
+      if (transfer) {
+        this.worker!.postMessage({ id, type, payload }, transfer);
+      } else {
+        this.worker!.postMessage({ id, type, payload });
+      }
+    });
+  }
 
   constructor() {
     // Không tự động khởi tạo AudioContext ở đây để tránh chính sách chặn autoplay của trình duyệt
@@ -256,12 +290,26 @@ class AudioEngineService {
       await this.loadMidiBytesForPlayback(midiBytes, songName);
     } 
     else if (mode === 'symphony') {
-      const symMidiBytes = this.generateSymphonyMidi(midiBytes);
-      await this.loadMidiBytesForPlayback(symMidiBytes, `${songName} (Giao Hưởng)`);
+      try {
+        console.log('[AudioEngine] Đang sinh nhạc giao hưởng qua Web Worker...');
+        const symMidiBytes = await this.postToWorker<Uint8Array>('generateSymphony', midiBytes);
+        await this.loadMidiBytesForPlayback(symMidiBytes, `${songName} (Giao Hưởng)`);
+      } catch (err) {
+        console.error('Lỗi khi sinh nhạc giao hưởng qua worker, dùng fallback:', err);
+        const symMidiBytes = this.generateSymphonyMidi(midiBytes);
+        await this.loadMidiBytesForPlayback(symMidiBytes, `${songName} (Giao Hưởng)`);
+      }
     }
     else if (mode === 'concerto') {
-      const concertoMidiBytes = this.generateConcertoMidi(midiBytes);
-      await this.loadMidiBytesForPlayback(concertoMidiBytes, `${songName} (Concerto)`);
+      try {
+        console.log('[AudioEngine] Đang sinh nhạc concerto qua Web Worker...');
+        const concertoMidiBytes = await this.postToWorker<Uint8Array>('generateConcerto', midiBytes);
+        await this.loadMidiBytesForPlayback(concertoMidiBytes, `${songName} (Concerto)`);
+      } catch (err) {
+        console.error('Lỗi khi sinh nhạc concerto qua worker, dùng fallback:', err);
+        const concertoMidiBytes = this.generateConcertoMidi(midiBytes);
+        await this.loadMidiBytesForPlayback(concertoMidiBytes, `${songName} (Concerto)`);
+      }
     }
   }
 
@@ -284,14 +332,22 @@ class AudioEngineService {
     this.duration = this.sequencer.duration || 0;
     this.bpm = this.sequencer.currentTempo || 120;
 
-    // Phân tích các bè nhạc cụ từ tệp MIDI mới nạp
-    this.parseTracks(arrayBuffer);
+    // Phân tích các bè nhạc cụ từ tệp MIDI mới nạp qua Web Worker
+    try {
+      // Sao chép buffer để gửi qua worker (transferable) tránh nghẽn
+      const parseBuffer = arrayBuffer.slice(0);
+      this.tracks = await this.postToWorker<TrackInfo[]>('parseTracks', parseBuffer, [parseBuffer]);
+    } catch (err) {
+      console.error('Lỗi khi phân tích tracks qua worker, dùng fallback:', err);
+      this.parseTracks(arrayBuffer);
+    }
+
     await this.loadSongSoundbanks();
     this.resetMixerSettings();
     this.triggerStateChange();
   }
 
-  // Phân tích danh sách bè của bài nhạc bằng @tonejs/midi
+  // Phân tích danh sách bè của bài nhạc bằng @tonejs/midi (dùng làm fallback)
   private parseTracks(arrayBuffer: ArrayBuffer): void {
     try {
       const midi = new Midi(arrayBuffer);
@@ -505,12 +561,26 @@ class AudioEngineService {
       await this.loadMidiBytesForPlayback(this.originalMidiBytes, this.originalSongName);
     } 
     else if (mode === 'symphony') {
-      const symMidiBytes = this.generateSymphonyMidi(this.originalMidiBytes);
-      await this.loadMidiBytesForPlayback(symMidiBytes, `${this.originalSongName} (Giao Hưởng)`);
+      try {
+        console.log('[AudioEngine] Đang chuyển đổi sang chế độ Giao Hưởng qua Web Worker...');
+        const symMidiBytes = await this.postToWorker<Uint8Array>('generateSymphony', this.originalMidiBytes);
+        await this.loadMidiBytesForPlayback(symMidiBytes, `${this.originalSongName} (Giao Hưởng)`);
+      } catch (err) {
+        console.error('Lỗi khi chuyển chế độ Giao Hưởng qua worker, dùng fallback:', err);
+        const symMidiBytes = this.generateSymphonyMidi(this.originalMidiBytes);
+        await this.loadMidiBytesForPlayback(symMidiBytes, `${this.originalSongName} (Giao Hưởng)`);
+      }
     }
     else if (mode === 'concerto') {
-      const concertoMidiBytes = this.generateConcertoMidi(this.originalMidiBytes);
-      await this.loadMidiBytesForPlayback(concertoMidiBytes, `${this.originalSongName} (Concerto)`);
+      try {
+        console.log('[AudioEngine] Đang chuyển đổi sang chế độ Concerto qua Web Worker...');
+        const concertoMidiBytes = await this.postToWorker<Uint8Array>('generateConcerto', this.originalMidiBytes);
+        await this.loadMidiBytesForPlayback(concertoMidiBytes, `${this.originalSongName} (Concerto)`);
+      } catch (err) {
+        console.error('Lỗi khi chuyển chế độ Concerto qua worker, dùng fallback:', err);
+        const concertoMidiBytes = this.generateConcertoMidi(this.originalMidiBytes);
+        await this.loadMidiBytesForPlayback(concertoMidiBytes, `${this.originalSongName} (Concerto)`);
+      }
     }
 
     this.seek(savedTime);
@@ -606,6 +676,7 @@ class AudioEngineService {
   }
 
   // Tự động phân tách và chuyển bài nhạc thành phối khí dàn nhạc giao hưởng 11 bè
+  // (Phiên bản tối ưu hiệu năng: Note Thinning + Alternation + Polyphony Limit)
   private generateSymphonyMidi(originalMidiBytes: Uint8Array): Uint8Array {
     try {
       const originalMidi = new Midi(originalMidiBytes.buffer as ArrayBuffer);
@@ -618,7 +689,7 @@ class AudioEngineService {
         symphonyMidi.header.setTempo(120);
       }
 
-      // 11 nhạc cụ giao hưởng
+      // 11 nhạc cụ giao hưởng (giữ đầy đủ dàn nhạc)
       const symphonicTracksInfo = [
         { name: 'Violin I (Treble Strings)', program: 40, channel: 0 },
         { name: 'Violin II (Treble Strings)', program: 40, channel: 1 },
@@ -641,6 +712,7 @@ class AudioEngineService {
         return t;
       });
 
+      // Thu thập tất cả nốt từ bài gốc
       const allNotes: { midi: number; time: number; duration: number; velocity: number }[] = [];
       originalMidi.tracks.forEach(track => {
         if (track.channel === 9) return; // Bỏ qua bộ gõ cũ
@@ -656,46 +728,107 @@ class AudioEngineService {
 
       allNotes.sort((a, b) => a.time - b.time);
 
-      let lastTimpaniTime = -5;
+      // === TỐI ƯU: Note Thinning — Giới hạn polyphony tối đa ===
+      // Gom nốt theo cửa sổ thời gian 30ms, giữ tối đa MAX_VOICES_PER_WINDOW nốt/cửa sổ
+      const MAX_VOICES_PER_WINDOW = 8;
+      const QUANTIZE_WINDOW = 0.03; // 30ms
 
-      allNotes.forEach(note => {
+      const thinnedNotes: typeof allNotes = [];
+      let windowStart = -Infinity;
+      let windowNotes: typeof allNotes = [];
+
+      const flushWindow = () => {
+        if (windowNotes.length <= MAX_VOICES_PER_WINDOW) {
+          thinnedNotes.push(...windowNotes);
+        } else {
+          // Ưu tiên giữ nốt có velocity cao nhất
+          windowNotes.sort((a, b) => b.velocity - a.velocity);
+          thinnedNotes.push(...windowNotes.slice(0, MAX_VOICES_PER_WINDOW));
+        }
+        windowNotes = [];
+      };
+
+      for (const note of allNotes) {
+        if (note.time - windowStart > QUANTIZE_WINDOW) {
+          flushWindow();
+          windowStart = note.time;
+        }
+        windowNotes.push(note);
+      }
+      flushWindow();
+
+      // Sắp xếp lại theo thời gian sau khi thinning
+      thinnedNotes.sort((a, b) => a.time - b.time);
+
+      // === PHỐI KHÍ THÔNG MINH ===
+      let lastTimpaniTime = -5;
+      let violinAlternator = 0; // Xen kẽ Violin I/II
+
+      thinnedNotes.forEach(note => {
         const m = note.midi;
         const t = note.time;
         const d = note.duration;
         const v = note.velocity;
 
         if (m >= 64) {
-          // Giai điệu âm cao: Violin I, Violin II, Flute, Clarinet, French Horn, Harp
-          symTracks[0].addNote({ midi: m, time: t, duration: d, velocity: v });
-          symTracks[1].addNote({ midi: m, time: t, duration: d, velocity: v * 0.7 });
-          
-          if (m >= 72) {
-            symTracks[5].addNote({ midi: m, time: t, duration: d, velocity: v * 0.8 });
+          // === Giai điệu âm cao ===
+          // Xen kẽ Violin I/II thay vì ghi cả hai đồng thời → giảm 1 voice
+          if (violinAlternator % 2 === 0) {
+            symTracks[0].addNote({ midi: m, time: t, duration: d, velocity: v });
+            symTracks[1].addNote({ midi: m, time: t, duration: d, velocity: v * 0.35 });
           } else {
-            symTracks[5].addNote({ midi: m, time: t, duration: d, velocity: v * 0.5 });
+            symTracks[1].addNote({ midi: m, time: t, duration: d, velocity: v * 0.85 });
+            symTracks[0].addNote({ midi: m, time: t, duration: d, velocity: v * 0.4 });
           }
-          
-          symTracks[7].addNote({ midi: m, time: t, duration: d, velocity: v * 0.65 });
-          symTracks[8].addNote({ midi: m, time: t, duration: d, velocity: v * 0.5 });
-          symTracks[9].addNote({ midi: m, time: t, duration: d, velocity: v * 0.45 });
+          violinAlternator++;
+
+          // Flute chỉ chơi nốt rất cao (giai điệu chính)
+          if (m >= 72) {
+            symTracks[5].addNote({ midi: m, time: t, duration: d, velocity: v * 0.65 });
+          }
+
+          // Clarinet đệm nhẹ — chỉ khi velocity gốc đủ mạnh
+          if (v >= 0.5) {
+            symTracks[7].addNote({ midi: m, time: t, duration: d, velocity: v * 0.4 });
+          }
+
+          // French Horn chỉ nhấn vào các nốt mạnh (accent)
+          if (v >= 0.7) {
+            symTracks[8].addNote({ midi: m, time: t, duration: d, velocity: v * 0.35 });
+          }
+
+          // Harp arpeggio nhẹ — chỉ trên nốt có duration dài (sustain)
+          if (d >= 0.3 && v >= 0.5) {
+            symTracks[9].addNote({ midi: m, time: t, duration: d, velocity: v * 0.3 });
+          }
         } 
         else if (m >= 48 && m < 64) {
-          // Hòa âm âm trung: Viola, Oboe, Clarinet, French Horn, Harp
+          // === Hòa âm âm trung ===
+          // Viola chơi chính
           symTracks[2].addNote({ midi: m, time: t, duration: d, velocity: v * 0.8 });
-          symTracks[6].addNote({ midi: m, time: t, duration: d, velocity: v * 0.75 });
-          symTracks[7].addNote({ midi: m, time: t, duration: d, velocity: v * 0.65 });
-          symTracks[8].addNote({ midi: m, time: t, duration: d, velocity: v * 0.65 });
-          symTracks[9].addNote({ midi: m, time: t, duration: d, velocity: v * 0.5 });
+
+          // Oboe chỉ đệm nốt mạnh
+          if (v >= 0.55) {
+            symTracks[6].addNote({ midi: m, time: t, duration: d, velocity: v * 0.55 });
+          }
+
+          // French Horn hòa âm trung — chỉ sustain dài
+          if (d >= 0.25 && v >= 0.5) {
+            symTracks[8].addNote({ midi: m, time: t, duration: d, velocity: v * 0.4 });
+          }
         } 
         else {
-          // Bè trầm (Bass): Cello, Contrabass, Timpani
-          symTracks[3].addNote({ midi: m, time: t, duration: d, velocity: v * 0.95 });
+          // === Bè trầm (Bass) ===
+          // Cello chơi chính
+          symTracks[3].addNote({ midi: m, time: t, duration: d, velocity: v * 0.9 });
           
+          // Contrabass octave dưới
           const cbMidi = m >= 36 ? m - 12 : m;
-          symTracks[4].addNote({ midi: cbMidi, time: t, duration: d, velocity: v * 0.75 });
+          symTracks[4].addNote({ midi: cbMidi, time: t, duration: d, velocity: v * 0.65 });
 
-          if (m < 40 && (t - lastTimpaniTime) >= 1.0) {
-            symTracks[10].addNote({ midi: m, time: t, duration: Math.min(d, 0.4), velocity: v * 0.5 });
+          // Timpani chỉ đánh nốt trầm sâu, cách nhau >= 1.5s
+          if (m < 40 && (t - lastTimpaniTime) >= 1.5) {
+            symTracks[10].addNote({ midi: m, time: t, duration: Math.min(d, 0.4), velocity: v * 0.45 });
             lastTimpaniTime = t;
           }
         }

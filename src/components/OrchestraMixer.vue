@@ -200,6 +200,7 @@ function playTest(channel: number) {
 }
 
 // Cập nhật số lượng nốt nhạc (voice) đang kêu thời gian thực để nháy đèn LED
+// (Tối ưu: giảm tần suất polling từ 50ms → 150ms để giảm áp lực main thread)
 function startTrackingVoices() {
   stopTrackingVoices();
   voicesInterval = window.setInterval(() => {
@@ -211,7 +212,7 @@ function startTrackingVoices() {
         }
       }
     });
-  }, 50);
+  }, 150);
 }
 
 function stopTrackingVoices() {
