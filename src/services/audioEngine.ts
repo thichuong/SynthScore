@@ -14,6 +14,15 @@ export interface TrackInfo {
   noteCount: number;
 }
 
+/**
+ * WARNING / CHÚ Ý QUAN TRỌNG:
+ * Tuyệt đối KHÔNG đưa instance của AudioEngineService hoặc export AudioEngine của nó
+ * vào ref() hoặc reactive() trong Vue component. Việc bọc reactive/ref sẽ tạo ra proxy
+ * cho các đối tượng gốc của Web Audio API (như AudioContext, AudioNode, AnalyserNode)
+ * và WebAssembly, làm suy giảm hiệu năng nghiêm trọng hoặc gây crash ứng dụng.
+ * Thay vào đó, hãy sử dụng các callback onStateChange/onTimeUpdate để cập nhật các ref
+ * dạng nguyên bản (primitives) trong component Vue.
+ */
 class AudioEngineService {
   private audioContext: AudioContext | null = null;
   private synth: WorkletSynthesizer | null = null;
@@ -47,7 +56,20 @@ class AudioEngineService {
 
   // Cache Soundfont để tránh tải lại
   public soundfontCache: Map<string, ArrayBuffer> = new Map();
-  private loadedPrograms: Set<number> = new Set();
+  private loadedSoundfonts: Set<string> = new Set();
+
+  // Ánh xạ nhạc cụ sang file Soundfont gốc tương ứng
+  private getSoundfontFileName(programNumber: number, isDrum: boolean = false): string {
+    if (isDrum || programNumber >= 112) {
+      return 'Roland_SC-88.sf3';
+    } else if (programNumber >= 80) {
+      return 'FluidR3Mono_GM.sf3';
+    } else if (programNumber >= 40) {
+      return 'Sonatina_Symphonic_Orchestra.sf3';
+    } else {
+      return 'MuseScore_General.sf3';
+    }
+  }
 
   private timeUpdateInterval: any = null;
 
@@ -129,17 +151,16 @@ class AudioEngineService {
     }
   }
 
-  // Nạp bộ âm thanh nhạc cụ (.sf3) động theo programNumber
+  // Nạp bộ âm thanh nhạc cụ (.sf3) động theo programNumber thông qua ánh xạ Soundfont
   public async loadInstrumentSoundbank(programNumber: number, isDrum: boolean = false): Promise<void> {
     if (!this.synth) {
       await this.init();
     }
     if (!this.synth) return;
 
-    // Bộ trống (drum kit) sẽ được đánh dấu bằng số 128
-    const bankKey = isDrum ? 128 : programNumber;
+    const sf3Name = this.getSoundfontFileName(programNumber, isDrum);
 
-    if (this.loadedPrograms.has(bankKey)) {
+    if (this.loadedSoundfonts.has(sf3Name)) {
       return; // Đã nạp rồi, không cần nạp lại
     }
 
@@ -147,7 +168,7 @@ class AudioEngineService {
     this.triggerStateChange();
 
     try {
-      const url = `/presets/instruments/${bankKey}.sf3`;
+      const url = `/presets/instruments/${sf3Name}`;
       let buffer!: ArrayBuffer;
 
       if (this.soundfontCache.has(url)) {
@@ -176,17 +197,17 @@ class AudioEngineService {
       }
 
       // Nạp soundbank vào manager của SpessaSynth
-      await this.synth.soundBankManager.addSoundBank(buffer.slice(0), `instr_${bankKey}`);
+      await this.synth.soundBankManager.addSoundBank(buffer.slice(0), sf3Name);
       await this.synth.isReady;
 
-      this.loadedPrograms.add(bankKey);
+      this.loadedSoundfonts.add(sf3Name);
       this.isLoadingSoundfont = false;
       this.triggerStateChange();
-      console.log(`Đã nạp thành công bộ âm thanh cho nhạc cụ #${bankKey}`);
+      console.log(`Đã nạp thành công bộ âm thanh Soundfont: ${sf3Name} cho nhạc cụ #${programNumber} (isDrum: ${isDrum})`);
     } catch (err) {
       this.isLoadingSoundfont = false;
       this.triggerStateChange();
-      console.error(`Không thể nạp bộ âm thanh cho nhạc cụ #${bankKey}:`, err);
+      console.error(`Không thể nạp bộ âm thanh Soundfont ${sf3Name} cho nhạc cụ #${programNumber}:`, err);
     }
   }
 

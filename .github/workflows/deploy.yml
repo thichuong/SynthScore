@@ -44,8 +44,8 @@ jobs:
       - name: Download Soundfonts
         run: |
           mkdir -p public/presets/instruments
-          for i in {0..128}; do
-            curl -L -f -s -o public/presets/instruments/$i.sf3 https://github.com/thichuong/SynthScore/releases/download/v1.0.0/$i.sf3 || echo "Bỏ qua $i.sf3 (chưa được tải lên release)"
+          for file in MuseScore_General.sf3 Sonatina_Symphonic_Orchestra.sf3 FluidR3Mono_GM.sf3 Roland_SC-88.sf3; do
+            curl -L -f -s -o public/presets/instruments/$file https://github.com/thichuong/SynthScore/releases/download/v1.0.0/$file || echo "Bỏ qua $file"
           done
 
       - name: Build
