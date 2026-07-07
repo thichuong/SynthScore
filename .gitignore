@@ -25,4 +25,4 @@ dist-ssr
 
 # Soundfonts (tự động tải ở build-time hoặc local dev)
 public/soundfonts/
-
+public/presets/instruments/

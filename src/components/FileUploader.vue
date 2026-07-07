@@ -7,13 +7,13 @@
       @dragleave.prevent="isDragging = false"
       @drop.prevent="handleDrop"
       @click="triggerFileSelect"
-      title="Kéo thả hoặc nhấp để tải lên tệp (.mid, .xml, .abc, .sf2)"
+      title="Kéo thả hoặc nhấp để tải lên tệp (.mid, .xml, .abc)"
     >
       <input 
         type="file" 
         ref="fileInput" 
         style="display: none" 
-        accept=".mid,.midi,.musicxml,.xml,.mxl,.abc,.sf2"
+        accept=".mid,.midi,.musicxml,.xml,.mxl,.abc"
         @change="handleFileChange"
       />
       <UploadCloud class="upload-icon" />
@@ -30,9 +30,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { UploadCloud } from 'lucide-vue-next';
-import { AudioEngine } from '../services/audioEngine';
 import { parseMxl } from '../services/mxlParser';
-import confetti from 'canvas-confetti';
 
 const emit = defineEmits<{
   (e: 'musicLoaded', payload: { data: Uint8Array | string; type: 'xml' | 'abc' | 'midi'; name: string }): void;
@@ -72,28 +70,7 @@ async function processFile(file: File) {
 
   const reader = new FileReader();
 
-  if (ext === 'sf2') {
-    reader.onload = async (e) => {
-      try {
-        const buffer = e.target?.result as ArrayBuffer;
-        await AudioEngine.loadCustomSoundfont(buffer, fileName);
-        uploadMsg.value = `Đã nạp Soundfont: ${fileName}`;
-        statusType.value = 'success';
-        
-        confetti({
-          particleCount: 80,
-          spread: 60,
-          origin: { y: 0.8 },
-          colors: ['#ff007f', '#00f0ff', '#ffffff']
-        });
-      } catch (err) {
-        uploadMsg.value = 'Lỗi nạp Soundfont sf2.';
-        statusType.value = 'error';
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  } 
-  else if (ext === 'mid' || ext === 'midi') {
+  if (ext === 'mid' || ext === 'midi') {
     reader.onload = (e) => {
       const buffer = new Uint8Array(e.target?.result as ArrayBuffer);
       emit('musicLoaded', {

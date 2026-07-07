@@ -43,10 +43,10 @@ jobs:
 
       - name: Download Soundfonts
         run: |
-          mkdir -p public/soundfonts
-          curl -L -o public/soundfonts/TimGM6mb.sf2 https://github.com/thichuong/SynthScore/releases/download/v1.0.0/TimGM6mb.sf2
-          curl -L -o public/soundfonts/ChoriumRevA.SF2 https://github.com/thichuong/SynthScore/releases/download/v1.0.0/ChoriumRevA.SF2
-          curl -L -o public/soundfonts/FluidR3_GM.sf2 https://github.com/thichuong/SynthScore/releases/download/v1.0.0/FluidR3_GM.sf2
+          mkdir -p public/presets/instruments
+          for i in {0..128}; do
+            curl -L -f -s -o public/presets/instruments/$i.sf3 https://github.com/thichuong/SynthScore/releases/download/v1.0.0/$i.sf3 || echo "Bỏ qua $i.sf3 (chưa được tải lên release)"
+          done
 
       - name: Build
         run: npm run build

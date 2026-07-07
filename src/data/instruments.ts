@@ -1,6 +1,7 @@
 export interface InstrumentInfo {
   number: number;
   name: string;
+  soundbankUrl?: string;
 }
 
 export interface InstrumentGroup {
@@ -50,69 +51,80 @@ export const GM_INSTRUMENTS: string[] = [
   'Guitar Fret Noise', 'Breath Noise', 'Seashore', 'Bird Tweet', 'Telephone Ring', 'Helicopter', 'Applause', 'Gunshot'
 ];
 
+const createInstruments = (start: number, end: number): InstrumentInfo[] => {
+  return GM_INSTRUMENTS.slice(start, end).map((name, i) => {
+    const num = start + i;
+    return {
+      number: num,
+      name,
+      soundbankUrl: `/presets/instruments/${num}.sf3`
+    };
+  });
+};
+
 export const instrumentGroups: InstrumentGroup[] = [
   {
     name: '🎹 Piano',
-    instruments: GM_INSTRUMENTS.slice(0, 8).map((name, i) => ({ number: i, name }))
+    instruments: createInstruments(0, 8)
   },
   {
     name: '🔔 Gõ Định Âm (Percussion)',
-    instruments: GM_INSTRUMENTS.slice(8, 16).map((name, i) => ({ number: 8 + i, name }))
+    instruments: createInstruments(8, 16)
   },
   {
     name: '💨 Organ',
-    instruments: GM_INSTRUMENTS.slice(16, 24).map((name, i) => ({ number: 16 + i, name }))
+    instruments: createInstruments(16, 24)
   },
   {
     name: '🎸 Guitar',
-    instruments: GM_INSTRUMENTS.slice(24, 32).map((name, i) => ({ number: 24 + i, name }))
+    instruments: createInstruments(24, 32)
   },
   {
     name: '🎸 Bass',
-    instruments: GM_INSTRUMENTS.slice(32, 40).map((name, i) => ({ number: 32 + i, name }))
+    instruments: createInstruments(32, 40)
   },
   {
     name: '🎻 Dây Độc Tấu (Strings)',
-    instruments: GM_INSTRUMENTS.slice(40, 48).map((name, i) => ({ number: 40 + i, name }))
+    instruments: createInstruments(40, 48)
   },
   {
     name: '🎻 Dàn Dây & Hợp Xướng (Ensemble)',
-    instruments: GM_INSTRUMENTS.slice(48, 56).map((name, i) => ({ number: 48 + i, name }))
+    instruments: createInstruments(48, 56)
   },
   {
     name: '🎺 Kèn Đồng (Brass)',
-    instruments: GM_INSTRUMENTS.slice(56, 64).map((name, i) => ({ number: 56 + i, name }))
+    instruments: createInstruments(56, 64)
   },
   {
     name: '💨 Kèn Gỗ Dăm (Reed)',
-    instruments: GM_INSTRUMENTS.slice(64, 72).map((name, i) => ({ number: 64 + i, name }))
+    instruments: createInstruments(64, 72)
   },
   {
     name: '💨 Kèn Gỗ Ống (Pipe)',
-    instruments: GM_INSTRUMENTS.slice(72, 80).map((name, i) => ({ number: 72 + i, name }))
+    instruments: createInstruments(72, 80)
   },
   {
     name: '⚡ Synth Lead',
-    instruments: GM_INSTRUMENTS.slice(80, 88).map((name, i) => ({ number: 80 + i, name }))
+    instruments: createInstruments(80, 88)
   },
   {
     name: '⚡ Synth Pad',
-    instruments: GM_INSTRUMENTS.slice(88, 96).map((name, i) => ({ number: 88 + i, name }))
+    instruments: createInstruments(88, 96)
   },
   {
     name: '⚡ Synth FX',
-    instruments: GM_INSTRUMENTS.slice(96, 104).map((name, i) => ({ number: 96 + i, name }))
+    instruments: createInstruments(96, 104)
   },
   {
     name: '🌏 Cổ Truyền (Ethnic)',
-    instruments: GM_INSTRUMENTS.slice(104, 112).map((name, i) => ({ number: 104 + i, name }))
+    instruments: createInstruments(104, 112)
   },
   {
     name: '🥁 Bộ Gõ Không Định Âm (Percussive)',
-    instruments: GM_INSTRUMENTS.slice(112, 120).map((name, i) => ({ number: 112 + i, name }))
+    instruments: createInstruments(112, 120)
   },
   {
     name: '🔊 Hiệu Ứng (Sound FX)',
-    instruments: GM_INSTRUMENTS.slice(120, 128).map((name, i) => ({ number: 120 + i, name }))
+    instruments: createInstruments(120, 128)
   }
 ];

@@ -47,14 +47,7 @@ class AudioEngineService {
 
   // Cache Soundfont để tránh tải lại
   public soundfontCache: Map<string, ArrayBuffer> = new Map();
-  public customSoundfontName = '';
-  public currentSoundfontId = 'timgm';
-
-  public readonly SOUNDFONTS = [
-    { id: 'timgm', name: 'TimGM6mb (Nhẹ - 6MB)', url: 'https://github.com/thichuong/SynthScore/releases/download/v1.0.0/TimGM6mb.sf2' },
-    { id: 'chorium', name: 'ChoriumRevA (Tốt - 27MB)', url: 'https://github.com/thichuong/SynthScore/releases/download/v1.0.0/ChoriumRevA.SF2' },
-    { id: 'fluid', name: 'FluidR3_GM (Nặng - 148MB)', url: 'https://github.com/thichuong/SynthScore/releases/download/v1.0.0/FluidR3_GM.sf2' }
-  ];
+  private loadedPrograms: Set<number> = new Set();
 
   private timeUpdateInterval: any = null;
 
@@ -121,8 +114,8 @@ class AudioEngineService {
         }
       });
 
-      // 7. Tải Soundfont mặc định
-      await this.loadSoundfont('timgm');
+      // 7. Tải nhạc cụ mặc định (Acoustic Grand Piano - 0)
+      await this.loadInstrumentSoundbank(0);
 
       this.isReady = true;
       this.isLoadingSoundfont = false;
@@ -136,160 +129,88 @@ class AudioEngineService {
     }
   }
 
-  // Nạp Soundfont theo ID
-  public async loadSoundfont(id: string): Promise<void> {
+  // Nạp bộ âm thanh nhạc cụ (.sf3) động theo programNumber
+  public async loadInstrumentSoundbank(programNumber: number, isDrum: boolean = false): Promise<void> {
     if (!this.synth) {
       await this.init();
     }
     if (!this.synth) return;
 
-    if (id === 'custom') {
-      const buffer = this.soundfontCache.get('custom');
-      if (buffer) {
-        this.isLoadingSoundfont = true;
-        this.triggerStateChange();
-        try {
-          try {
-            await this.synth.soundBankManager.deleteSoundBank('default');
-          } catch (e) {}
-          try {
-            await this.synth.soundBankManager.deleteSoundBank('custom');
-          } catch (e) {}
+    // Bộ trống (drum kit) sẽ được đánh dấu bằng số 128
+    const bankKey = isDrum ? 128 : programNumber;
 
-          await this.synth.soundBankManager.addSoundBank(buffer.slice(0), 'custom');
-          await this.synth.isReady;
-          this.currentSoundfontId = 'custom';
-          this.isLoadingSoundfont = false;
-          this.triggerStateChange();
-          return;
-        } catch (err) {
-          this.isLoadingSoundfont = false;
-          this.triggerStateChange();
-          console.error('Không thể nạp lại Soundfont tùy chỉnh từ cache:', err);
-          throw err;
-        }
-      } else {
-        throw new Error('Chưa có Soundfont tùy chỉnh nào được tải lên.');
-      }
+    if (this.loadedPrograms.has(bankKey)) {
+      return; // Đã nạp rồi, không cần nạp lại
     }
-
-    const sf = this.SOUNDFONTS.find(s => s.id === id);
-    if (!sf) return;
 
     this.isLoadingSoundfont = true;
     this.triggerStateChange();
 
     try {
+      const url = `/presets/instruments/${bankKey}.sf3`;
       let buffer!: ArrayBuffer;
-      if (this.soundfontCache.has(id)) {
-        buffer = this.soundfontCache.get(id)!;
+
+      if (this.soundfontCache.has(url)) {
+        buffer = this.soundfontCache.get(url)!;
       } else {
-        const cachedDbBuffer = await getCachedSoundfont(sf.url);
+        const cachedDbBuffer = await getCachedSoundfont(url);
         if (cachedDbBuffer) {
           buffer = cachedDbBuffer;
-          this.soundfontCache.set(id, buffer);
+          this.soundfontCache.set(url, buffer);
         } else {
-          const fileName = sf.url.substring(sf.url.lastIndexOf('/') + 1);
           const baseUrl = import.meta.env.BASE_URL || '/';
           const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
-          const localUrl = `${normalizedBaseUrl}soundfonts/${fileName}`;
-          
-          let fetchedSuccessfully = false;
+          // Vì url đã bắt đầu bằng '/', bỏ dấu '/' ở đầu để ghép
+          const relativeUrl = url.startsWith('/') ? url.substring(1) : url;
+          const localUrl = `${normalizedBaseUrl}${relativeUrl}`;
 
-          // Thử tải từ local (same-origin, tránh CORS trên GitHub Pages/localhost)
-          try {
-            console.log(`Đang thử nạp Soundfont từ local URL: ${localUrl}`);
-            const localRes = await fetch(localUrl);
-            if (localRes.ok) {
-              buffer = await localRes.arrayBuffer();
-              fetchedSuccessfully = true;
-              console.log(`Nạp thành công Soundfont ${sf.name} từ local!`);
-            } else {
-              console.warn(`Local fetch trả về mã lỗi: ${localRes.status}. Chuyển sang tải từ GitHub...`);
-            }
-          } catch (localErr) {
-            console.warn(`Không thể nạp Soundfont từ local (${localErr}). Chuyển sang tải từ GitHub...`);
-          }
-
-          // Fallback tải từ mạng (GitHub/Proxy) nếu local fetch không thành công
-          if (!fetchedSuccessfully) {
-            let fetchUrl = sf.url;
-            // Sử dụng proxy cục bộ trong môi trường localhost để vượt qua CORS
-            if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-              if (fetchUrl.startsWith('https://github.com/')) {
-                fetchUrl = fetchUrl.replace('https://github.com/', '/github-releases/');
-              } else if (fetchUrl.startsWith('https://raw.githubusercontent.com/')) {
-                fetchUrl = fetchUrl.replace('https://raw.githubusercontent.com/', '/raw-github/');
-              }
-            }
-
-            console.log(`Đang tải Soundfont từ mạng: ${fetchUrl}`);
-            const res = await fetch(fetchUrl);
-            if (!res.ok) throw new Error(`Không thể fetch Soundfont từ URL: ${fetchUrl} (status: ${res.status})`);
-            buffer = await res.arrayBuffer();
-          }
+          console.log(`Đang tải bộ âm thanh nhạc cụ từ local URL: ${localUrl}`);
+          const res = await fetch(localUrl);
+          if (!res.ok) throw new Error(`Không thể fetch Soundbank từ URL: ${localUrl} (status: ${res.status})`);
+          buffer = await res.arrayBuffer();
 
           // Lưu cache
-          this.soundfontCache.set(id, buffer);
-          await cacheSoundfont(sf.url, buffer);
+          this.soundfontCache.set(url, buffer);
+          await cacheSoundfont(url, buffer);
         }
       }
 
-      // Xóa tất cả các soundbank để đảm bảo nạp mới hoàn toàn
-      try {
-        await this.synth.soundBankManager.deleteSoundBank('default');
-      } catch (e) {}
-      try {
-        await this.synth.soundBankManager.deleteSoundBank('custom');
-      } catch (e) {}
-
-      await this.synth.soundBankManager.addSoundBank(buffer.slice(0), 'default');
+      // Nạp soundbank vào manager của SpessaSynth
+      await this.synth.soundBankManager.addSoundBank(buffer.slice(0), `instr_${bankKey}`);
       await this.synth.isReady;
 
-      this.currentSoundfontId = id;
+      this.loadedPrograms.add(bankKey);
       this.isLoadingSoundfont = false;
       this.triggerStateChange();
+      console.log(`Đã nạp thành công bộ âm thanh cho nhạc cụ #${bankKey}`);
     } catch (err) {
       this.isLoadingSoundfont = false;
       this.triggerStateChange();
-      console.error(`Không thể nạp Soundfont ${sf.name}:`, err);
-      throw err;
+      console.error(`Không thể nạp bộ âm thanh cho nhạc cụ #${bankKey}:`, err);
     }
   }
 
-  // Cho phép người dùng tải lên Soundfont .sf2 của riêng họ
-  public async loadCustomSoundfont(arrayBuffer: ArrayBuffer, name: string): Promise<void> {
-    if (!this.synth) {
-      await this.init();
-    }
-    if (!this.synth) return;
+  // Tự động tải tất cả các bộ âm thanh cho các nhạc cụ có trong bài hát hiện tại
+  private async loadSongSoundbanks(): Promise<void> {
+    const loadPromises: Promise<void>[] = [];
+    
+    // Duyệt qua tất cả các track được tìm thấy trong bài
+    this.tracks.forEach(track => {
+      const isDrum = track.channel === 9; // Kênh 10 (index 9) là bộ gõ
+      loadPromises.push(this.loadInstrumentSoundbank(track.instrumentNumber, isDrum));
+    });
 
-    this.isLoadingSoundfont = true;
-    this.triggerStateChange();
-
-    try {
-      // Xóa soundbank cũ
-      try {
-        await this.synth.soundBankManager.deleteSoundBank('default');
-      } catch (e) {}
-      try {
-        await this.synth.soundBankManager.deleteSoundBank('custom');
-      } catch (e) {}
-
-      await this.synth.soundBankManager.addSoundBank(arrayBuffer.slice(0), 'custom');
-      await this.synth.isReady;
-      
-      this.soundfontCache.set('custom', arrayBuffer);
-      this.customSoundfontName = name;
-      this.currentSoundfontId = 'custom';
-      
-      this.isLoadingSoundfont = false;
+    if (loadPromises.length > 0) {
+      this.isLoadingSoundfont = true;
       this.triggerStateChange();
-    } catch (err) {
-      this.isLoadingSoundfont = false;
-      this.triggerStateChange();
-      console.error('Không thể nạp file Soundfont tùy chỉnh:', err);
-      throw err;
+      try {
+        await Promise.all(loadPromises);
+      } catch (err) {
+        console.error('Lỗi khi nạp song song các bộ âm thanh nhạc cụ:', err);
+      } finally {
+        this.isLoadingSoundfont = false;
+        this.triggerStateChange();
+      }
     }
   }
 
@@ -332,6 +253,7 @@ class AudioEngineService {
 
     // Phân tích các bè nhạc cụ từ tệp MIDI mới nạp
     this.parseTracks(arrayBuffer);
+    await this.loadSongSoundbanks();
     this.resetMixerSettings();
     this.triggerStateChange();
   }
@@ -523,11 +445,13 @@ class AudioEngineService {
   }
 
   // Thay đổi nhạc cụ cho một track cụ thể
-  public setTrackInstrument(channelIndex: number, programNumber: number): void {
+  public async setTrackInstrument(channelIndex: number, programNumber: number): Promise<void> {
     const track = this.tracks.find(t => t.channel === channelIndex);
     if (track) {
       track.instrumentNumber = programNumber;
       track.instrumentName = GM_INSTRUMENTS[programNumber] || 'Unknown';
+      const isDrum = channelIndex === 9;
+      await this.loadInstrumentSoundbank(programNumber, isDrum);
       if (this.synth) {
         this.synth.programChange(channelIndex, programNumber);
       }
@@ -564,7 +488,7 @@ class AudioEngineService {
   }
 
   // Thêm một nhạc cụ mới vào danh sách
-  public addTrack(): void {
+  public async addTrack(): Promise<void> {
     const usedChannels = new Set(this.tracks.map(t => t.channel));
     let newChan = -1;
     for (let i = 0; i < 16; i++) {
@@ -596,6 +520,9 @@ class AudioEngineService {
     this.tracks.push(newTrack);
     this.tracks.sort((a, b) => a.channel - b.channel);
     
+    const isDrum = newChan === 9;
+    await this.loadInstrumentSoundbank(0, isDrum);
+    
     if (this.synth) {
       this.synth.programChange(newChan, 0);
       const chan = this.synth.midiChannels[newChan];
@@ -620,6 +547,29 @@ class AudioEngineService {
       }
       this.triggerStateChange();
     }
+  }
+
+  // Phát một nốt nhạc thử âm cho một kênh cụ thể
+  public playTestNote(channelIndex: number): void {
+    if (!this.synth) return;
+    
+    // Kích hoạt AudioContext nếu ở trạng thái suspended
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+    }
+
+    const note = channelIndex === 9 ? 36 : 60; // Nốt Bass drum (36) cho Drum, C4 (60) cho các nhạc cụ khác
+    const velocity = 100;
+
+    // Trigger noteOn
+    this.synth.noteOn(channelIndex, note, velocity);
+
+    // Kích hoạt noteOff sau 800ms
+    setTimeout(() => {
+      if (this.synth) {
+        this.synth.noteOff(channelIndex, note);
+      }
+    }, 800);
   }
 
   // Tự động phân tách và chuyển bài nhạc thành phối khí dàn nhạc giao hưởng 11 bè

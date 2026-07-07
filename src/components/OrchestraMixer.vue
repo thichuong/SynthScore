@@ -38,7 +38,10 @@
     <div class="mixer-body">
       <div v-if="tracks.length === 0" class="empty-state">
         <Music class="empty-icon" />
-        <p>Không có thông tin kênh nhạc cụ. Hãy tải lên một tệp tin nhạc.</p>
+        <p>Không có thông tin kênh nhạc cụ. Bạn có thể bắt đầu bằng cách thêm nhạc cụ mới.</p>
+        <button class="add-track-btn-center" @click="addTrack" title="Thêm nhạc cụ mới">
+          <Plus class="add-icon" /> Thêm nhạc cụ mới
+        </button>
       </div>
 
       <div v-else class="tracks-list-container">
@@ -103,6 +106,13 @@
               <!-- Điều khiển Mute/Solo & Xóa -->
               <div class="mixer-buttons">
                 <button 
+                  class="btn-test" 
+                  @click="playTest(track.channel)"
+                  title="Phát nốt nhạc thử âm"
+                >
+                  <Play class="btn-icon" /> THỬ
+                </button>
+                <button 
                   class="btn-mute" 
                   :class="{ active: track.isMuted }"
                   @click="toggleMute(track.channel)"
@@ -137,7 +147,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-import { Sliders, Volume2, VolumeX, Music, Trash2, Plus } from 'lucide-vue-next';
+import { Sliders, Volume2, VolumeX, Music, Trash2, Plus, Play } from 'lucide-vue-next';
 import { AudioEngine } from '../services/audioEngine';
 import type { TrackInfo } from '../services/audioEngine';
 import { instrumentGroups } from '../data/instruments';
@@ -183,6 +193,10 @@ function addTrack() {
 
 function deleteTrack(channelIndex: number) {
   AudioEngine.deleteTrack(channelIndex);
+}
+
+function playTest(channel: number) {
+  AudioEngine.playTestNote(channel);
 }
 
 // Cập nhật số lượng nốt nhạc (voice) đang kêu thời gian thực để nháy đèn LED
@@ -609,5 +623,39 @@ onBeforeUnmount(() => {
 .delete-icon {
   width: 10px;
   height: 10px;
+}
+
+.add-track-btn-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  color: #00f0ff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 12px;
+  transition: all 0.3s ease;
+}
+
+.add-track-btn-center:hover {
+  background: rgba(0, 240, 255, 0.2);
+  border-color: #00f0ff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
+.btn-test {
+  background: rgba(0, 240, 255, 0.05) !important;
+  border: 1px solid rgba(0, 240, 255, 0.1) !important;
+  color: #00f0ff !important;
+}
+
+.btn-test:hover {
+  background: rgba(0, 240, 255, 0.15) !important;
+  border-color: rgba(0, 240, 255, 0.3) !important;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.25);
 }
 </style>

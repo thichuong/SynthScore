@@ -21,21 +21,6 @@
           @select="handleSongSelect"
         />
 
-        <!-- Bộ chọn SoundFont -->
-        <div class="soundfont-selector">
-          <select 
-            :value="selectedSoundfontId" 
-            :disabled="isLoadingSoundfont || !isInitialized"
-            @change="handleSoundfontChange"
-            class="soundfont-select"
-            title="Chọn bộ SoundFont để phát nhạc"
-          >
-            <option v-for="sf in soundfonts" :key="sf.id" :value="sf.id">
-              {{ sf.name }}
-            </option>
-          </select>
-        </div>
-
         <FileUploader @musicLoaded="handleMusicLoaded" />
       </div>
 
@@ -130,30 +115,8 @@ const rawText = ref<string | null>(null);
 
 const selectedSongIndex = ref(-1);
 
-const selectedSoundfontId = ref('timgm');
-const soundfonts = ref<{ id: string; name: string }[]>([]);
-
-function updateSoundfontList() {
-  selectedSoundfontId.value = AudioEngine.currentSoundfontId;
-  const list = [
-    { id: 'timgm', name: 'TimGM6mb (Nhẹ - 6MB)' },
-    { id: 'chorium', name: 'ChoriumRevA (Tốt - 27MB)' },
-    { id: 'fluid', name: 'FluidR3_GM (Nặng - 148MB)' }
-  ];
-  if (AudioEngine.soundfontCache.has('custom')) {
-    list.push({ 
-      id: 'custom', 
-      name: `Tùy chỉnh: ${AudioEngine.customSoundfontName || 'Đã tải lên'}` 
-    });
-  }
-  soundfonts.value = list;
-}
-
 // Lắng nghe trạng thái thay đổi từ AudioEngine
 onMounted(() => {
-  // Điền danh sách ban đầu
-  updateSoundfontList();
-
   AudioEngine.onStateChange(() => {
     isInitialized.value = AudioEngine.isInitialized;
     isReady.value = AudioEngine.isReady;
@@ -167,7 +130,6 @@ onMounted(() => {
     if (AudioEngine.activeMidiBytes && fileData.value !== AudioEngine.activeMidiBytes) {
       fileData.value = AudioEngine.activeMidiBytes;
     }
-    updateSoundfontList();
   });
 
   AudioEngine.onTimeUpdate((time) => {
@@ -188,15 +150,6 @@ async function initializeEngine() {
   }
 }
 
-async function handleSoundfontChange(event: Event) {
-  const target = event.target as HTMLSelectElement;
-  const id = target.value;
-  try {
-    await AudioEngine.loadSoundfont(id);
-  } catch (err) {
-    console.error('Lỗi khi chuyển đổi Soundfont:', err);
-  }
-}
 
 async function handleModeChange(mode: 'default' | 'symphony' | 'concerto') {
   await AudioEngine.setPlaybackMode(mode);
@@ -326,46 +279,6 @@ async function loadFromLibrary(song: SongEntry) {
   gap: 12px;
 }
 
-.soundfont-selector {
-  display: flex;
-  align-items: center;
-}
-
-.soundfont-select {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #e2e2e9;
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  outline: none;
-  transition: all 0.3s ease;
-  min-width: 220px;
-}
-
-.soundfont-select:hover:not(:disabled) {
-  border-color: rgba(0, 240, 255, 0.3);
-  background: rgba(0, 240, 255, 0.05);
-}
-
-.soundfont-select:focus {
-  border-color: #00f0ff;
-  box-shadow: 0 0 0 2px rgba(0, 240, 255, 0.15);
-}
-
-.soundfont-select:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.soundfont-select option {
-  background-color: #101016;
-  color: #e2e2e9;
-  font-weight: 500;
-}
 
 .logo-area {
   display: flex;
