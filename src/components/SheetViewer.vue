@@ -54,7 +54,6 @@ import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue';
 import type { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
 import { Midi } from '@tonejs/midi';
 import { Music, Layers } from 'lucide-vue-next';
-import { AudioEngine } from '../services/audioEngine';
 
 const props = defineProps<{
   fileData: Uint8Array | string | null;
@@ -112,34 +111,6 @@ watch(() => activeTab.value, (newTab) => {
   }
 });
 
-// Watch thay đổi tiến trình thời gian để đồng bộ cursor
-watch(() => props.currentTime, (newTime) => {
-  if (activeTab.value === 'sheet' && props.fileType === 'xml' && osmd) {
-    syncOsmdCursor(newTime);
-  }
-});
-
-// Đồng bộ vị trí Cursor của OpenSheetMusicDisplay
-function syncOsmdCursor(timeInSeconds: number) {
-  if (!osmd || !osmd.cursor) return;
-  
-  const bpm = AudioEngine.bpm || 120;
-  const currentBeat = timeInSeconds * (bpm / 60);
-
-  // Nếu thời gian chạy lùi lại (tua lại), reset cursor
-  if (osmd.cursor.iterator && osmd.cursor.iterator.currentTimeStamp.RealValue * 4 > currentBeat + 0.1) {
-    osmd.cursor.reset();
-  }
-
-  // Tiến hành di chuyển cursor cho tới vị trí nhịp hiện tại
-  while (
-    osmd.cursor.iterator &&
-    !osmd.cursor.iterator.EndReached &&
-    osmd.cursor.iterator.currentTimeStamp.RealValue * 4 <= currentBeat
-  ) {
-    osmd.cursor.next();
-  }
-}
 
 // Xóa trắng bản nhạc cũ
 function clearRender() {
@@ -157,7 +128,7 @@ async function renderMusic() {
     const { OpenSheetMusicDisplay } = await import('opensheetmusicdisplay');
     osmd = new OpenSheetMusicDisplay(osmdContainer.value, {
       autoResize: true,
-      backend: 'svg',
+      backend: 'canvas',
       drawTitle: true,
       drawSubtitle: true,
       drawComposer: true,
@@ -166,8 +137,6 @@ async function renderMusic() {
 
     await osmd.load(props.rawText);
     osmd.render();
-    osmd.cursor.show();
-    osmd.cursor.reset();
   } 
   else if (props.fileType === 'abc' && props.rawText) {
     const abcjs = await import('abcjs');

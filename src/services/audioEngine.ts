@@ -173,6 +173,9 @@ class AudioEngineService {
       // 7. Tải nhạc cụ mặc định (Acoustic Grand Piano - 0)
       await this.loadInstrumentSoundbank(0);
 
+      // Thiết lập âm lượng tổng ban đầu cho bộ tổng hợp âm
+      this.synth.setSystemParameter('gain', this.masterVolume / 100);
+
       this.isReady = true;
       this.isLoadingSoundfont = false;
       this.triggerStateChange();

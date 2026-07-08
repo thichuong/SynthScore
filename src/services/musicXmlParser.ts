@@ -9,24 +9,36 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
   const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
   
   const midi = new Midi();
-  const titleNode = xmlDoc.querySelector('work work-title') || xmlDoc.querySelector('movement-title');
+  const titleNode = xmlDoc.getElementsByTagNameNS('*', 'work-title')[0] || xmlDoc.getElementsByTagNameNS('*', 'movement-title')[0];
   midi.name = titleNode?.textContent?.trim() || 'MusicXML Song';
 
-  const parts = xmlDoc.querySelectorAll('part-list score-part');
+  const parts = xmlDoc.getElementsByTagNameNS('*', 'score-part');
   const partMap = new Map<string, string>();
-  parts.forEach(part => {
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
     const id = part.getAttribute('id');
-    const name = part.querySelector('part-name')?.textContent || 'Instrument';
+    const nameNode = part.getElementsByTagNameNS('*', 'part-name')[0];
+    const name = nameNode?.textContent || 'Instrument';
     if (id) partMap.set(id, name);
-  });
+  }
 
-  const partElements = xmlDoc.querySelectorAll('part');
-  partElements.forEach(partEl => {
+  const partElements = xmlDoc.getElementsByTagNameNS('*', 'part');
+  let channelCounter = 0;
+
+  for (let p = 0; p < partElements.length; p++) {
+    const partEl = partElements[p];
     const partId = partEl.getAttribute('id') || '';
     const trackName = partMap.get(partId) || 'Track';
     
     const track = midi.addTrack();
     track.name = trackName;
+
+    // Gán channel MIDI riêng cho từng track (bỏ qua kênh 9 dành cho trống)
+    if (channelCounter === 9) {
+      channelCounter++;
+    }
+    track.channel = channelCounter % 16;
+    channelCounter++;
     
     // Tự động gán loại nhạc cụ cơ bản dựa trên tên
     const nameLower = trackName.toLowerCase();
@@ -50,33 +62,37 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
     // Để xử lý chords, chúng ta lưu thời gian bắt đầu của nốt trước đó
     let lastNoteStartTime = 0;
 
-    const measures = partEl.querySelectorAll('measure');
-    measures.forEach(measure => {
+    const measures = partEl.getElementsByTagNameNS('*', 'measure');
+    for (let m = 0; m < measures.length; m++) {
+      const measure = measures[m];
       const children = Array.from(measure.childNodes);
       
       children.forEach(child => {
         if (child.nodeType !== Node.ELEMENT_NODE) return;
         const el = child as HTMLElement;
-        const tagName = el.tagName.toLowerCase();
+        const tagName = el.localName.toLowerCase();
 
         if (tagName === 'attributes') {
-          const divNode = el.querySelector('divisions');
+          const divNode = el.getElementsByTagNameNS('*', 'divisions')[0];
           if (divNode) {
             divisions = parseInt(divNode.textContent || '1', 10);
           }
         } 
         else if (tagName === 'direction') {
-          const tempoNode = el.querySelector('sound[tempo]');
-          if (tempoNode) {
-            const newBpm = parseFloat(tempoNode.getAttribute('tempo') || '120');
-            if (newBpm > 0) {
-              currentBpm = newBpm;
-              midi.header.setTempo(currentBpm);
+          const soundNodes = el.getElementsByTagNameNS('*', 'sound');
+          for (let s = 0; s < soundNodes.length; s++) {
+            if (soundNodes[s].hasAttribute('tempo')) {
+              const newBpm = parseFloat(soundNodes[s].getAttribute('tempo') || '120');
+              if (newBpm > 0) {
+                currentBpm = newBpm;
+                midi.header.setTempo(currentBpm);
+              }
+              break;
             }
           }
         } 
         else if (tagName === 'backup') {
-          const durNode = el.querySelector('duration');
+          const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
             const dur = parseInt(durNode.textContent || '0', 10);
             const beats = dur / divisions;
@@ -85,7 +101,7 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
           }
         } 
         else if (tagName === 'forward') {
-          const durNode = el.querySelector('duration');
+          const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
             const dur = parseInt(durNode.textContent || '0', 10);
             const beats = dur / divisions;
@@ -94,10 +110,10 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
           }
         } 
         else if (tagName === 'note') {
-          const isRest = el.querySelector('rest') !== null;
-          const isChord = el.querySelector('chord') !== null;
+          const isRest = el.getElementsByTagNameNS('*', 'rest').length > 0;
+          const isChord = el.getElementsByTagNameNS('*', 'chord').length > 0;
           
-          const durNode = el.querySelector('duration');
+          const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           const durationVal = durNode ? parseInt(durNode.textContent || '0', 10) : 0;
           const durationBeats = durationVal / divisions;
           const durationSeconds = durationBeats * (60 / currentBpm);
@@ -108,11 +124,14 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
             timeInSeconds += durationSeconds;
           } else {
             // Đọc thông tin cao độ nốt nhạc
-            const pitchNode = el.querySelector('pitch');
+            const pitchNode = el.getElementsByTagNameNS('*', 'pitch')[0];
             if (pitchNode) {
-              const step = pitchNode.querySelector('step')?.textContent || 'C';
-              const octave = parseInt(pitchNode.querySelector('octave')?.textContent || '4', 10);
-              const alterVal = parseFloat(pitchNode.querySelector('alter')?.textContent || '0');
+              const stepNode = pitchNode.getElementsByTagNameNS('*', 'step')[0];
+              const step = stepNode?.textContent || 'C';
+              const octaveNode = pitchNode.getElementsByTagNameNS('*', 'octave')[0];
+              const octave = parseInt(octaveNode?.textContent || '4', 10);
+              const alterNode = pitchNode.getElementsByTagNameNS('*', 'alter')[0];
+              const alterVal = parseFloat(alterNode?.textContent || '0');
               
               const noteName = getNoteName(step, alterVal, octave);
               
@@ -142,8 +161,8 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
           }
         }
       });
-    });
-  });
+    }
+  }
 
   return midi.toArray();
 }
