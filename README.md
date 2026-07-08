@@ -10,7 +10,6 @@ SynthScore là một ứng dụng web hiện đại được xây dựng trên *
 *   **Hiển thị Bản nhạc truyền thống:** Hỗ trợ kết xuất các định dạng **MusicXML** / **MXL** (compressed MusicXML) thông qua thư viện `OpenSheetMusicDisplay` (OSMD).
 *   **Hỗ trợ Định dạng ABC:** Kết xuất bản nhạc cực kỳ nhanh chóng từ mã nguồn định dạng `.abc` thông qua thư viện `abcjs`.
 *   **Thác nước Nốt nhạc (Piano Roll Visualizer):** Chế độ hiển thị thác nốt đổ (Falling Notes) tuyệt đẹp trực tiếp trên Canvas, đồng bộ hóa thời gian thực với nhạc đang phát.
-*   **Dẫn hướng & Theo dõi trực quan:** Tự động di chuyển dòng kẻ nhạc (auto-scroll) và đánh dấu nốt nhạc/vạch nhịp đang phát.
 
 ### 2. 🎛️ Bàn Trộn Âm Thanh Dàn Nhạc (Orchestra Mixer)
 *   **Hỗ trợ Đa Kênh (Multi-track):** Hiển thị danh sách toàn bộ các track/kênh nhạc cụ có trong file nhạc.
