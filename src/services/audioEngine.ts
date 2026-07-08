@@ -37,6 +37,12 @@ class AudioEngineService {
   public playbackRate = 1.0;
   public masterVolume = 80; // 0 to 100
 
+  // Hiệu ứng không gian Master Reverb
+  public masterReverbGain = 50; // 0 to 100 (50% mặc định)
+  public reverbCharacter = 3;   // 0 to 7 (3 = Concert Hall)
+  public reverbTime = 90;       // 0 to 127
+  public reverbPreDelay = 40;   // 0 to 127
+
   // Danh sách bè nhạc (tracks)
   public tracks: TrackInfo[] = [];
 
@@ -171,6 +177,17 @@ class AudioEngineService {
 
       // Thiết lập âm lượng tổng ban đầu cho bộ tổng hợp âm
       this.synth.setSystemParameter('gain', this.masterVolume / 100);
+
+      // Kích hoạt bộ xử lý hiệu ứng (Reverb/Chorus/Delay)
+      this.synth.setSystemParameter('effectsEnabled', true);
+      this.synth.setSystemParameter('reverbGain', this.masterReverbGain / 100);
+
+      // Cấu hình Reverb mặc định sang kiểu phòng hòa nhạc ấm
+      if (this.synth.reverbProcessor) {
+        this.synth.reverbProcessor.character = this.reverbCharacter;
+        this.synth.reverbProcessor.time = this.reverbTime;
+        this.synth.reverbProcessor.preDelayTime = this.reverbPreDelay;
+      }
 
       this.isReady = true;
       this.isLoadingSoundfont = false;
@@ -355,13 +372,94 @@ class AudioEngineService {
   private resetMixerSettings(): void {
     if (!this.synth) return;
     
-    // Đặt lại âm lượng và tắt/bật cho tất cả 16 kênh của Synthesizer
-    for (let i = 0; i < 16; i++) {
-      const channel = this.synth.midiChannels[i];
-      if (channel) {
-        channel.setSystemParameter('gain', 0.8);
-        channel.setSystemParameter('isMuted', false);
+    // Áp dụng âm lượng, pan, reverb, chorus cho các track hiện có
+    this.tracks.forEach(track => {
+      if (this.synth) {
+        const channel = this.synth.midiChannels[track.channel];
+        if (channel) {
+          channel.setSystemParameter('gain', track.volume / 100);
+          channel.setSystemParameter('pan', track.pan / 100);
+          channel.setSystemParameter('isMuted', track.isMuted);
+          this.synth.controllerChange(track.channel, 91, track.reverbSend);
+          this.synth.controllerChange(track.channel, 93, track.chorusSend);
+        }
       }
+    });
+
+    // Reset các kênh còn lại về mặc định
+    const usedChannels = new Set(this.tracks.map(t => t.channel));
+    for (let i = 0; i < 16; i++) {
+      if (!usedChannels.has(i)) {
+        const channel = this.synth.midiChannels[i];
+        if (channel) {
+          channel.setSystemParameter('gain', 0.8);
+          channel.setSystemParameter('pan', 0);
+          channel.setSystemParameter('isMuted', false);
+          this.synth.controllerChange(i, 91, 0);
+          this.synth.controllerChange(i, 93, 0);
+        }
+      }
+    }
+  }
+
+  // Điều chỉnh Panning cho một track
+  public setTrackPan(channelIndex: number, pan: number): void {
+    const track = this.tracks.find(t => t.channel === channelIndex);
+    if (track) {
+      track.pan = pan;
+      if (this.synth) {
+        const chan = this.synth.midiChannels[channelIndex];
+        if (chan) {
+          chan.setSystemParameter('pan', pan / 100);
+        }
+      }
+      this.triggerStateChange();
+    }
+  }
+
+  // Điều chỉnh lượng Reverb Send cho một track (CC 91)
+  public setTrackReverbSend(channelIndex: number, val: number): void {
+    const track = this.tracks.find(t => t.channel === channelIndex);
+    if (track) {
+      track.reverbSend = val;
+      if (this.synth) {
+        this.synth.controllerChange(channelIndex, 91, val);
+      }
+      this.triggerStateChange();
+    }
+  }
+
+  // Điều chỉnh lượng Chorus Send cho một track (CC 93)
+  public setTrackChorusSend(channelIndex: number, val: number): void {
+    const track = this.tracks.find(t => t.channel === channelIndex);
+    if (track) {
+      track.chorusSend = val;
+      if (this.synth) {
+        this.synth.controllerChange(channelIndex, 93, val);
+      }
+      this.triggerStateChange();
+    }
+  }
+
+  // Điều chỉnh Master Reverb Volume
+  public setMasterReverbGain(vol: number): void {
+    this.masterReverbGain = vol;
+    if (this.synth) {
+      this.synth.setSystemParameter('reverbGain', vol / 100);
+      this.triggerStateChange();
+    }
+  }
+
+  // Điều chỉnh các tham số chi tiết của Reverb
+  public setMasterReverbParams(char: number, time: number, preDelay: number): void {
+    this.reverbCharacter = char;
+    this.reverbTime = time;
+    this.reverbPreDelay = preDelay;
+    if (this.synth && this.synth.reverbProcessor) {
+      this.synth.reverbProcessor.character = char;
+      this.synth.reverbProcessor.time = time;
+      this.synth.reverbProcessor.preDelayTime = preDelay;
+      this.triggerStateChange();
     }
   }
 
@@ -564,7 +662,10 @@ class AudioEngineService {
       volume: 80,
       isMuted: false,
       isSoloed: false,
-      noteCount: 0
+      noteCount: 0,
+      pan: 0,
+      reverbSend: 50,
+      chorusSend: 0
     };
     
     this.tracks.push(newTrack);

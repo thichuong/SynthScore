@@ -10,6 +10,54 @@ export interface TrackInfo {
   isMuted: boolean;
   isSoloed: boolean;
   noteCount: number;
+  pan: number;         // -100 to 100 (Left to Right)
+  reverbSend: number;  // 0 to 127
+  chorusSend: number;  // 0 to 127
+}
+
+// Hàm cung cấp cấu hình không gian âm thanh mặc định cho nhạc cụ
+export function getDefaultTrackSettings(program: number, channel: number): { pan: number; reverbSend: number; chorusSend: number } {
+  // Bè dây (40-47)
+  if (program >= 40 && program <= 47) {
+    let pan = 0;
+    // Cấu hình vị trí Pan dàn nhạc giao hưởng cổ điển
+    if (program === 40) {
+      // Violin: Lệch trái. Kênh chẵn lệch nhiều hơn, kênh lẻ lệch ít hơn
+      pan = channel % 2 === 0 ? -30 : -15;
+    } else if (program === 41) {
+      // Viola: Hơi lệch trái
+      pan = -10;
+    } else if (program === 42) {
+      // Cello: Hơi lệch phải
+      pan = 20;
+    } else if (program === 43) {
+      // Contrabass: Lệch phải nhiều
+      pan = 40;
+    } else {
+      pan = -5;
+    }
+    return {
+      pan,
+      reverbSend: 90,  // Tăng vang nhiều cho bè dây
+      chorusSend: program === 40 ? 40 : 25  // Thêm chorus để tạo cảm giác dày bè (ensemble)
+    };
+  }
+
+  // Piano (0-7)
+  if (program >= 0 && program <= 7) {
+    return {
+      pan: 0,
+      reverbSend: 64,
+      chorusSend: 0
+    };
+  }
+
+  // Các nhạc cụ khác mặc định
+  return {
+    pan: 0,
+    reverbSend: 50,
+    chorusSend: 0
+  };
 }
 
 // Cấu hình 11 nhạc cụ giao hưởng
@@ -69,6 +117,7 @@ export function parseMidiTracks(arrayBuffer: ArrayBuffer): TrackInfo[] {
 
     // Tạo mảng thông tin track hoàn chỉnh
     return Array.from(channelNotes.entries()).map(([chan, info]) => {
+      const defaults = getDefaultTrackSettings(info.instrNum, chan);
       return {
         channel: chan,
         name: info.name,
@@ -77,23 +126,30 @@ export function parseMidiTracks(arrayBuffer: ArrayBuffer): TrackInfo[] {
         volume: 80,
         isMuted: false,
         isSoloed: false,
-        noteCount: info.count
+        noteCount: info.count,
+        ...defaults
       };
     }).sort((a, b) => a.channel - b.channel);
 
   } catch (e) {
     console.error('Không thể phân tích cấu trúc MIDI tracks:', e);
     // Fallback: tạo 16 kênh mặc định
-    return Array.from({ length: 16 }, (_, i) => ({
-      channel: i,
-      name: i === 9 ? 'Bộ trống (Drums)' : `Bè Kênh ${i + 1}`,
-      instrumentName: i === 9 ? 'Drum Kit' : 'Acoustic Piano',
-      instrumentNumber: i === 9 ? 0 : 0,
-      volume: 80,
-      isMuted: false,
-      isSoloed: false,
-      noteCount: 1
-    }));
+    return Array.from({ length: 16 }, (_, i) => {
+      const isDrum = i === 9;
+      const prog = isDrum ? 0 : 0;
+      const defaults = getDefaultTrackSettings(prog, i);
+      return {
+        channel: i,
+        name: isDrum ? 'Bộ trống (Drums)' : `Bè Kênh ${i + 1}`,
+        instrumentName: isDrum ? 'Drum Kit' : 'Acoustic Piano',
+        instrumentNumber: isDrum ? 0 : 0,
+        volume: 80,
+        isMuted: false,
+        isSoloed: false,
+        noteCount: 1,
+        ...defaults
+      };
+    });
   }
 }
 
