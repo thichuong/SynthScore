@@ -90,7 +90,7 @@ import PlaybackControls from './components/PlaybackControls.vue';
 import SongLibraryPicker from './components/SongLibraryPicker.vue';
 
 import { AudioEngine } from './services/audioEngine';
-import type { TrackInfo } from './services/audioEngine';
+import type { TrackInfo } from './services/midiGenerator';
 import { parseMusicXmlToMidiBytes } from './services/musicXmlParser';
 import { parseMxl } from './services/mxlParser';
 import { getCachedSong, cacheSong } from './services/appCache';

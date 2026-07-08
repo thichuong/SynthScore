@@ -149,7 +149,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { Sliders, Volume2, VolumeX, Music, Trash2, Plus, Play } from 'lucide-vue-next';
 import { AudioEngine } from '../services/audioEngine';
-import type { TrackInfo } from '../services/audioEngine';
+import type { TrackInfo } from '../services/midiGenerator';
 import { instrumentGroups } from '../data/instruments';
 
 defineProps<{
