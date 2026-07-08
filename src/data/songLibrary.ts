@@ -7,14 +7,25 @@ export interface SongEntry {
   /** Tên hiển thị của bản nhạc */
   name: string;
   /** URL trực tiếp tới file .mxl */
-  url: string;
+  url?: string;
   /** Nhạc sĩ / tác giả (tùy chọn) */
   composer?: string;
   /** Mức độ khó (tùy chọn) */
   difficulty?: 'beginner' | 'easy' | 'intermediate' | 'advanced' | 'expert';
+  /** Danh sách thẻ bài hát */
+  tags?: string[];
+  /** Đánh dấu là bài hát tải lên */
+  isUploaded?: boolean;
+  /** Dữ liệu tệp tải lên phục vụ phát nhạc */
+  uploadedData?: {
+    data: Uint8Array | string;
+    type: 'xml' | 'abc' | 'midi';
+    midiBytes: Uint8Array;
+    rawText: string | null;
+  };
 }
 
-export const songLibrary: SongEntry[] = [
+const songLibraryData: SongEntry[] = [
   // --- Bach ---
   {
     name: 'Air on the G String',
@@ -457,6 +468,11 @@ export const songLibrary: SongEntry[] = [
     difficulty: 'advanced',
   },
 ];
+
+export const songLibrary: SongEntry[] = songLibraryData.map(song => ({
+  ...song,
+  tags: ['có sẵn']
+}));
 
 /**
  * Lấy danh sách nhạc sĩ duy nhất từ thư viện.

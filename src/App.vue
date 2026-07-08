@@ -15,6 +15,7 @@
       <div class="header-controls">
         <!-- Thư viện bản nhạc -->
         <SongLibraryPicker 
+          :songs="songs"
           :playingIndex="selectedSongIndex" 
           :isLoading="isLoadingLibrarySong"
           :disabled="isLoadingSoundfont"
@@ -117,6 +118,9 @@ const rawText = ref<string | null>(null);
 
 const selectedSongIndex = ref(-1);
 
+// Danh sách bài hát (reactive) khởi tạo bằng các bài hát mặc định từ songLibrary
+const songs = ref<SongEntry[]>([...songLibrary]);
+
 // Lắng nghe trạng thái thay đổi từ AudioEngine
 onMounted(() => {
   AudioEngine.onStateChange(() => {
@@ -140,8 +144,8 @@ onMounted(() => {
 
   // Tự động chuyển bài khi kết thúc bài hát
   AudioEngine.onSongEnded(async () => {
-    if (selectedSongIndex.value >= 0 && songLibrary.length > 0) {
-      const nextIndex = (selectedSongIndex.value + 1) % songLibrary.length;
+    if (selectedSongIndex.value >= 0 && songs.value.length > 0) {
+      const nextIndex = (selectedSongIndex.value + 1) % songs.value.length;
       await handleSongSelect(nextIndex);
       AudioEngine.play();
     }
@@ -166,6 +170,55 @@ async function handleModeChange(mode: 'default' | 'symphony' | 'concerto') {
   await AudioEngine.setPlaybackMode(mode);
 }
 
+// Hàm trích xuất metadata (tên bài hát, tác giả) từ định dạng .xml hoặc .abc
+function extractMetadata(data: string, type: 'xml' | 'abc'): { name?: string; composer?: string } {
+  const result: { name?: string; composer?: string } = {};
+  
+  if (type === 'xml') {
+    try {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(data, 'text/xml');
+      
+      const titleNode = xmlDoc.getElementsByTagNameNS('*', 'work-title')[0] || 
+                        xmlDoc.getElementsByTagNameNS('*', 'movement-title')[0];
+      if (titleNode?.textContent) {
+        result.name = titleNode.textContent.trim();
+      }
+      
+      const creators = xmlDoc.getElementsByTagNameNS('*', 'creator');
+      for (let i = 0; i < creators.length; i++) {
+        const creator = creators[i];
+        if (creator.getAttribute('type') === 'composer') {
+          result.composer = creator.textContent?.trim();
+          break;
+        }
+      }
+      if (!result.composer && creators.length > 0) {
+        result.composer = creators[0].textContent?.trim();
+      }
+    } catch (e) {
+      console.warn('Không thể phân tích metadata từ MusicXML:', e);
+    }
+  } 
+  else if (type === 'abc') {
+    try {
+      const lines = data.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('T:')) {
+          result.name = trimmed.substring(2).trim();
+        } else if (trimmed.startsWith('C:')) {
+          result.composer = trimmed.substring(2).trim();
+        }
+      }
+    } catch (e) {
+      console.warn('Không thể phân tích metadata từ ABC:', e);
+    }
+  }
+  
+  return result;
+}
+
 // Xử lý nạp nhạc từ người dùng tải lên
 async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xml' | 'abc' | 'midi'; name: string }) {
   // Đảm bảo AudioEngine đã được khởi tạo
@@ -173,52 +226,86 @@ async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xm
     await initializeEngine();
   }
 
-  // Reset chỉ số bài hát trong thư viện về -1 khi người dùng tải tệp tin nhạc riêng
-  selectedSongIndex.value = -1;
-
   let midiBytes: Uint8Array;
+  let rawTextValue: string | null = null;
   
   if (payload.type === 'midi') {
     midiBytes = payload.data as Uint8Array;
-    fileData.value = midiBytes;
-    fileType.value = 'midi';
-    rawText.value = null;
   } 
   else if (payload.type === 'xml') {
     const xmlText = payload.data as string;
     midiBytes = parseMusicXmlToMidiBytes(xmlText);
-    fileData.value = midiBytes;
-    fileType.value = 'xml';
-    rawText.value = xmlText;
+    rawTextValue = xmlText;
   } 
   else { // abc
     const abcText = payload.data as string;
     const abcjs = await import('abcjs');
     const midiBin = abcjs.default.synth.getMidiFile(abcText, { midiOutputType: 'binary' }) as any;
     midiBytes = new Uint8Array(midiBin);
-    fileData.value = midiBytes;
-    fileType.value = 'abc';
-    rawText.value = abcText;
+    rawTextValue = abcText;
   }
 
-  await AudioEngine.loadSong(midiBytes, payload.name);
+  // Trích xuất thông tin bài hát nếu có thể
+  let extractedName = payload.name.replace(/\.[^/.]+$/, "");
+  let extractedComposer = 'Tải lên bởi bạn';
+
+  if (payload.type === 'xml' || payload.type === 'abc') {
+    const meta = extractMetadata(payload.data as string, payload.type);
+    if (meta.name) {
+      extractedName = meta.name;
+    }
+    if (meta.composer) {
+      extractedComposer = meta.composer;
+    }
+  }
+
+  // Tạo một SongEntry mới có gắn thẻ "tải lên" và lưu dữ liệu tệp đã nạp
+  const newUploadedSong: SongEntry = {
+    name: extractedName,
+    composer: extractedComposer,
+    tags: ['tải lên'],
+    isUploaded: true,
+    uploadedData: {
+      data: payload.data,
+      type: payload.type,
+      midiBytes,
+      rawText: rawTextValue
+    }
+  };
+
+  // Thêm vào danh sách bài hát và tự động kích hoạt
+  songs.value.push(newUploadedSong);
+  const newIndex = songs.value.length - 1;
+  
+  await handleSongSelect(newIndex);
 }
 
 // Xử lý chọn bản nhạc từ SongLibraryPicker
 async function handleSongSelect(index: number) {
+  if (index < 0 || index >= songs.value.length) return;
   selectedSongIndex.value = index;
-  const song: SongEntry = songLibrary[index];
-  await loadFromLibrary(song);
+  const song: SongEntry = songs.value[index];
+
+  if (song.isUploaded && song.uploadedData) {
+    // Nếu là bài hát người dùng tải lên, dùng luôn dữ liệu đã lưu trong bộ nhớ
+    fileData.value = song.uploadedData.midiBytes;
+    fileType.value = song.uploadedData.type;
+    rawText.value = song.uploadedData.rawText;
+    await AudioEngine.loadSong(song.uploadedData.midiBytes, song.name);
+  } else {
+    // Bài hát thư viện chuẩn thì tải từ mạng
+    await loadFromLibrary(song);
+  }
 }
 
 // Xử lý chuyển sang bài hát phía trước
 async function handlePrevSong() {
-  if (songLibrary.length === 0) return;
+  if (songs.value.length === 0) return;
   let newIndex = selectedSongIndex.value - 1;
   if (selectedSongIndex.value === -1) {
-    newIndex = songLibrary.length - 1;
+    newIndex = songs.value.length - 1;
   } else if (newIndex < 0) {
-    newIndex = songLibrary.length - 1;
+    newIndex = songs.value.length - 1;
   }
   const wasPlaying = isPlaying.value;
   await handleSongSelect(newIndex);
@@ -229,11 +316,11 @@ async function handlePrevSong() {
 
 // Xử lý chuyển sang bài hát kế tiếp
 async function handleNextSong() {
-  if (songLibrary.length === 0) return;
+  if (songs.value.length === 0) return;
   let newIndex = selectedSongIndex.value + 1;
   if (selectedSongIndex.value === -1) {
     newIndex = 0;
-  } else if (newIndex >= songLibrary.length) {
+  } else if (newIndex >= songs.value.length) {
     newIndex = 0;
   }
   const wasPlaying = isPlaying.value;
@@ -248,24 +335,30 @@ async function loadFromLibrary(song: SongEntry) {
     await initializeEngine();
   }
 
+  if (!song.url) {
+    console.error('Không tìm thấy URL của bài hát từ thư viện:', song);
+    return;
+  }
+
+  const url = song.url;
   isLoadingLibrarySong.value = true;
 
   try {
     let buffer: ArrayBuffer;
 
     // Kiểm tra cache trước
-    const cached = await getCachedSong(song.url);
+    const cached = await getCachedSong(url);
     if (cached) {
       buffer = cached;
     } else {
       // Tải từ mạng và lưu cache
-      const response = await fetch(song.url);
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       buffer = await response.arrayBuffer();
       // Lưu vào IndexedDB để lần sau không cần tải lại
-      await cacheSong(song.url, buffer);
+      await cacheSong(url, buffer);
     }
     
     // Giải nén MXL → MusicXML text

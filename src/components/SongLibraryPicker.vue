@@ -11,10 +11,10 @@
       
       <span class="trigger-text">
         <template v-if="isLoading">Đang tải bản nhạc...</template>
-        <template v-else-if="playingIndex >= 0">
-          <span class="trigger-song-name">{{ songLibrary[playingIndex].name }}</span>
-          <span class="trigger-composer" v-if="songLibrary[playingIndex].composer">
-            — {{ songLibrary[playingIndex].composer }}
+        <template v-else-if="playingIndex >= 0 && songs[playingIndex]">
+          <span class="trigger-song-name">{{ songs[playingIndex].name }}</span>
+          <span class="trigger-composer" v-if="songs[playingIndex].composer">
+            — {{ songs[playingIndex].composer }}
           </span>
         </template>
         <template v-else>🎵 Chọn bản nhạc từ thư viện...</template>
@@ -37,6 +37,19 @@
             class="search-input"
             @keydown.escape="closeDropdown"
           />
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="tag-filters">
+          <button 
+            v-for="tab in ['tất cả', 'có sẵn', 'tải lên']" 
+            :key="tab"
+            class="filter-tab"
+            :class="{ active: activeFilter === tab }"
+            @click="activeFilter = tab"
+          >
+            {{ tab }}
+          </button>
         </div>
 
         <!-- Song List -->
@@ -70,6 +83,16 @@
                 >
                   {{ difficultyLabel(song.difficulty) }}
                 </span>
+                <span class="song-tags" v-if="song.tags && song.tags.length">
+                  <span 
+                    v-for="t in song.tags" 
+                    :key="t"
+                    class="song-tag"
+                    :class="t === 'tải lên' ? 'tag-uploaded' : 'tag-builtin'"
+                  >
+                    {{ t }}
+                  </span>
+                </span>
               </span>
             </div>
 
@@ -93,10 +116,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { Music, ChevronDown, Search } from 'lucide-vue-next';
-import { songLibrary } from '../data/songLibrary';
 import type { SongEntry } from '../data/songLibrary';
 
 const props = defineProps<{
+  songs: SongEntry[];
   playingIndex: number;
   isLoading: boolean;
   disabled: boolean;
@@ -109,6 +132,7 @@ const emit = defineEmits<{
 const isOpen = ref(false);
 const searchQuery = ref('');
 const hoveredIndex = ref(-1);
+const activeFilter = ref<'tất cả' | 'có sẵn' | 'tải lên'>('tất cả');
 
 const pickerRef = ref<HTMLElement | null>(null);
 const searchInputRef = ref<HTMLInputElement | null>(null);
@@ -122,7 +146,14 @@ const filteredSongs = computed<FilteredSong[]>(() => {
   const query = searchQuery.value.toLowerCase().trim();
   const results: FilteredSong[] = [];
   
-  songLibrary.forEach((song, idx) => {
+  props.songs.forEach((song, idx) => {
+    // Lọc theo tag
+    if (activeFilter.value !== 'tất cả') {
+      if (!song.tags || !song.tags.includes(activeFilter.value)) {
+        return;
+      }
+    }
+
     if (!query) {
       results.push({ ...song, originalIndex: idx });
       return;
@@ -566,5 +597,69 @@ watch(() => props.playingIndex, () => {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* === Tag Filters === */
+.tag-filters {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.filter-tab {
+  background: none;
+  border: none;
+  color: #8c8c9e;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  text-transform: uppercase;
+}
+
+.filter-tab:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.filter-tab.active {
+  color: #00f0ff;
+  background: rgba(0, 240, 255, 0.08);
+  border-color: rgba(0, 240, 255, 0.2);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.05);
+}
+
+/* === Song Tags === */
+.song-tags {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.song-tag {
+  font-size: 0.55rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.tag-builtin {
+  background: rgba(127, 0, 255, 0.1);
+  color: #a070ff;
+  border: 1px solid rgba(127, 0, 255, 0.2);
+}
+
+.tag-uploaded {
+  background: rgba(0, 240, 255, 0.1);
+  color: #00f0ff;
+  border: 1px solid rgba(0, 240, 255, 0.2);
 }
 </style>
