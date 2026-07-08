@@ -183,10 +183,10 @@ class AudioEngineService {
       this.synth.setSystemParameter('reverbGain', this.masterReverbGain / 100);
 
       // Cấu hình Reverb mặc định sang kiểu phòng hòa nhạc ấm
-      if (this.synth.reverbProcessor) {
-        this.synth.reverbProcessor.character = this.reverbCharacter;
-        this.synth.reverbProcessor.time = this.reverbTime;
-        this.synth.reverbProcessor.preDelayTime = this.reverbPreDelay;
+      if ((this.synth as any).reverbProcessor) {
+        (this.synth as any).reverbProcessor.character = this.reverbCharacter;
+        (this.synth as any).reverbProcessor.time = this.reverbTime;
+        (this.synth as any).reverbProcessor.preDelayTime = this.reverbPreDelay;
       }
 
       this.isReady = true;
@@ -455,10 +455,10 @@ class AudioEngineService {
     this.reverbCharacter = char;
     this.reverbTime = time;
     this.reverbPreDelay = preDelay;
-    if (this.synth && this.synth.reverbProcessor) {
-      this.synth.reverbProcessor.character = char;
-      this.synth.reverbProcessor.time = time;
-      this.synth.reverbProcessor.preDelayTime = preDelay;
+    if (this.synth && (this.synth as any).reverbProcessor) {
+      (this.synth as any).reverbProcessor.character = char;
+      (this.synth as any).reverbProcessor.time = time;
+      (this.synth as any).reverbProcessor.preDelayTime = preDelay;
       this.triggerStateChange();
     }
   }

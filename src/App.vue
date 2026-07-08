@@ -82,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, shallowRef, onMounted } from 'vue';
 import { Music, CheckCircle, AlertCircle } from 'lucide-vue-next';
 import FileUploader from './components/FileUploader.vue';
 import OrchestraMixer from './components/OrchestraMixer.vue';
@@ -112,7 +112,7 @@ const songName = ref('');
 const tracks = ref<TrackInfo[]>([]);
 const playbackMode = ref<'default' | 'symphony' | 'concerto'>('default');
 
-const fileData = ref<Uint8Array | string | null>(null);
+const fileData = shallowRef<Uint8Array | string | null>(null);
 const fileType = ref<'xml' | 'abc' | 'midi' | null>(null);
 const rawText = ref<string | null>(null);
 

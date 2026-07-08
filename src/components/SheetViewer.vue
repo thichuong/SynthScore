@@ -76,31 +76,42 @@ const hasSheet = computed(() => {
   return props.fileType === 'xml' || props.fileType === 'abc';
 });
 
-// Watch thay đổi dữ liệu tệp tin để render lại
-watch(() => props.fileData, async (newData) => {
-  if (!newData) {
-    clearRender();
+// Watch thay đổi dữ liệu text bản nhạc (MusicXML hoặc ABC) để render lại sheet music
+watch(() => props.rawText, async (newText) => {
+  if (!newText) {
+    clearSheetMusic();
     return;
   }
   
-  if (hasSheet.value) {
-    activeTab.value = 'sheet';
-  } else {
-    activeTab.value = 'visualizer';
-  }
-
   loading.value = true;
   // Cho phép Vue cập nhật DOM trước khi render
   setTimeout(async () => {
     try {
-      await renderMusic();
+      await renderSheetMusic();
     } catch (e) {
       console.error('Lỗi khi hiển thị bản nhạc:', e);
     } finally {
       loading.value = false;
     }
   }, 100);
-}, { deep: true });
+});
+
+// Watch thay đổi dữ liệu MIDI để khởi chạy lại Falling Notes visualizer
+watch(() => props.fileData, (newData) => {
+  if (!newData) {
+    clearVisualizer();
+    return;
+  }
+  
+  // Tự động chuyển tab dựa trên việc có hỗ trợ bản nhạc không
+  if (hasSheet.value) {
+    activeTab.value = 'sheet';
+  } else {
+    activeTab.value = 'visualizer';
+  }
+
+  renderVisualizer();
+});
 
 // Khởi chạy vòng lặp hoạt ảnh vẽ Falling Notes
 watch(() => activeTab.value, (newTab) => {
@@ -113,16 +124,20 @@ watch(() => activeTab.value, (newTab) => {
 
 
 // Xóa trắng bản nhạc cũ
-function clearRender() {
+function clearSheetMusic() {
   if (osmdContainer.value) osmdContainer.value.innerHTML = '';
   const abcContainer = document.getElementById('abc-container');
   if (abcContainer) abcContainer.innerHTML = '';
+}
+
+// Dừng visualizer
+function clearVisualizer() {
   stopAnimation();
 }
 
 // Render bản nhạc dựa trên định dạng
-async function renderMusic() {
-  clearRender();
+async function renderSheetMusic() {
+  clearSheetMusic();
 
   if (props.fileType === 'xml' && props.rawText && osmdContainer.value) {
     const { OpenSheetMusicDisplay } = await import('opensheetmusicdisplay');
@@ -145,8 +160,10 @@ async function renderMusic() {
       add_classes: true,
     });
   }
+}
 
-  // Chuẩn bị dữ liệu nốt nhạc cho Falling Notes canvas
+// Render visualizer canvas
+function renderVisualizer() {
   if (visualizerCanvas.value) {
     initCanvas();
     startAnimation();
@@ -427,8 +444,11 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
 
 onMounted(() => {
   window.addEventListener('resize', initCanvas);
+  if (props.rawText) {
+    renderSheetMusic();
+  }
   if (props.fileData) {
-    renderMusic();
+    renderVisualizer();
   }
 });
 
