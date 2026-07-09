@@ -16,6 +16,8 @@ export interface SongEntry {
   tags?: string[];
   /** Đánh dấu là bài hát tải lên */
   isUploaded?: boolean;
+  /** Đánh dấu là bài hát ưa thích */
+  isFavorite?: boolean;
   /** Dữ liệu tệp tải lên phục vụ phát nhạc */
   uploadedData?: {
     data: Uint8Array | string;

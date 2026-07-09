@@ -16,10 +16,14 @@
         <!-- Thư viện bản nhạc -->
         <SongLibraryPicker 
           :songs="songs"
+          :filteredSongs="filteredSongs"
           :playingIndex="selectedSongIndex" 
           :isLoading="isLoadingLibrarySong"
           :disabled="isLoadingSoundfont"
+          v-model:searchQuery="searchQuery"
+          v-model:activeFilter="activeFilter"
           @select="handleSongSelect"
+          @toggle-favorite="toggleFavorite"
         />
 
         <FileUploader @musicLoaded="handleMusicLoaded" />
@@ -82,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted } from 'vue';
+import { ref, shallowRef, onMounted, computed } from 'vue';
 import { Music, CheckCircle, AlertCircle } from 'lucide-vue-next';
 import FileUploader from './components/FileUploader.vue';
 import OrchestraMixer from './components/OrchestraMixer.vue';
@@ -118,11 +122,67 @@ const rawText = ref<string | null>(null);
 
 const selectedSongIndex = ref(-1);
 
+// Định danh bài hát duy nhất bằng khóa
+function getSongKey(song: SongEntry): string {
+  if (song.url) return song.url;
+  return `uploaded_${song.composer || ''}_${song.name}`;
+}
+
+const searchQuery = ref('');
+const activeFilter = ref<'tất cả' | 'có sẵn' | 'tải lên' | 'ưa thích'>('tất cả');
+
+interface FilteredSong extends SongEntry {
+  originalIndex: number;
+}
+
 // Danh sách bài hát (reactive) khởi tạo bằng các bài hát mặc định từ songLibrary
-const songs = ref<SongEntry[]>([...songLibrary]);
+const songs = ref<SongEntry[]>(songLibrary.map(song => ({
+  ...song,
+  isFavorite: false
+})));
+
+const filteredSongs = computed<FilteredSong[]>(() => {
+  const query = searchQuery.value.toLowerCase().trim();
+  const results: FilteredSong[] = [];
+
+  songs.value.forEach((song, idx) => {
+    // 1. Lọc theo bộ lọc tab
+    if (activeFilter.value === 'có sẵn') {
+      if (!song.tags?.includes('có sẵn')) return;
+    } else if (activeFilter.value === 'tải lên') {
+      if (!song.tags?.includes('tải lên')) return;
+    } else if (activeFilter.value === 'ưa thích') {
+      if (!song.isFavorite) return;
+    }
+
+    // 2. Lọc theo tìm kiếm
+    if (query) {
+      const haystack = `${song.name} ${song.composer || ''}`.toLowerCase();
+      if (!haystack.includes(query)) return;
+    }
+
+    results.push({ ...song, originalIndex: idx });
+  });
+
+  return results;
+});
 
 // Lắng nghe trạng thái thay đổi từ AudioEngine
 onMounted(() => {
+  // Tải danh sách ưa thích từ localStorage
+  try {
+    const saved = localStorage.getItem('synthscore_favorites');
+    if (saved) {
+      const favoriteKeys = JSON.parse(saved);
+      songs.value = songs.value.map(song => ({
+        ...song,
+        isFavorite: favoriteKeys.includes(getSongKey(song))
+      }));
+    }
+  } catch (e) {
+    console.error('Không thể đọc danh sách ưa thích từ localStorage:', e);
+  }
+
   AudioEngine.onStateChange(() => {
     isInitialized.value = AudioEngine.isInitialized;
     isReady.value = AudioEngine.isReady;
@@ -142,11 +202,18 @@ onMounted(() => {
     currentTime.value = time;
   });
 
-  // Tự động chuyển bài khi kết thúc bài hát
+  // Tự động chuyển bài khi kết thúc bài hát (chỉ chuyển bài thuộc danh sách đã lọc)
   AudioEngine.onSongEnded(async () => {
-    if (selectedSongIndex.value >= 0 && songs.value.length > 0) {
-      const nextIndex = (selectedSongIndex.value + 1) % songs.value.length;
-      await handleSongSelect(nextIndex);
+    if (filteredSongs.value.length > 0) {
+      const currentFilteredIdx = filteredSongs.value.findIndex(
+        s => s.originalIndex === selectedSongIndex.value
+      );
+      let nextFilteredIdx = 0;
+      if (currentFilteredIdx !== -1) {
+        nextFilteredIdx = (currentFilteredIdx + 1) % filteredSongs.value.length;
+      }
+      const nextSongOriginalIdx = filteredSongs.value[nextFilteredIdx].originalIndex;
+      await handleSongSelect(nextSongOriginalIdx);
       AudioEngine.play();
     }
   });
@@ -260,11 +327,21 @@ async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xm
   }
 
   // Tạo một SongEntry mới có gắn thẻ "tải lên" và lưu dữ liệu tệp đã nạp
+  const uploadedSongKey = `uploaded_${extractedComposer}_${extractedName}`;
+  let isFav = false;
+  try {
+    const saved = localStorage.getItem('synthscore_favorites');
+    if (saved) {
+      isFav = JSON.parse(saved).includes(uploadedSongKey);
+    }
+  } catch {}
+
   const newUploadedSong: SongEntry = {
     name: extractedName,
     composer: extractedComposer,
     tags: ['tải lên'],
     isUploaded: true,
+    isFavorite: isFav,
     uploadedData: {
       data: payload.data,
       type: payload.type,
@@ -298,35 +375,62 @@ async function handleSongSelect(index: number) {
   }
 }
 
-// Xử lý chuyển sang bài hát phía trước
+// Xử lý chuyển sang bài hát phía trước trong danh sách đã lọc
 async function handlePrevSong() {
-  if (songs.value.length === 0) return;
-  let newIndex = selectedSongIndex.value - 1;
-  if (selectedSongIndex.value === -1) {
-    newIndex = songs.value.length - 1;
-  } else if (newIndex < 0) {
-    newIndex = songs.value.length - 1;
+  if (filteredSongs.value.length === 0) return;
+  
+  const currentFilteredIdx = filteredSongs.value.findIndex(
+    s => s.originalIndex === selectedSongIndex.value
+  );
+  
+  let prevFilteredIdx = filteredSongs.value.length - 1;
+  if (currentFilteredIdx !== -1) {
+    prevFilteredIdx = (currentFilteredIdx - 1 + filteredSongs.value.length) % filteredSongs.value.length;
   }
+  
+  const prevSongOriginalIdx = filteredSongs.value[prevFilteredIdx].originalIndex;
   const wasPlaying = isPlaying.value;
-  await handleSongSelect(newIndex);
+  await handleSongSelect(prevSongOriginalIdx);
   if (wasPlaying) {
     AudioEngine.play();
   }
 }
 
-// Xử lý chuyển sang bài hát kế tiếp
+// Xử lý chuyển sang bài hát kế tiếp trong danh sách đã lọc
 async function handleNextSong() {
-  if (songs.value.length === 0) return;
-  let newIndex = selectedSongIndex.value + 1;
-  if (selectedSongIndex.value === -1) {
-    newIndex = 0;
-  } else if (newIndex >= songs.value.length) {
-    newIndex = 0;
+  if (filteredSongs.value.length === 0) return;
+  
+  const currentFilteredIdx = filteredSongs.value.findIndex(
+    s => s.originalIndex === selectedSongIndex.value
+  );
+  
+  let nextFilteredIdx = 0;
+  if (currentFilteredIdx !== -1) {
+    nextFilteredIdx = (currentFilteredIdx + 1) % filteredSongs.value.length;
   }
+  
+  const nextSongOriginalIdx = filteredSongs.value[nextFilteredIdx].originalIndex;
   const wasPlaying = isPlaying.value;
-  await handleSongSelect(newIndex);
+  await handleSongSelect(nextSongOriginalIdx);
   if (wasPlaying) {
     AudioEngine.play();
+  }
+}
+
+// Xử lý đánh dấu ưa thích
+function toggleFavorite(originalIndex: number) {
+  if (originalIndex < 0 || originalIndex >= songs.value.length) return;
+  const song = songs.value[originalIndex];
+  song.isFavorite = !song.isFavorite;
+
+  // Cập nhật localStorage
+  const favoriteKeys = songs.value
+    .filter(s => s.isFavorite)
+    .map(s => getSongKey(s));
+  try {
+    localStorage.setItem('synthscore_favorites', JSON.stringify(favoriteKeys));
+  } catch (e) {
+    console.error('Không thể ghi danh sách ưa thích vào localStorage:', e);
   }
 }
 

@@ -42,7 +42,7 @@
         <!-- Filter Tabs -->
         <div class="tag-filters">
           <button 
-            v-for="tab in ['tất cả', 'có sẵn', 'tải lên']" 
+            v-for="tab in ['tất cả', 'có sẵn', 'tải lên', 'ưa thích']" 
             :key="tab"
             class="filter-tab"
             :class="{ active: activeFilter === tab }"
@@ -83,7 +83,7 @@
                 >
                   {{ difficultyLabel(song.difficulty) }}
                 </span>
-                <span class="song-tags" v-if="song.tags && song.tags.length">
+                <span class="song-tags" v-if="(song.tags && song.tags.length) || song.isFavorite">
                   <span 
                     v-for="t in song.tags" 
                     :key="t"
@@ -92,9 +92,22 @@
                   >
                     {{ t }}
                   </span>
+                  <span v-if="song.isFavorite" class="song-tag tag-favorite">
+                    ưa thích
+                  </span>
                 </span>
               </span>
             </div>
+
+            <!-- Favorite toggle button -->
+            <button 
+              class="favorite-btn" 
+              :class="{ 'is-favorite': song.isFavorite }"
+              @click.stop="emit('toggle-favorite', song.originalIndex)"
+              :title="song.isFavorite ? 'Bỏ ưa thích' : 'Thêm vào ưa thích'"
+            >
+              <Heart class="favorite-icon" :fill="song.isFavorite ? '#ff007f' : 'none'" />
+            </button>
 
             <div class="song-playing-badge" v-if="song.originalIndex === playingIndex">
               <span class="eq-bar"></span>
@@ -114,12 +127,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
-import { Music, ChevronDown, Search } from 'lucide-vue-next';
+import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { Music, ChevronDown, Search, Heart } from 'lucide-vue-next';
 import type { SongEntry } from '../data/songLibrary';
+
+interface FilteredSong extends SongEntry {
+  originalIndex: number;
+}
 
 const props = defineProps<{
   songs: SongEntry[];
+  filteredSongs: FilteredSong[];
   playingIndex: number;
   isLoading: boolean;
   disabled: boolean;
@@ -127,45 +145,17 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'select', index: number): void;
+  (e: 'toggle-favorite', index: number): void;
 }>();
 
 const isOpen = ref(false);
-const searchQuery = ref('');
+const searchQuery = defineModel<string>('searchQuery', { required: true });
 const hoveredIndex = ref(-1);
-const activeFilter = ref<'tất cả' | 'có sẵn' | 'tải lên'>('tất cả');
+const activeFilter = defineModel<'tất cả' | 'có sẵn' | 'tải lên' | 'ưa thích'>('activeFilter', { required: true });
 
 const pickerRef = ref<HTMLElement | null>(null);
 const searchInputRef = ref<HTMLInputElement | null>(null);
 const songListRef = ref<HTMLElement | null>(null);
-
-interface FilteredSong extends SongEntry {
-  originalIndex: number;
-}
-
-const filteredSongs = computed<FilteredSong[]>(() => {
-  const query = searchQuery.value.toLowerCase().trim();
-  const results: FilteredSong[] = [];
-  
-  props.songs.forEach((song, idx) => {
-    // Lọc theo tag
-    if (activeFilter.value !== 'tất cả') {
-      if (!song.tags || !song.tags.includes(activeFilter.value)) {
-        return;
-      }
-    }
-
-    if (!query) {
-      results.push({ ...song, originalIndex: idx });
-      return;
-    }
-    const haystack = `${song.name} ${song.composer || ''}`.toLowerCase();
-    if (haystack.includes(query)) {
-      results.push({ ...song, originalIndex: idx });
-    }
-  });
-
-  return results;
-});
 
 function difficultyLabel(diff?: SongEntry['difficulty']): string {
   const labels: Record<string, string> = {
@@ -661,5 +651,53 @@ watch(() => props.playingIndex, () => {
   background: rgba(0, 240, 255, 0.1);
   color: #00f0ff;
   border: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+.favorite-btn {
+  background: none;
+  border: none;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #5c5c6e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  margin-left: auto;
+  margin-right: 4px;
+  z-index: 2;
+  outline: none;
+}
+
+.song-item:hover .favorite-btn {
+  color: #8c8c9e;
+}
+
+.favorite-btn.is-favorite {
+  color: #ff007f;
+  animation: pulse-fav 0.3s ease;
+}
+
+.favorite-btn:hover {
+  transform: scale(1.15);
+  color: #ff007f !important;
+}
+
+.favorite-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.tag-favorite {
+  background: rgba(255, 0, 127, 0.1);
+  color: #ff007f;
+  border: 1px solid rgba(255, 0, 127, 0.2);
+}
+
+@keyframes pulse-fav {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
 }
 </style>
