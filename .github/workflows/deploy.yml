@@ -1,4 +1,4 @@
-# Simple workflow for deploying static content to GitHub Pages
+# Simple workflow for deploying static content to Pages and Cloudflare
 name: Deploy static content to Pages
 
 on:
@@ -22,11 +22,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Job 1: Build source code và đóng gói artifact
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -51,15 +48,62 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-dist
+          path: ./dist
+          retention-days: 1
+
+  # Job 2: Deploy lên GitHub Pages
+  deploy-github-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-dist
+          path: ./dist
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
-      - name: Upload artifact
+      - name: Upload artifact for Github Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload build output directory
           path: './dist'
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # Job 3: Deploy lên Cloudflare Pages
+  deploy-cloudflare-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-dist
+          path: ./dist
+
+      - name: Remove assets exceeding Cloudflare Pages 25MB limit
+        run: |
+          if [ -d "./dist/presets/instruments" ]; then
+            echo "Tìm và xóa các file nhạc cụ vượt quá giới hạn 25MB của Cloudflare Pages..."
+            find ./dist/presets/instruments -type f -size +24M -print -delete
+          fi
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: 'synthscore'
+          directory: './dist'
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

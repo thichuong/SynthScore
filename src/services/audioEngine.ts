@@ -236,8 +236,13 @@ class AudioEngineService {
           const localUrl = `${normalizedBaseUrl}${relativeUrl}`;
 
           console.log(`Đang tải bộ âm thanh nhạc cụ từ local URL: ${localUrl}`);
-          const res = await fetch(localUrl);
-          if (!res.ok) throw new Error(`Không thể fetch Soundbank từ URL: ${localUrl} (status: ${res.status})`);
+          let res = await fetch(localUrl);
+          if (!res.ok) {
+            console.warn(`Không thể tải từ local URL (status: ${res.status}). Thử tải từ fallback GitHub Pages...`);
+            const fallbackUrl = `https://thichuong.github.io/SynthScore/presets/instruments/${sf3Name}`;
+            res = await fetch(fallbackUrl);
+            if (!res.ok) throw new Error(`Không thể fetch Soundbank từ cả local và fallback URL (status: ${res.status})`);
+          }
           buffer = await res.arrayBuffer();
 
           // Lưu cache
