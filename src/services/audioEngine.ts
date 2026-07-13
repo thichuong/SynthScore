@@ -225,8 +225,16 @@ class AudioEngineService {
         buffer = this.soundfontCache.get(url)!;
       } else {
         const cachedDbBuffer = await getCachedSoundfont(url);
-        if (cachedDbBuffer) {
-          buffer = cachedDbBuffer;
+        let isDbBufferValid = false;
+        if (cachedDbBuffer && cachedDbBuffer.byteLength >= 4) {
+          const header = String.fromCharCode(...new Uint8Array(cachedDbBuffer, 0, 4));
+          if (header === 'RIFF' || header === 'RIFS') {
+            isDbBufferValid = true;
+          }
+        }
+
+        if (isDbBufferValid) {
+          buffer = cachedDbBuffer!;
           this.soundfontCache.set(url, buffer);
         } else {
           const baseUrl = import.meta.env.BASE_URL || '/';
