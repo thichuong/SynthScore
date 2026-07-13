@@ -36,10 +36,12 @@ self.addEventListener('fetch', (event) => {
   // Không cache file nhạc (.mxl, .mid) hoặc SoundFont (.sf2) trong SW Cache vì chúng được lưu tối ưu trong IndexedDB
   if (
     url.pathname.endsWith('.sf2') || 
+    url.pathname.endsWith('.sf3') || 
     url.pathname.endsWith('.mxl') || 
     url.pathname.endsWith('.musicxml') || 
     url.pathname.endsWith('.mid') || 
-    url.pathname.endsWith('.midi')
+    url.pathname.endsWith('.midi') || 
+    url.pathname.endsWith('.abc')
   ) {
     return;
   }
