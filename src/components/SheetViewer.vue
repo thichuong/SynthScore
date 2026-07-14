@@ -18,12 +18,26 @@
           <Layers class="icon" /> Thác Nốt Nhạc (Falling Notes)
         </button>
       </div>
-      <div class="viewer-status" v-if="loading">
-        <span class="spinner"></span> Đang tải bản nhạc...
+
+      <div class="viewer-actions">
+        <div class="viewer-status" v-if="loading">
+          <span class="spinner"></span> Đang tải bản nhạc...
+        </div>
+
+        <button 
+          class="viewer-play-btn" 
+          :class="{ playing: isPlaying }"
+          @click="togglePlay"
+          :title="isPlaying ? 'Tạm dừng' : 'Phát nhạc'"
+          :disabled="!isReady"
+        >
+          <Pause v-if="isPlaying" class="icon" />
+          <Play v-else class="icon play-icon" />
+        </button>
       </div>
     </div>
 
-    <div class="viewer-body">
+    <div class="viewer-body" @click="togglePlay">
       <!-- Container hiển thị Sheet Music (MusicXML) -->
       <div 
         v-show="activeTab === 'sheet' && fileType === 'xml'" 
@@ -46,6 +60,16 @@
         <canvas ref="visualizerCanvas" class="visualizer-canvas"></canvas>
       </div>
     </div>
+
+    <!-- Overlay Icon Phát/Tạm Dừng khi click màn hình -->
+    <Transition name="fade-scale">
+      <div v-if="overlayIcon" class="click-feedback-overlay">
+        <div class="feedback-icon-circle">
+          <Play v-if="overlayIcon === 'play'" class="feedback-icon play-icon" />
+          <Pause v-else class="feedback-icon" />
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -53,7 +77,8 @@
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue';
 import type { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
 import { Midi } from '@tonejs/midi';
-import { Music, Layers } from 'lucide-vue-next';
+import { Music, Layers, Play, Pause } from 'lucide-vue-next';
+import { AudioEngine } from '../services/audioEngine';
 
 const props = defineProps<{
   fileData: Uint8Array | string | null;
@@ -61,7 +86,33 @@ const props = defineProps<{
   rawText: string | null;
   isPlaying: boolean;
   currentTime: number;
+  isReady: boolean;
 }>();
+
+const overlayIcon = ref<'play' | 'pause' | null>(null);
+let overlayTimeoutId: number | null = null;
+
+function triggerClickFeedback(type: 'play' | 'pause') {
+  overlayIcon.value = type;
+  if (overlayTimeoutId !== null) {
+    clearTimeout(overlayTimeoutId);
+  }
+  overlayTimeoutId = window.setTimeout(() => {
+    overlayIcon.value = null;
+    overlayTimeoutId = null;
+  }, 500);
+}
+
+function togglePlay() {
+  if (!props.isReady) return;
+  if (props.isPlaying) {
+    AudioEngine.pause();
+    triggerClickFeedback('pause');
+  } else {
+    AudioEngine.play();
+    triggerClickFeedback('play');
+  }
+}
 
 const osmdContainer = ref<HTMLDivElement | null>(null);
 const visualizerCanvas = ref<HTMLCanvasElement | null>(null);
@@ -455,6 +506,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', initCanvas);
   stopAnimation();
+  if (overlayTimeoutId !== null) {
+    clearTimeout(overlayTimeoutId);
+  }
 });
 </script>
 
@@ -468,6 +522,7 @@ onBeforeUnmount(() => {
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  position: relative;
 }
 
 .viewer-header {
@@ -538,6 +593,107 @@ onBeforeUnmount(() => {
   position: relative;
   overflow: auto;
   background: #111115;
+  cursor: pointer;
+  user-select: none;
+}
+
+.viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.viewer-play-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #00f0ff 0%, #0072ff 100%);
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.viewer-play-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.5);
+}
+
+.viewer-play-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.viewer-play-btn:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  color: #606070;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.viewer-play-btn .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.play-icon {
+  transform: translateX(1px);
+}
+
+.click-feedback-overlay {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.feedback-icon-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(15, 15, 21, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.feedback-icon {
+  width: 32px;
+  height: 32px;
+  color: #00f0ff;
+  filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.6));
+}
+
+.feedback-icon.play-icon {
+  transform: translateX(2px);
+}
+
+/* Transition fade-scale */
+.fade-scale-enter-active,
+.fade-scale-leave-active {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fade-scale-enter-from {
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+.fade-scale-leave-to {
+  opacity: 0;
+  transform: scale(1.4);
 }
 
 .osmd-container {

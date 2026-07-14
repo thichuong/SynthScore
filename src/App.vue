@@ -65,6 +65,7 @@
           :rawText="rawText"
           :isPlaying="isPlaying"
           :currentTime="currentTime"
+          :isReady="isReady"
         />
       </div>
     </main>
