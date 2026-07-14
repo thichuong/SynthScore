@@ -5,7 +5,10 @@ import {
   type TrackInfo,
   parseMidiTracks,
   generateSymphonyMidi,
-  generateConcertoMidi
+  generateConcertoMidi,
+  symphonicTracksInfo,
+  concertoTracksInfo,
+  getDefaultTrackSettings
 } from './midiGenerator';
 
 export type { TrackInfo };
@@ -174,6 +177,21 @@ class AudioEngineService {
 
       // 7. Tải nhạc cụ mặc định (Acoustic Grand Piano - 0)
       await this.loadInstrumentSoundbank(0);
+
+      const defaults = getDefaultTrackSettings(0, 0);
+      this.tracks = [{
+        channel: 0,
+        name: 'Acoustic Grand Piano',
+        instrumentName: GM_INSTRUMENTS[0],
+        instrumentNumber: 0,
+        volume: 80,
+        isMuted: false,
+        isSoloed: false,
+        noteCount: 0,
+        pan: defaults.pan,
+        reverbSend: defaults.reverbSend,
+        chorusSend: defaults.chorusSend
+      }];
 
       // Thiết lập âm lượng tổng ban đầu cho bộ tổng hợp âm
       this.synth.setSystemParameter('gain', this.masterVolume / 100);
@@ -392,24 +410,44 @@ class AudioEngineService {
     this.bpm = this.sequencer.currentTempo || 120;
 
     // Phân tích các bè nhạc cụ từ tệp MIDI mới nạp qua Web Worker
+    let parsedTracks: TrackInfo[] = [];
     try {
       // Sao chép buffer để gửi qua worker (transferable) tránh nghẽn
       const parseBuffer = arrayBuffer.slice(0);
-      this.tracks = await this.postToWorker<TrackInfo[]>('parseTracks', parseBuffer, [parseBuffer]);
+      parsedTracks = await this.postToWorker<TrackInfo[]>('parseTracks', parseBuffer, [parseBuffer]);
     } catch (err) {
       console.error('Lỗi khi phân tích tracks qua worker, dùng fallback:', err);
-      this.parseTracks(arrayBuffer);
+      parsedTracks = parseMidiTracks(arrayBuffer);
     }
+
+    // Ghép nối cấu hình để giữ lại thiết lập Mixer của người dùng
+    this.tracks = parsedTracks.map(pt => {
+      const existing = this.tracks.find(et => et.channel === pt.channel);
+      if (existing) {
+        return {
+          ...pt,
+          volume: existing.volume,
+          pan: existing.pan,
+          reverbSend: existing.reverbSend,
+          chorusSend: existing.chorusSend,
+          isMuted: existing.isMuted,
+          isSoloed: existing.isSoloed,
+          instrumentNumber: (this.playbackMode === 'symphony' || this.playbackMode === 'concerto')
+            ? existing.instrumentNumber
+            : pt.instrumentNumber,
+          instrumentName: (this.playbackMode === 'symphony' || this.playbackMode === 'concerto')
+            ? existing.instrumentName
+            : pt.instrumentName,
+        };
+      }
+      return pt;
+    });
 
     await this.loadSongSoundbanks();
     this.resetMixerSettings();
     this.triggerStateChange();
   }
 
-  // Phân tích danh sách bè của bài nhạc (dùng làm fallback)
-  private parseTracks(arrayBuffer: ArrayBuffer): void {
-    this.tracks = parseMidiTracks(arrayBuffer);
-  }
 
   // Khôi phục cài đặt mixer
   private resetMixerSettings(): void {
@@ -425,6 +463,7 @@ class AudioEngineService {
           channel.setSystemParameter('isMuted', track.isMuted);
           this.synth.controllerChange(track.channel, 91, track.reverbSend);
           this.synth.controllerChange(track.channel, 93, track.chorusSend);
+          this.synth.programChange(track.channel, track.instrumentNumber);
         }
       }
     });
@@ -638,12 +677,69 @@ class AudioEngineService {
 
   // Thiết lập hoặc khôi phục chế độ phát nhạc về nguyên bản
   public async setPlaybackMode(mode: 'default' | 'symphony' | 'concerto'): Promise<void> {
-    if (!this.originalMidiBytes) return;
+    this.playbackMode = mode;
+    this.triggerStateChange();
+
+    if (!this.originalMidiBytes) {
+      if (mode === 'symphony') {
+        this.tracks = symphonicTracksInfo.map(info => {
+          const defaults = getDefaultTrackSettings(info.program, info.channel);
+          return {
+            channel: info.channel,
+            name: info.name,
+            instrumentName: GM_INSTRUMENTS[info.program] || 'Unknown',
+            instrumentNumber: info.program,
+            volume: 80,
+            isMuted: false,
+            isSoloed: false,
+            noteCount: 0,
+            pan: defaults.pan,
+            reverbSend: defaults.reverbSend,
+            chorusSend: defaults.chorusSend
+          };
+        });
+      } else if (mode === 'concerto') {
+        this.tracks = concertoTracksInfo.map(info => {
+          const defaults = getDefaultTrackSettings(info.program, info.channel);
+          return {
+            channel: info.channel,
+            name: info.name,
+            instrumentName: GM_INSTRUMENTS[info.program] || 'Unknown',
+            instrumentNumber: info.program,
+            volume: 80,
+            isMuted: false,
+            isSoloed: false,
+            noteCount: 0,
+            pan: defaults.pan,
+            reverbSend: defaults.reverbSend,
+            chorusSend: defaults.chorusSend
+          };
+        });
+      } else {
+        const defaults = getDefaultTrackSettings(0, 0);
+        this.tracks = [{
+          channel: 0,
+          name: 'Acoustic Grand Piano',
+          instrumentName: GM_INSTRUMENTS[0],
+          instrumentNumber: 0,
+          volume: 80,
+          isMuted: false,
+          isSoloed: false,
+          noteCount: 0,
+          pan: defaults.pan,
+          reverbSend: defaults.reverbSend,
+          chorusSend: defaults.chorusSend
+        }];
+      }
+
+      await this.loadSongSoundbanks();
+      this.resetMixerSettings();
+      this.triggerStateChange();
+      return;
+    }
 
     const wasPlaying = this.isPlaying;
     const savedTime = this.currentTime;
-
-    this.playbackMode = mode;
 
     if (mode === 'default') {
       await this.loadMidiBytesForPlayback(this.originalMidiBytes, this.originalSongName);
