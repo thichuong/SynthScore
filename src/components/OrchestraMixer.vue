@@ -144,7 +144,13 @@
             v-for="track in tracks" 
             :key="track.channel" 
             class="track-card"
-            :class="{ muted: track.isMuted, soloed: track.isSoloed, active: liveVoices[track.channel] > 0, expanded: expandedTracks[track.channel] }"
+            :class="{ 
+              muted: track.isMuted, 
+              soloed: track.isSoloed, 
+              active: liveVoices[track.channel] > 0, 
+              expanded: expandedTracks[track.channel],
+              'dropdown-active': activeDropdownChannel === track.channel
+            }"
           >
             <!-- Cột hiển thị đèn tín hiệu nốt nhạc (Vũ đạo nốt nhạc) -->
             <div class="meter-container">
@@ -166,21 +172,12 @@
               </div>
               
               <div class="instrument-selector-container">
-                <select 
-                  :value="track.instrumentNumber" 
-                  @change="changeInstrument(track.channel, parseInt(($event.target as HTMLSelectElement).value))"
-                  class="instrument-select"
-                >
-                  <optgroup v-for="group in instrumentGroups" :key="group.name" :label="group.name">
-                    <option 
-                      v-for="inst in group.instruments" 
-                      :key="inst.number" 
-                      :value="inst.number"
-                    >
-                      {{ inst.name }}
-                    </option>
-                  </optgroup>
-                </select>
+                <InstrumentSelector
+                  :modelValue="track.instrumentNumber"
+                  @update:modelValue="changeInstrument(track.channel, $event)"
+                  @open="activeDropdownChannel = track.channel"
+                  @close="if (activeDropdownChannel === track.channel) activeDropdownChannel = null;"
+                />
               </div>
 
               <!-- Điều khiển Volume -->
@@ -320,8 +317,8 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { Sliders, Volume2, VolumeX, Music, Trash2, Plus, Play, RotateCcw, Sparkles, ChevronDown, ChevronUp } from 'lucide-vue-next';
 import { AudioEngine } from '../services/audioEngine';
 import type { TrackInfo } from '../services/midiGenerator';
-import { instrumentGroups } from '../data/instruments';
 import { getDefaultTrackSettings } from '../services/midiGenerator';
+import InstrumentSelector from './InstrumentSelector.vue';
 
 defineProps<{
   tracks: TrackInfo[];
@@ -341,6 +338,7 @@ const localReverbCharacter = ref(AudioEngine.reverbCharacter);
 const localReverbTime = ref(AudioEngine.reverbTime);
 const localReverbPreDelay = ref(AudioEngine.reverbPreDelay);
 const expandedTracks = ref<Record<number, boolean>>({});
+const activeDropdownChannel = ref<number | null>(null);
 
 function toggleTrackExpand(channel: number) {
   expandedTracks.value[channel] = !expandedTracks.value[channel];
@@ -509,10 +507,11 @@ onBeforeUnmount(() => { stopTrackingVoices(); });
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #606078; gap: 8px; }
 .empty-icon { width: 32px; height: 32px; opacity: 0.5; }
 .tracks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-.track-card { display: flex; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px; gap: 12px; transition: all 0.25s ease; }
+.track-card { position: relative; display: flex; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px; gap: 12px; transition: all 0.25s ease; }
 .track-card.active { border-color: rgba(0, 240, 255, 0.2); }
 .track-card.muted { opacity: 0.4; }
 .track-card.soloed { border-color: #ff007f; }
+.track-card.dropdown-active { z-index: 50; }
 
 .meter-container { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 34px; }
 .meter-label { font-size: 0.65rem; font-weight: 700; color: #7c7c8e; }
@@ -523,7 +522,6 @@ onBeforeUnmount(() => { stopTrackingVoices(); });
 .track-name-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .track-name { font-size: 0.8rem; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .voice-count-badge { font-size: 0.65rem; background: rgba(57, 255, 20, 0.15); color: #39ff14; padding: 1px 4px; border-radius: 3px; font-weight: 700; }
-.instrument-select { width: 100%; padding: 4px 6px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: #e2e2e9; font-size: 0.72rem; outline: none; cursor: pointer; }
 .volume-slider-container { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
 .vol-slider { flex: 1; height: 4px; -webkit-appearance: none; background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
 .vol-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #00f0ff; cursor: pointer; }
