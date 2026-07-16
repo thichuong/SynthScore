@@ -23,7 +23,7 @@ class MockWorker {
                 name: 'Piano Track',
                 instrumentName: 'Piano',
                 instrumentNumber: 0,
-                volume: 80,
+                volume: 100,
                 isMuted: false,
                 isSoloed: false,
                 noteCount: 5,
@@ -84,7 +84,7 @@ describe('audioEngine', () => {
 
     expect(AudioEngine.isInitialized).toBe(true);
     expect(AudioEngine.isReady).toBe(true);
-    expect(AudioEngine.masterVolume).toBe(80);
+    expect(AudioEngine.masterVolume).toBe(100);
   });
 
   it('should load a song and parse track info', async () => {
@@ -127,7 +127,7 @@ describe('audioEngine', () => {
         name: 'Track 1',
         instrumentName: 'Piano',
         instrumentNumber: 0,
-        volume: 80,
+        volume: 100,
         isMuted: false,
         isSoloed: false,
         noteCount: 1,

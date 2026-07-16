@@ -38,7 +38,7 @@ class AudioEngineService {
   public duration = 0;
   public bpm = 120;
   public playbackRate = 1.0;
-  public masterVolume = 80; // 0 to 100
+  public masterVolume = 100; // 0 to 100
 
   // Hiệu ứng không gian Master Reverb
   public masterReverbGain = 50; // 0 to 100 (50% mặc định)
@@ -184,7 +184,7 @@ class AudioEngineService {
         name: 'Acoustic Grand Piano',
         instrumentName: GM_INSTRUMENTS[0],
         instrumentNumber: 0,
-        volume: 80,
+        volume: 100,
         isMuted: false,
         isSoloed: false,
         noteCount: 0,
@@ -474,7 +474,7 @@ class AudioEngineService {
       if (!usedChannels.has(i)) {
         const channel = this.synth.midiChannels[i];
         if (channel) {
-          channel.setSystemParameter('gain', 0.8);
+          channel.setSystemParameter('gain', 1.0);
           channel.setSystemParameter('pan', 0);
           channel.setSystemParameter('isMuted', false);
           this.synth.controllerChange(i, 91, 0);
@@ -689,7 +689,7 @@ class AudioEngineService {
             name: info.name,
             instrumentName: GM_INSTRUMENTS[info.program] || 'Unknown',
             instrumentNumber: info.program,
-            volume: 80,
+            volume: 100,
             isMuted: false,
             isSoloed: false,
             noteCount: 0,
@@ -706,7 +706,7 @@ class AudioEngineService {
             name: info.name,
             instrumentName: GM_INSTRUMENTS[info.program] || 'Unknown',
             instrumentNumber: info.program,
-            volume: 80,
+            volume: 100,
             isMuted: false,
             isSoloed: false,
             noteCount: 0,
@@ -722,7 +722,7 @@ class AudioEngineService {
           name: 'Acoustic Grand Piano',
           instrumentName: GM_INSTRUMENTS[0],
           instrumentNumber: 0,
-          volume: 80,
+          volume: 100,
           isMuted: false,
           isSoloed: false,
           noteCount: 0,
@@ -798,7 +798,7 @@ class AudioEngineService {
       name: `Kênh mới ${newChan + 1}`,
       instrumentName: GM_INSTRUMENTS[0], // Acoustic Grand Piano
       instrumentNumber: 0,
-      volume: 80,
+      volume: 100,
       isMuted: false,
       isSoloed: false,
       noteCount: 0,
@@ -817,7 +817,7 @@ class AudioEngineService {
       this.synth.programChange(newChan, 0);
       const chan = this.synth.midiChannels[newChan];
       if (chan) {
-        chan.setSystemParameter('gain', 0.8);
+        chan.setSystemParameter('gain', 1.0);
         chan.setSystemParameter('isMuted', false);
       }
     }

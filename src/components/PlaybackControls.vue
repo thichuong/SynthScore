@@ -128,7 +128,7 @@ const emit = defineEmits<{
 
 const progressBarRef = ref<HTMLDivElement | null>(null);
 const localPlaybackRate = ref(1.0);
-const localVolume = ref(80);
+const localVolume = ref(AudioEngine.masterVolume);
 
 // Tính phần trăm tiến độ
 const progressPercent = computed(() => {
