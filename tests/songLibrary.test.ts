@@ -69,52 +69,18 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
   const partsNotes: DetailedNote[][] = [];
   const partElements = xmlDoc.getElementsByTagNameNS('*', 'part');
   
-  // Thu nhập tất cả các sự kiện thay đổi tempo theo chỉ số measure để chia sẻ giữa các bè
-  const tempoMap = new Map<number, number>();
-  for (let p = 0; p < partElements.length; p++) {
-    const partEl = partElements[p];
-    const measures = partEl.getElementsByTagNameNS('*', 'measure');
-    for (let m = 0; m < measures.length; m++) {
-      const measure = measures[m];
-      const soundNodes = measure.getElementsByTagNameNS('*', 'sound');
-      for (let s = 0; s < soundNodes.length; s++) {
-        if (soundNodes[s].hasAttribute('tempo')) {
-          const bpm = parseFloat(soundNodes[s].getAttribute('tempo') || '0');
-          if (bpm > 0) {
-            tempoMap.set(m, bpm);
-          }
-        }
-      }
-    }
-  }
-
-  const initialBpm = tempoMap.get(0) || 120;
-
-  for (let p = 0; p < partElements.length; p++) {
-    const partEl = partElements[p];
-    const notesList: DetailedNote[] = [];
-    
+  // 1. Xác định vị trí phách bắt đầu của từng measure
+  const measureStartBeats: number[] = [];
+  if (partElements.length > 0) {
+    const firstPart = partElements[0];
     let divisions = 1;
-    let currentBpm = initialBpm;
-    let timeInSeconds = 0;
-    let lastNoteStartTime = 0;
-    
-    const measures = partEl.getElementsByTagNameNS('*', 'measure');
+    let beatOffset = 0;
+    const measures = firstPart.getElementsByTagNameNS('*', 'measure');
     for (let m = 0; m < measures.length; m++) {
-      const measure = measures[m];
-      
-      // Cập nhật tempo khi bắt đầu measure nếu có trong tempoMap
-      if (tempoMap.has(m)) {
-        const newBpm = tempoMap.get(m)!;
-        if (newBpm !== currentBpm) {
-          currentBpm = newBpm;
-        }
-      }
-
-      const children = Array.from(measure.childNodes);
-      
+      measureStartBeats[m] = beatOffset;
+      const children = Array.from(measures[m].childNodes);
       children.forEach(child => {
-        if (child.nodeType !== 1) return; // ELEMENT_NODE
+        if (child.nodeType !== 1) return;
         const el = child as HTMLElement;
         const tagName = el.localName.toLowerCase();
         
@@ -123,46 +89,189 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
           if (divNode) {
             divisions = parseInt(divNode.textContent || '1', 10);
           }
-        } 
-        else if (tagName === 'direction') {
+        } else if (tagName === 'backup') {
+          const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
+          if (durNode) {
+            beatOffset = Math.max(0, beatOffset - parseInt(durNode.textContent || '0', 10) / divisions);
+          }
+        } else if (tagName === 'forward') {
+          const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
+          if (durNode) {
+            beatOffset += parseInt(durNode.textContent || '0', 10) / divisions;
+          }
+        } else if (tagName === 'note') {
+          const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
+          const dur = durNode ? parseInt(durNode.textContent || '0', 10) : 0;
+          const isChord = el.getElementsByTagNameNS('*', 'chord').length > 0;
+          if (!isChord) {
+            beatOffset += dur / divisions;
+          }
+        }
+      });
+    }
+  }
+
+  // Helper làm tròn phách tránh sai lệch float nhỏ
+  const roundBeat = (b: number) => Math.round(b * 10000) / 10000;
+
+  // 2. Thu thập tất cả thay đổi tempo từ tất cả các bè
+  const tempoChangesMap = new Map<number, number>(); // beatOffset -> bpm
+  for (let p = 0; p < partElements.length; p++) {
+    const partEl = partElements[p];
+    let divisions = 1;
+    let beatOffset = 0;
+    const measures = partEl.getElementsByTagNameNS('*', 'measure');
+    for (let m = 0; m < measures.length; m++) {
+      if (measureStartBeats[m] !== undefined) {
+        beatOffset = measureStartBeats[m];
+      }
+      
+      const soundNodes = measures[m].getElementsByTagNameNS('*', 'sound');
+      for (let s = 0; s < soundNodes.length; s++) {
+        if (soundNodes[s].hasAttribute('tempo')) {
+          const bpm = parseFloat(soundNodes[s].getAttribute('tempo') || '0');
+          if (bpm > 0) {
+            tempoChangesMap.set(roundBeat(beatOffset), bpm);
+          }
+        }
+      }
+      
+      const children = Array.from(measures[m].childNodes);
+      children.forEach(child => {
+        if (child.nodeType !== 1) return;
+        const el = child as HTMLElement;
+        const tagName = el.localName.toLowerCase();
+        
+        if (tagName === 'attributes') {
+          const divNode = el.getElementsByTagNameNS('*', 'divisions')[0];
+          if (divNode) {
+            divisions = parseInt(divNode.textContent || '1', 10);
+          }
+        } else if (tagName === 'backup') {
+          const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
+          if (durNode) {
+            const dur = parseInt(durNode.textContent || '0', 10);
+            beatOffset = Math.max(0, beatOffset - dur / divisions);
+          }
+        } else if (tagName === 'forward') {
+          const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
+          if (durNode) {
+            const dur = parseInt(durNode.textContent || '0', 10);
+            beatOffset += dur / divisions;
+          }
+        } else if (tagName === 'note') {
+          const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
+          const dur = durNode ? parseInt(durNode.textContent || '0', 10) : 0;
+          const isChord = el.getElementsByTagNameNS('*', 'chord').length > 0;
+          if (!isChord) {
+            beatOffset += dur / divisions;
+          }
+        } else if (tagName === 'direction') {
           const soundNodes = el.getElementsByTagNameNS('*', 'sound');
           for (let s = 0; s < soundNodes.length; s++) {
             if (soundNodes[s].hasAttribute('tempo')) {
-              const newBpm = parseFloat(soundNodes[s].getAttribute('tempo') || '120');
-              if (newBpm > 0 && newBpm !== currentBpm) {
-                currentBpm = newBpm;
+              const bpm = parseFloat(soundNodes[s].getAttribute('tempo') || '0');
+              if (bpm > 0) {
+                tempoChangesMap.set(roundBeat(beatOffset), bpm);
               }
-              break;
             }
           }
-        } 
-        else if (tagName === 'backup') {
+        }
+      });
+    }
+  }
+
+  interface TempoChange {
+    beat: number;
+    bpm: number;
+    time: number;
+  }
+
+  const tempoChanges: TempoChange[] = [];
+  tempoChangesMap.forEach((bpm, beat) => {
+    tempoChanges.push({ beat, bpm, time: 0 });
+  });
+  tempoChanges.sort((a, b) => a.beat - b.beat);
+
+  let initialBpm = 120;
+  if (tempoChanges.length > 0 && tempoChanges[0].beat === 0) {
+    initialBpm = tempoChanges[0].bpm;
+  } else {
+    tempoChanges.unshift({ beat: 0, bpm: 120, time: 0 });
+  }
+
+  // Tính thời gian giây của từng điểm tempo
+  tempoChanges[0].time = 0;
+  for (let i = 1; i < tempoChanges.length; i++) {
+    const prev = tempoChanges[i - 1];
+    const curr = tempoChanges[i];
+    const durationBeats = curr.beat - prev.beat;
+    const durationSeconds = durationBeats * (60 / prev.bpm);
+    curr.time = prev.time + durationSeconds;
+  }
+
+  // Ánh xạ phách sang giây
+  function convertBeatsToSeconds(beat: number): number {
+    let activeTempo = tempoChanges[0];
+    for (let i = 1; i < tempoChanges.length; i++) {
+      if (tempoChanges[i].beat <= beat + 1e-6) {
+        activeTempo = tempoChanges[i];
+      } else {
+        break;
+      }
+    }
+    const beatsSinceTempo = beat - activeTempo.beat;
+    return activeTempo.time + beatsSinceTempo * (60 / activeTempo.bpm);
+  }
+
+  // 3. Tiến hành phân tích nốt cho từng bè
+  for (let p = 0; p < partElements.length; p++) {
+    const partEl = partElements[p];
+    const notesList: DetailedNote[] = [];
+    
+    let divisions = 1;
+    let beatOffset = 0;
+    let lastNoteStartBeat = 0;
+    
+    const measures = partEl.getElementsByTagNameNS('*', 'measure');
+    for (let m = 0; m < measures.length; m++) {
+      if (measureStartBeats[m] !== undefined) {
+        beatOffset = measureStartBeats[m];
+      }
+
+      const children = Array.from(measures[m].childNodes);
+      children.forEach(child => {
+        if (child.nodeType !== 1) return;
+        const el = child as HTMLElement;
+        const tagName = el.localName.toLowerCase();
+        
+        if (tagName === 'attributes') {
+          const divNode = el.getElementsByTagNameNS('*', 'divisions')[0];
+          if (divNode) {
+            divisions = parseInt(divNode.textContent || '1', 10);
+          }
+        } else if (tagName === 'backup') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
             const dur = parseInt(durNode.textContent || '0', 10);
-            const beats = dur / divisions;
-            timeInSeconds = Math.max(0, timeInSeconds - (beats * (60 / currentBpm)));
+            beatOffset = Math.max(0, beatOffset - dur / divisions);
           }
-        } 
-        else if (tagName === 'forward') {
+        } else if (tagName === 'forward') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
             const dur = parseInt(durNode.textContent || '0', 10);
-            const beats = dur / divisions;
-            timeInSeconds += beats * (60 / currentBpm);
+            beatOffset += dur / divisions;
           }
-        } 
-        else if (tagName === 'note') {
+        } else if (tagName === 'note') {
           const isRest = el.getElementsByTagNameNS('*', 'rest').length > 0;
           const isChord = el.getElementsByTagNameNS('*', 'chord').length > 0;
           
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           const durationVal = durNode ? parseInt(durNode.textContent || '0', 10) : 0;
           const durationBeats = durationVal / divisions;
-          const durationSeconds = durationBeats * (60 / currentBpm);
           
           if (isRest) {
-            timeInSeconds += durationSeconds;
+            beatOffset += durationBeats;
           } else {
             const pitchNode = el.getElementsByTagNameNS('*', 'pitch')[0];
             if (pitchNode) {
@@ -175,12 +284,14 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
               
               const noteName = getNoteName(step, alterVal, octave);
               
-              let startSec = timeInSeconds;
-              if (isChord) {
-                startSec = lastNoteStartTime;
-              } else {
-                lastNoteStartTime = timeInSeconds;
+              const startBeat = isChord ? lastNoteStartBeat : beatOffset;
+              if (!isChord) {
+                lastNoteStartBeat = beatOffset;
               }
+              
+              const startSec = convertBeatsToSeconds(startBeat);
+              const endSec = convertBeatsToSeconds(startBeat + durationBeats);
+              const durationSeconds = endSec - startSec;
               
               notesList.push({
                 pitch: noteName,
@@ -189,7 +300,7 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
               });
               
               if (!isChord) {
-                timeInSeconds += durationSeconds;
+                beatOffset += durationBeats;
               }
             }
           }
@@ -280,10 +391,16 @@ describe('Song Library Note Reading Audit', () => {
           
           // Sort comparator
           const sortFn = (a: any, b: any) => {
-            if (Math.abs(a.time - b.time) > 0.05) {
+            if (Math.abs(a.time - b.time) > 0.0001) {
               return a.time - b.time;
             }
-            return (a.pitch || a.name).localeCompare(b.pitch || b.name);
+            const nameA = a.pitch || a.name || "";
+            const nameB = b.pitch || b.name || "";
+            const pitchCompare = nameA.localeCompare(nameB);
+            if (pitchCompare !== 0) {
+              return pitchCompare;
+            }
+            return a.duration - b.duration;
           };
           
           xmlNotes.sort(sortFn);
