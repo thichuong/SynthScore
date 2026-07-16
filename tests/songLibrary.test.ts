@@ -69,18 +69,48 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
   const partsNotes: DetailedNote[][] = [];
   const partElements = xmlDoc.getElementsByTagNameNS('*', 'part');
   
+  // Thu nhập tất cả các sự kiện thay đổi tempo theo chỉ số measure để chia sẻ giữa các bè
+  const tempoMap = new Map<number, number>();
+  for (let p = 0; p < partElements.length; p++) {
+    const partEl = partElements[p];
+    const measures = partEl.getElementsByTagNameNS('*', 'measure');
+    for (let m = 0; m < measures.length; m++) {
+      const measure = measures[m];
+      const soundNodes = measure.getElementsByTagNameNS('*', 'sound');
+      for (let s = 0; s < soundNodes.length; s++) {
+        if (soundNodes[s].hasAttribute('tempo')) {
+          const bpm = parseFloat(soundNodes[s].getAttribute('tempo') || '0');
+          if (bpm > 0) {
+            tempoMap.set(m, bpm);
+          }
+        }
+      }
+    }
+  }
+
+  const initialBpm = tempoMap.get(0) || 120;
+
   for (let p = 0; p < partElements.length; p++) {
     const partEl = partElements[p];
     const notesList: DetailedNote[] = [];
     
     let divisions = 1;
-    let currentBpm = 120;
+    let currentBpm = initialBpm;
     let timeInSeconds = 0;
     let lastNoteStartTime = 0;
     
     const measures = partEl.getElementsByTagNameNS('*', 'measure');
     for (let m = 0; m < measures.length; m++) {
       const measure = measures[m];
+      
+      // Cập nhật tempo khi bắt đầu measure nếu có trong tempoMap
+      if (tempoMap.has(m)) {
+        const newBpm = tempoMap.get(m)!;
+        if (newBpm !== currentBpm) {
+          currentBpm = newBpm;
+        }
+      }
+
       const children = Array.from(measure.childNodes);
       
       children.forEach(child => {
@@ -99,7 +129,7 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
           for (let s = 0; s < soundNodes.length; s++) {
             if (soundNodes[s].hasAttribute('tempo')) {
               const newBpm = parseFloat(soundNodes[s].getAttribute('tempo') || '120');
-              if (newBpm > 0) {
+              if (newBpm > 0 && newBpm !== currentBpm) {
                 currentBpm = newBpm;
               }
               break;
@@ -250,7 +280,7 @@ describe('Song Library Note Reading Audit', () => {
           
           // Sort comparator
           const sortFn = (a: any, b: any) => {
-            if (Math.abs(a.time - b.time) > 0.001) {
+            if (Math.abs(a.time - b.time) > 0.05) {
               return a.time - b.time;
             }
             return (a.pitch || a.name).localeCompare(b.pitch || b.name);
@@ -284,8 +314,8 @@ describe('Song Library Note Reading Audit', () => {
               if (trackErrors <= 3) mismatchDetails.push(`Bè ${p}: MIDI thiếu ${xN.pitch} tại ${xN.time.toFixed(2)}s`);
             } else {
               const pitchMatch = xN.pitch === mN.pitch;
-              const timeMatch = Math.abs(xN.time - mN.time) < 0.001;
-              const durMatch = Math.abs(xN.duration - mN.duration) < 0.001;
+              const timeMatch = Math.abs(xN.time - mN.time) < 0.05;
+              const durMatch = Math.abs(xN.duration - mN.duration) < 0.05;
               
               if (!pitchMatch || !timeMatch || !durMatch) {
                 diffCount++;

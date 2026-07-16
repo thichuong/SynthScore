@@ -25,6 +25,29 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
   const partElements = xmlDoc.getElementsByTagNameNS('*', 'part');
   let channelCounter = 0;
 
+  // Thu thập tất cả các sự kiện thay đổi tempo theo chỉ số measure để chia sẻ giữa các bè
+  const tempoMap = new Map<number, number>();
+  for (let p = 0; p < partElements.length; p++) {
+    const partEl = partElements[p];
+    const measures = partEl.getElementsByTagNameNS('*', 'measure');
+    for (let m = 0; m < measures.length; m++) {
+      const measure = measures[m];
+      const soundNodes = measure.getElementsByTagNameNS('*', 'sound');
+      for (let s = 0; s < soundNodes.length; s++) {
+        if (soundNodes[s].hasAttribute('tempo')) {
+          const bpm = parseFloat(soundNodes[s].getAttribute('tempo') || '0');
+          if (bpm > 0) {
+            tempoMap.set(m, bpm);
+          }
+        }
+      }
+    }
+  }
+
+  // Tìm tempo khởi tạo, mặc định là 120
+  const initialBpm = tempoMap.get(0) || 120;
+  midi.header.setTempo(initialBpm);
+
   for (let p = 0; p < partElements.length; p++) {
     const partEl = partElements[p];
     const partId = partEl.getAttribute('id') || '';
@@ -55,7 +78,7 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
     }
 
     let divisions = 1; // Số xung nhịp mỗi nốt đen (ticks per quarter note)
-    let currentBpm = 120;
+    let currentBpm = initialBpm;
     let timeInSeconds = 0; // Thời gian chạy (giây)
     let timeInBeats = 0; // Thời gian chạy (phách)
     
@@ -65,6 +88,27 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
     const measures = partEl.getElementsByTagNameNS('*', 'measure');
     for (let m = 0; m < measures.length; m++) {
       const measure = measures[m];
+      
+      // Cập nhật tempo khi bắt đầu measure nếu có trong tempoMap
+      if (tempoMap.has(m)) {
+        const newBpm = tempoMap.get(m)!;
+        if (newBpm !== currentBpm) {
+          currentBpm = newBpm;
+          const ticks = Math.round(midi.header.secondsToTicks(timeInSeconds));
+          const existing = midi.header.tempos.find(t => t.ticks === ticks);
+          if (existing) {
+            existing.bpm = newBpm;
+            existing.time = timeInSeconds;
+          } else {
+            midi.header.tempos.push({
+              bpm: newBpm,
+              ticks: ticks,
+              time: timeInSeconds
+            });
+          }
+        }
+      }
+
       const children = Array.from(measure.childNodes);
       
       children.forEach(child => {
@@ -83,9 +127,20 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
           for (let s = 0; s < soundNodes.length; s++) {
             if (soundNodes[s].hasAttribute('tempo')) {
               const newBpm = parseFloat(soundNodes[s].getAttribute('tempo') || '120');
-              if (newBpm > 0) {
+              if (newBpm > 0 && newBpm !== currentBpm) {
                 currentBpm = newBpm;
-                midi.header.setTempo(currentBpm);
+                const ticks = Math.round(midi.header.secondsToTicks(timeInSeconds));
+                const existing = midi.header.tempos.find(t => t.ticks === ticks);
+                if (existing) {
+                  existing.bpm = newBpm;
+                  existing.time = timeInSeconds;
+                } else {
+                  midi.header.tempos.push({
+                    bpm: newBpm,
+                    ticks: ticks,
+                    time: timeInSeconds
+                  });
+                }
               }
               break;
             }
