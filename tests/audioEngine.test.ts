@@ -173,4 +173,58 @@ describe('audioEngine', () => {
     expect(AudioEngine.playbackMode).toBe('default');
     expect(AudioEngine.currentSongName).toBe('Concerto Prep');
   });
+
+  it('should resolve correct Soundfont file based on program number or track channel', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    
+    // Reset loaded Soundfonts to force loading from network/mock
+    (AudioEngine as any).loadedSoundfonts.clear();
+    (AudioEngine as any).soundfontCache.clear();
+    
+    // 1. Program 0 (Piano) -> MuseScore_General.sf3
+    await AudioEngine.loadInstrumentSoundbank(0, false);
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('MuseScore_General.sf3'));
+    
+    // 2. Program 40 (Violin) -> Sonatina_Symphonic_Orchestra.sf3
+    await AudioEngine.loadInstrumentSoundbank(40, false);
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Sonatina_Symphonic_Orchestra.sf3'));
+    
+    // 3. Program 80 (Synth) -> FluidR3Mono_GM.sf3
+    await AudioEngine.loadInstrumentSoundbank(80, false);
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('FluidR3Mono_GM.sf3'));
+    
+    // 4. Program 0, isDrum true -> Roland_SC-88.sf3
+    await AudioEngine.loadInstrumentSoundbank(0, true);
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Roland_SC-88.sf3'));
+    
+    // 5. Program 115 -> Roland_SC-88.sf3
+    await AudioEngine.loadInstrumentSoundbank(115, false);
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Roland_SC-88.sf3'));
+  });
+
+  it('should play test note and trigger synthesizer noteOn/noteOff with correct timing', () => {
+    vi.useFakeTimers();
+    
+    const synth = (AudioEngine as any).synth;
+    const noteOnSpy = vi.spyOn(synth, 'noteOn');
+    const noteOffSpy = vi.spyOn(synth, 'noteOff');
+    
+    // 1. Play normal channel test note (C4, velocity 100)
+    AudioEngine.playTestNote(0);
+    expect(noteOnSpy).toHaveBeenCalledWith(0, 60, 100);
+    
+    // Advance timers by 800ms
+    vi.advanceTimersByTime(800);
+    expect(noteOffSpy).toHaveBeenCalledWith(0, 60);
+    
+    // 2. Play drum channel test note (Bass Drum 36, velocity 100)
+    AudioEngine.playTestNote(9);
+    expect(noteOnSpy).toHaveBeenLastCalledWith(9, 36, 100);
+    
+    // Advance timers by 800ms
+    vi.advanceTimersByTime(800);
+    expect(noteOffSpy).toHaveBeenLastCalledWith(9, 36);
+    
+    vi.useRealTimers();
+  });
 });

@@ -88,6 +88,29 @@ SynthScore là một ứng dụng web hiện đại được xây dựng trên *
     npm run build
     ```
 
+5.  **Chạy bộ kiểm thử tự động (Run tests):**
+    ```bash
+    npm run test
+    ```
+
+---
+
+## 🧪 Hệ thống Kiểm thử Tự động (Automated Testing)
+
+SynthScore tích hợp sẵn hệ thống kiểm thử tự động toàn diện được cấu hình bằng **Vitest** và **JSDOM** để kiểm tra tính ổn định của các dịch vụ âm thanh và bộ dịch nhạc thô:
+
+### 1. Các thành phần được kiểm thử
+*   **MXL Parser (`mxlParser.ts`)**: Xác thực giải nén file nén `.mxl` sang MusicXML chuỗi thô.
+*   **MusicXML Parser (`musicXmlParser.ts`)**: Kiểm tra thuật toán biên dịch MusicXML sang tệp MIDI nhị phân.
+*   **MIDI Generator (`midiGenerator.ts`)**: Thử nghiệm thuật toán phân tách track nhạc cụ và sinh phối khí Giao hưởng (11 bè) / Concerto (9 bè).
+*   **MIDI Web Worker (`midiWorker.ts`)**: Giả lập thông điệp giữa luồng chính và luồng phụ.
+*   **Audio Engine (`audioEngine.ts`)**: Giả lập Web Audio API và `spessasynth_lib` để kiểm thử nạp Soundfont tự động theo mã General MIDI, các nút điều khiển âm lượng, tắt tiếng, hát đơn (solo) và phát thử nốt nhạc (`playTestNote`).
+
+### 2. Đối chiếu sâu từng nốt nhạc (Reverse Note Audit)
+*   Bộ test [songLibrary.test.ts](file:///home/exblackhole/Desktop/SynthScore/tests/songLibrary.test.ts) tự động tải và cache toàn bộ **69 bản nhạc mẫu** của thư viện về thư mục `.test-cache/`.
+*   Tiến hành phân tích ngược note-by-note (đối chiếu cao độ nốt, thời điểm bắt đầu, thời lượng giây) giữa file XML gốc và file MIDI xuất ra để phát hiện lỗi mất nốt hoặc lệch nhịp.
+*   Xuất báo cáo Markdown chi tiết tại file [tests-report.md](file:///home/exblackhole/Desktop/SynthScore/tests-report.md) hiển thị độ khớp nốt tuyệt đối của từng bản nhạc.
+
 ---
 
 ## 📂 Cấu trúc Thư mục Dự án
