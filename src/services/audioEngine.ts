@@ -28,12 +28,14 @@ class AudioEngineService {
   private synth: WorkletSynthesizer | null = null;
   private sequencer: Sequencer | null = null;
   public analyser: AnalyserNode | null = null;
+  public compressor: DynamicsCompressorNode | null = null;
+  private readonly VOLUME_BOOST_FACTOR = 1.2; // Mặc định boost thêm ~4dB (1.6x) để cân bằng âm lượng trình duyệt
 
   public isInitialized = false;
   public isReady = false;
   public isLoadingSoundfont = false;
   public isPlaying = false;
-  
+
   public currentSongName = '';
   public currentTime = 0;
   public duration = 0;
@@ -157,7 +159,7 @@ class AudioEngineService {
       return Promise.resolve();
     }
     if (this.preloadingPromises.has(url)) {
-      return this.preloadingPromises.get(url)!.then(() => {});
+      return this.preloadingPromises.get(url)!.then(() => { });
     }
 
     const loadPromise = (async () => {
@@ -237,7 +239,7 @@ class AudioEngineService {
     })();
 
     this.preloadingPromises.set(url, loadPromise);
-    return loadPromise.then(() => {});
+    return loadPromise.then(() => { });
   }
 
   // Khởi tạo Audio Engine
@@ -258,7 +260,7 @@ class AudioEngineService {
         try {
           this.silentAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjM2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU2LjQxAAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFN//MUZAMAAAGkAAAAAAAAA0gAAAAARTMu//MUZAYAAAGkAAAAAAAAA0gAAAAAOTku//MUZAkAAAGkAAAAAAAAA0gAAAAANVVV');
           this.silentAudio.loop = true;
-          
+
           if (typeof window !== 'undefined') {
             const unlockAudio = () => {
               if (this.audioContext && this.audioContext.state === 'suspended') {
@@ -295,8 +297,18 @@ class AudioEngineService {
       // 4. Cấu hình Analyser để trực quan hóa
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = 256;
+
+      // 4.5. Khởi tạo DynamicsCompressorNode để nén và làm mịn âm lượng tổng (Limiter)
+      this.compressor = this.audioContext.createDynamicsCompressor();
+      this.compressor.threshold.setValueAtTime(-12, this.audioContext.currentTime);
+      this.compressor.knee.setValueAtTime(10, this.audioContext.currentTime);
+      this.compressor.ratio.setValueAtTime(4, this.audioContext.currentTime);
+      this.compressor.attack.setValueAtTime(0.005, this.audioContext.currentTime);
+      this.compressor.release.setValueAtTime(0.1, this.audioContext.currentTime);
+
       this.synth.connect(this.analyser);
-      this.analyser.connect(this.audioContext.destination);
+      this.analyser.connect(this.compressor);
+      this.compressor.connect(this.audioContext.destination);
 
       // 5. Khởi tạo Sequencer
       this.sequencer = new Sequencer(this.synth);
@@ -331,7 +343,7 @@ class AudioEngineService {
           try {
             this.silentAudio.pause();
             this.silentAudio.currentTime = 0;
-          } catch (e) {}
+          } catch (e) { }
         }
 
         // Cập nhật trạng thái Media Session
@@ -364,8 +376,8 @@ class AudioEngineService {
         chorusSend: defaults.chorusSend
       }];
 
-      // Thiết lập âm lượng tổng ban đầu cho bộ tổng hợp âm
-      this.synth.setSystemParameter('gain', this.masterVolume / 100);
+      // Thiết lập âm lượng tổng ban đầu cho bộ tổng hợp âm với hệ số boost
+      this.synth.setSystemParameter('gain', (this.masterVolume / 100) * this.VOLUME_BOOST_FACTOR);
 
       // Kích hoạt bộ xử lý hiệu ứng (Reverb/Chorus/Delay)
       this.synth.setSystemParameter('effectsEnabled', true);
@@ -498,7 +510,7 @@ class AudioEngineService {
   // Tự động tải tất cả các bộ âm thanh cho các nhạc cụ có trong bài hát hiện tại
   private async loadSongSoundbanks(): Promise<void> {
     const loadPromises: Promise<void>[] = [];
-    
+
     // Duyệt qua tất cả các track được tìm thấy trong bài
     this.tracks.forEach(track => {
       const isDrum = track.channel === 9; // Kênh 10 (index 9) là bộ gõ
@@ -538,7 +550,7 @@ class AudioEngineService {
 
     if (mode === 'default') {
       await this.loadMidiBytesForPlayback(midiBytes, songName);
-    } 
+    }
     else if (mode === 'symphony') {
       try {
         console.log('[AudioEngine] Đang sinh nhạc giao hưởng qua Web Worker...');
@@ -578,7 +590,7 @@ class AudioEngineService {
       midiBytes.byteOffset + midiBytes.byteLength
     );
     this.sequencer.loadNewSongList([{ binary: arrayBuffer, fileName: songName }]);
-    
+
     this.duration = this.sequencer.duration || 0;
     this.bpm = this.sequencer.currentTempo || 120;
 
@@ -628,7 +640,7 @@ class AudioEngineService {
   // Khôi phục cài đặt mixer
   private resetMixerSettings(): void {
     if (!this.synth) return;
-    
+
     // Áp dụng âm lượng, pan, reverb, chorus cho các track hiện có
     this.tracks.forEach(track => {
       if (this.synth) {
@@ -724,7 +736,7 @@ class AudioEngineService {
   // Điều khiển phát nhạc
   public play(): void {
     if (!this.sequencer || !this.audioContext) return;
-    
+
     // Kích hoạt AudioContext nếu đang ở trạng thái ngủ
     if (this.audioContext.state === 'suspended') {
       this.audioContext.resume();
@@ -881,8 +893,8 @@ class AudioEngineService {
   public setMasterVolume(vol: number): void {
     this.masterVolume = vol;
     if (!this.synth) return;
-    // SpessaSynth có volume tổng nằm ở system parameters
-    this.synth.setSystemParameter('gain', vol / 100);
+    // SpessaSynth có volume tổng nằm ở system parameters kèm hệ số boost
+    this.synth.setSystemParameter('gain', (vol / 100) * this.VOLUME_BOOST_FACTOR);
     this.triggerStateChange();
   }
 
@@ -1001,7 +1013,7 @@ class AudioEngineService {
 
     if (mode === 'default') {
       await this.loadMidiBytesForPlayback(this.originalMidiBytes, this.originalSongName);
-    } 
+    }
     else if (mode === 'symphony') {
       try {
         console.log('[AudioEngine] Đang chuyển đổi sang chế độ Giao Hưởng qua Web Worker...');
@@ -1064,13 +1076,13 @@ class AudioEngineService {
       reverbSend: 50,
       chorusSend: 0
     };
-    
+
     this.tracks.push(newTrack);
     this.tracks.sort((a, b) => a.channel - b.channel);
-    
+
     const isDrum = newChan === 9;
     await this.loadInstrumentSoundbank(0, isDrum);
-    
+
     if (this.synth) {
       this.synth.programChange(newChan, 0);
       const chan = this.synth.midiChannels[newChan];
@@ -1100,7 +1112,7 @@ class AudioEngineService {
   // Phát một nốt nhạc thử âm cho một kênh cụ thể
   public playTestNote(channelIndex: number): void {
     if (!this.synth) return;
-    
+
     // Kích hoạt AudioContext nếu ở trạng thái suspended
     if (this.audioContext && this.audioContext.state === 'suspended') {
       this.audioContext.resume();
@@ -1142,7 +1154,7 @@ class AudioEngineService {
       if (anySoloed) {
         shouldMute = !track.isSoloed;
       }
-      
+
       const chan = synth.midiChannels[track.channel];
       if (chan) {
         chan.setSystemParameter('isMuted', shouldMute);
@@ -1159,7 +1171,7 @@ class AudioEngineService {
     }
 
     const nav = window.navigator as any;
-    
+
     // Thiết lập Metadata bản nhạc
     if (typeof (window as any).MediaMetadata !== 'undefined') {
       try {
@@ -1271,7 +1283,17 @@ class AudioEngineService {
     await offlineCtx.audioWorklet.addModule(`${normalizedBaseUrl}spessasynth_processor.min.js`);
 
     const offlineSynth = new WorkletSynthesizer(offlineCtx);
-    offlineSynth.connect(offlineCtx.destination);
+
+    // Tạo DynamicsCompressorNode cho offline context để đồng bộ giới hạn âm lượng và ngăn vỡ tiếng
+    const offlineCompressor = offlineCtx.createDynamicsCompressor();
+    offlineCompressor.threshold.setValueAtTime(-12, 0);
+    offlineCompressor.knee.setValueAtTime(10, 0);
+    offlineCompressor.ratio.setValueAtTime(4, 0);
+    offlineCompressor.attack.setValueAtTime(0.005, 0);
+    offlineCompressor.release.setValueAtTime(0.1, 0);
+
+    offlineSynth.connect(offlineCompressor);
+    offlineCompressor.connect(offlineCtx.destination);
 
     const arrayBuffer = (this.activeMidiBytes.buffer as ArrayBuffer).slice(
       this.activeMidiBytes.byteOffset,
@@ -1296,6 +1318,10 @@ class AudioEngineService {
       soundBankList,
       snapshot
     });
+
+    if (options?.applyMixer === false) {
+      offlineSynth.setSystemParameter('gain', this.VOLUME_BOOST_FACTOR);
+    }
 
     if (onStepChange) onStepChange('rendering');
     const audioBuffer = await offlineCtx.startRendering();
@@ -1403,25 +1429,25 @@ class AudioEngineService {
     const sampleRate = audioBuffer.sampleRate;
     const numChannels = audioBuffer.numberOfChannels;
     const originalLength = audioBuffer.length;
-    
+
     const oversampleFactor = 64;
     const dsdSampleRate = sampleRate * oversampleFactor;
     const totalDsdSamples = originalLength * oversampleFactor;
-    
+
     const blockSize = 4096;
     const blockBits = blockSize * 8;
     const numBlocks = Math.ceil(totalDsdSamples / blockBits);
     const paddedDsdSamples = numBlocks * blockBits;
-    
+
     const dsdDataSize = numBlocks * blockSize * numChannels;
     const fileSize = 28 + 64 + 12 + dsdDataSize;
-    
+
     const buffer = new ArrayBuffer(fileSize);
     const view = new DataView(buffer);
     const uint8 = new Uint8Array(buffer);
-    
+
     let offset = 0;
-    
+
     // 1. DSD Chunk
     uint8.set([68, 83, 68, 32], offset); // "DSD "
     offset += 4;
@@ -1434,7 +1460,7 @@ class AudioEngineService {
     view.setUint32(offset, 0, true);
     view.setUint32(offset + 4, 0, true);
     offset += 8;
-    
+
     // 2. fmt Chunk
     uint8.set([102, 109, 116, 32], offset); // "fmt "
     offset += 4;
@@ -1464,7 +1490,7 @@ class AudioEngineService {
     view.setUint32(offset + 8, 0, true);
     view.setUint32(offset + 12, 0, true);
     offset += 16;
-    
+
     // 3. data Chunk
     uint8.set([100, 97, 116, 97], offset); // "data"
     offset += 4;
@@ -1472,25 +1498,25 @@ class AudioEngineService {
     view.setUint32(offset, dataChunkSize & 0xffffffff, true);
     view.setUint32(offset + 4, Math.floor(dataChunkSize / 0x100000000), true);
     offset += 8;
-    
+
     // 4. Modulate data
     const chData: Float32Array[] = [];
     for (let c = 0; c < numChannels; c++) {
       chData.push(audioBuffer.getChannelData(c));
     }
-    
+
     const integrators = new Float32Array(numChannels);
     const outputs = new Float32Array(numChannels);
-    
+
     for (let b = 0; b < numBlocks; b++) {
       for (let c = 0; c < numChannels; c++) {
         const channelPcm = chData[c];
         const blockBuffer = new Uint8Array(blockSize);
-        
+
         for (let bitIdx = 0; bitIdx < blockBits; bitIdx++) {
           const dsdSampleIdx = b * blockBits + bitIdx;
           let x = 0;
-          
+
           if (dsdSampleIdx < totalDsdSamples) {
             const pcmIdxFloat = dsdSampleIdx / oversampleFactor;
             const idxLower = Math.floor(pcmIdxFloat);
@@ -1500,7 +1526,7 @@ class AudioEngineService {
             const pcmValUpper = channelPcm[idxUpper];
             x = pcmValLower + frac * (pcmValUpper - pcmValLower);
           }
-          
+
           integrators[c] += x - outputs[c];
           let bitValue = 0;
           if (integrators[c] >= 0) {
@@ -1510,19 +1536,19 @@ class AudioEngineService {
             outputs[c] = -1.0;
             bitValue = 0;
           }
-          
+
           const byteOffsetInBlock = Math.floor(bitIdx / 8);
           const bitOffsetInByte = bitIdx % 8; // LSB first
           if (bitValue === 1) {
             blockBuffer[byteOffsetInBlock] |= (1 << bitOffsetInByte);
           }
         }
-        
+
         uint8.set(blockBuffer, offset);
         offset += blockSize;
       }
     }
-    
+
     return new Blob([buffer], { type: 'audio/x-dsf' });
   }
 

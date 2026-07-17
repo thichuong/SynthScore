@@ -96,10 +96,11 @@
         <input 
           type="range" 
           min="0" 
-          max="100" 
+          max="150" 
           v-model.number="localVolume" 
           @input="updateVolume"
           class="slider-input"
+          title="Âm lượng tổng (mức trên 100% sử dụng bộ giới hạn tự động để tránh vỡ tiếng)"
         />
         <span class="slider-value">{{ localVolume }}%</span>
       </div>
@@ -218,7 +219,7 @@
               </div>
               <div class="step-item" :class="{ active: exportStep === 'rendering', completed: isStepCompleted('rendering') }">
                 <span class="step-dot"></span>
-                <span class="step-text">Đang tổng hợp nhạc offline (siêu tốc)...</span>
+                <span class="step-text">Đang tổng hợp nhạc offline...</span>
               </div>
               <div class="step-item" :class="{ active: exportStep === 'encoding', completed: isStepCompleted('encoding') }">
                 <span class="step-dot"></span>

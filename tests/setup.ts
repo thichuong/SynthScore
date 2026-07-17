@@ -13,6 +13,16 @@ class MockAudioContext {
       connect: vi.fn(),
     };
   }
+  createDynamicsCompressor() {
+    return {
+      threshold: { setValueAtTime: vi.fn() },
+      knee: { setValueAtTime: vi.fn() },
+      ratio: { setValueAtTime: vi.fn() },
+      attack: { setValueAtTime: vi.fn() },
+      release: { setValueAtTime: vi.fn() },
+      connect: vi.fn(),
+    };
+  }
   resume = vi.fn().mockImplementation(async () => {
     (this as any).state = 'running';
   });
@@ -24,6 +34,16 @@ class MockOfflineAudioContext {
   };
   destination = {};
   constructor(public numChannels: number, public length: number, public sampleRate: number) {}
+  createDynamicsCompressor() {
+    return {
+      threshold: { setValueAtTime: vi.fn() },
+      knee: { setValueAtTime: vi.fn() },
+      ratio: { setValueAtTime: vi.fn() },
+      attack: { setValueAtTime: vi.fn() },
+      release: { setValueAtTime: vi.fn() },
+      connect: vi.fn(),
+    };
+  }
   startRendering = vi.fn().mockImplementation(async () => {
     return {
       sampleRate: this.sampleRate,
