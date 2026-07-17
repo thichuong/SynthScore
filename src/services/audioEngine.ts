@@ -62,6 +62,7 @@ class AudioEngineService {
   // Cache Soundfont để tránh tải lại
   public soundfontCache: Map<string, ArrayBuffer> = new Map();
   private loadedSoundfonts: Set<string> = new Set();
+  private preloadingPromises: Map<string, Promise<ArrayBuffer>> = new Map();
 
   // Ánh xạ nhạc cụ sang file Soundfont gốc tương ứng
   private getSoundfontFileName(programNumber: number, isDrum: boolean = false): string {
@@ -115,6 +116,127 @@ class AudioEngineService {
 
   constructor() {
     // Không tự động khởi tạo AudioContext ở đây để tránh chính sách chặn autoplay của trình duyệt
+    this.setupGestureListeners();
+  }
+
+  // Tự động lắng nghe tương tác đầu tiên của người dùng để khởi tạo Audio Engine
+  private setupGestureListeners(): void {
+    if (typeof window === 'undefined') return;
+
+    const autoInitOnGesture = async () => {
+      if (!this.isInitialized) {
+        console.log('[AudioEngine] Phát hiện tương tác người dùng, tự động khởi tạo Audio Engine...');
+        try {
+          await this.init();
+        } catch (e) {
+          console.error('[AudioEngine] Lỗi khi tự động khởi tạo Audio Engine trên tương tác:', e);
+        }
+      }
+      removeListeners();
+    };
+
+    const removeListeners = () => {
+      window.removeEventListener('click', autoInitOnGesture, true);
+      window.removeEventListener('touchstart', autoInitOnGesture, true);
+      window.removeEventListener('keydown', autoInitOnGesture, true);
+    };
+
+    window.addEventListener('click', autoInitOnGesture, true);
+    window.addEventListener('touchstart', autoInitOnGesture, true);
+    window.addEventListener('keydown', autoInitOnGesture, true);
+  }
+
+  // Tiền tải (preload) soundfont vào cache (IndexedDB & Memory cache) mà không khởi tạo AudioContext
+  public preloadSoundfont(programNumber: number, isDrum: boolean = false): Promise<void> {
+    const sf3Name = this.getSoundfontFileName(programNumber, isDrum);
+    const url = `/presets/instruments/${sf3Name}`;
+
+    // Nếu đã nạp trong cache bộ nhớ hoặc đang được tải, không cần chạy lại
+    if (this.soundfontCache.has(url)) {
+      return Promise.resolve();
+    }
+    if (this.preloadingPromises.has(url)) {
+      return this.preloadingPromises.get(url)!.then(() => {});
+    }
+
+    const loadPromise = (async () => {
+      try {
+        // Kiểm tra trong IndexedDB trước
+        const cachedDbBuffer = await getCachedSoundfont(url);
+        let isDbBufferValid = false;
+        if (cachedDbBuffer && cachedDbBuffer.byteLength >= 4) {
+          const header = String.fromCharCode(...new Uint8Array(cachedDbBuffer, 0, 4));
+          if (header === 'RIFF' || header === 'RIFS') {
+            isDbBufferValid = true;
+          }
+        }
+
+        if (isDbBufferValid) {
+          this.soundfontCache.set(url, cachedDbBuffer!);
+          return cachedDbBuffer!;
+        }
+
+        // Tải từ mạng
+        const baseUrl = import.meta.env.BASE_URL || '/';
+        const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+        const relativeUrl = url.startsWith('/') ? url.substring(1) : url;
+        const localUrl = `${normalizedBaseUrl}${relativeUrl}`;
+
+        console.log(`[AudioEngine] Đang tiền tải soundfont từ local URL: ${localUrl}`);
+        let res = await fetch(localUrl);
+        let contentType = res.headers.get('content-type') || '';
+        let buffer: ArrayBuffer | null = null;
+        let isValid = false;
+
+        if (res.ok && !contentType.includes('text/html')) {
+          const tempBuffer = await res.arrayBuffer();
+          if (tempBuffer.byteLength >= 4) {
+            const header = String.fromCharCode(...new Uint8Array(tempBuffer, 0, 4));
+            if (header === 'RIFF' || header === 'RIFS') {
+              buffer = tempBuffer;
+              isValid = true;
+            } else {
+              console.warn(`[AudioEngine] Local URL tiền tải trả về file không hợp lệ (header: ${header})`);
+            }
+          }
+        }
+
+        if (!isValid) {
+          console.warn(`[AudioEngine] Không thể tiền tải soundfont từ local URL. Thử tải từ fallback GitHub Pages...`);
+          const fallbackUrl = `https://thichuong.github.io/SynthScore/presets/instruments/${sf3Name}`;
+          res = await fetch(fallbackUrl);
+          contentType = res.headers.get('content-type') || '';
+          if (res.ok && !contentType.includes('text/html')) {
+            const tempBuffer = await res.arrayBuffer();
+            if (tempBuffer.byteLength >= 4) {
+              const header = String.fromCharCode(...new Uint8Array(tempBuffer, 0, 4));
+              if (header === 'RIFF' || header === 'RIFS') {
+                buffer = tempBuffer;
+                isValid = true;
+              } else {
+                console.warn(`[AudioEngine] Fallback URL tiền tải trả về file không hợp lệ (header: ${header})`);
+              }
+            }
+          }
+        }
+
+        if (isValid && buffer) {
+          this.soundfontCache.set(url, buffer);
+          await cacheSoundfont(url, buffer);
+          return buffer;
+        } else {
+          throw new Error(`Không thể tiền tải Soundbank hợp lệ từ cả local và fallback URL`);
+        }
+      } catch (e) {
+        console.error('[AudioEngine] Lỗi khi tiền tải soundfont:', e);
+        throw e;
+      } finally {
+        this.preloadingPromises.delete(url);
+      }
+    })();
+
+    this.preloadingPromises.set(url, loadPromise);
+    return loadPromise.then(() => {});
   }
 
   // Khởi tạo Audio Engine
@@ -129,6 +251,37 @@ class AudioEngineService {
       // 1. Tạo AudioContext
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       this.audioContext = new AudioCtx();
+
+      // Khởi tạo phần tử âm thanh im lặng để mở khóa sớm trên user gesture
+      if (!this.silentAudio && typeof Audio !== 'undefined') {
+        try {
+          this.silentAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjM2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU2LjQxAAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFN//MUZAMAAAGkAAAAAAAAA0gAAAAARTMu//MUZAYAAAGkAAAAAAAAA0gAAAAAOTku//MUZAkAAAGkAAAAAAAAA0gAAAAANVVV');
+          this.silentAudio.loop = true;
+          
+          if (typeof window !== 'undefined') {
+            const unlockAudio = () => {
+              if (this.audioContext && this.audioContext.state === 'suspended') {
+                this.audioContext.resume().catch(e => console.warn('Lỗi khi resume AudioContext:', e));
+              }
+              if (this.silentAudio) {
+                this.silentAudio.play()
+                  .then(() => {
+                    this.silentAudio!.pause();
+                  })
+                  .catch(e => {
+                    console.warn('Không thể pre-unlock audio:', e);
+                  });
+              }
+              window.removeEventListener('click', unlockAudio, true);
+              window.removeEventListener('touchstart', unlockAudio, true);
+            };
+            window.addEventListener('click', unlockAudio, true);
+            window.addEventListener('touchstart', unlockAudio, true);
+          }
+        } catch (e) {
+          console.error('Không thể tạo đối tượng Audio im lặng trong init:', e);
+        }
+      }
 
       // 2. Đăng ký AudioWorklet Processor từ thư mục public (tự động thêm base path từ Vite)
       const baseUrl = import.meta.env.BASE_URL || '/';
@@ -258,6 +411,8 @@ class AudioEngineService {
 
       if (this.soundfontCache.has(url)) {
         buffer = this.soundfontCache.get(url)!;
+      } else if (this.preloadingPromises.has(url)) {
+        buffer = await this.preloadingPromises.get(url)!;
       } else {
         const cachedDbBuffer = await getCachedSoundfont(url);
         let isDbBufferValid = false;
@@ -577,7 +732,7 @@ class AudioEngineService {
     // Khởi tạo phần tử âm thanh im lặng nếu chưa tồn tại
     if (!this.silentAudio && typeof Audio !== 'undefined') {
       try {
-        this.silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+        this.silentAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjM2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU2LjQxAAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFN//MUZAMAAAGkAAAAAAAAA0gAAAAARTMu//MUZAYAAAGkAAAAAAAAA0gAAAAAOTku//MUZAkAAAGkAAAAAAAAA0gAAAAANVVV');
         this.silentAudio.loop = true;
       } catch (e) {
         console.error('Không thể tạo đối tượng Audio im lặng:', e);
@@ -1012,7 +1167,7 @@ class AudioEngineService {
           artist: 'SynthScore',
           album: 'SynthScore Web Player',
           artwork: [
-            { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' }
+            { src: new URL('/favicon.svg', window.location.href).href, sizes: 'any', type: 'image/svg+xml' }
           ]
         });
       } catch (e) {
