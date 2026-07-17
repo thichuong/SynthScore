@@ -35,7 +35,6 @@ SynthScore là một ứng dụng web hiện đại được xây dựng trên *
     *   `.mid`, `.midi` (File nhạc MIDI)
     *   `.xml`, `.mxl` (Bản nhạc MusicXML/Compressed)
     *   `.abc` (Bản nhạc ký âm ABC)
-    *   `.sf2` (Bộ nhạc cụ SoundFont tùy chỉnh)
 
 ### 6. 📱 Hỗ trợ Progressive Web App (PWA)
 *   Cung cấp cấu hình manifest đầy đủ cho phép cài đặt trực tiếp ứng dụng lên điện thoại, máy tính bảng và PC.

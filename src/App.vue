@@ -4,7 +4,7 @@
     <header class="app-header">
       <div class="logo-area">
         <div class="logo-icon-wrapper">
-          <Music class="logo-icon animate-pulse" />
+          <img src="./assets/logo.svg" alt="SynthScore" class="logo-icon animate-pulse" />
         </div>
         <div class="logo-text">
           <h1>SynthScore</h1>
@@ -88,7 +88,7 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, computed } from 'vue';
-import { Music, CheckCircle, AlertCircle } from 'lucide-vue-next';
+import { CheckCircle, AlertCircle } from 'lucide-vue-next';
 import FileUploader from './components/FileUploader.vue';
 import OrchestraMixer from './components/OrchestraMixer.vue';
 import SheetViewer from './components/SheetViewer.vue';
@@ -536,17 +536,19 @@ async function loadFromLibrary(song: SongEntry) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, #ff007f 0%, #7f00ff 100%);
-  border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(255, 0, 127, 0.3);
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
 }
 
 .logo-icon {
-  width: 20px;
-  height: 20px;
-  color: #ffffff;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
 }
 
 .logo-text h1 {
