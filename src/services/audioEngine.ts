@@ -79,6 +79,7 @@ class AudioEngineService {
   private timeUpdateInterval: any = null;
   private worker: Worker | null = null;
   private workerCallbacks: Map<string, { resolve: (val: any) => void; reject: (err: any) => void }> = new Map();
+  private silentAudio: HTMLAudioElement | null = null;
 
   private postToWorker<T>(type: 'parseTracks' | 'generateSymphony' | 'generateConcerto', payload: any, transfer?: Transferable[]): Promise<T> {
     if (!this.worker) {
@@ -170,6 +171,22 @@ class AudioEngineService {
         if (this.onTimeUpdateCallback) {
           this.onTimeUpdateCallback(0);
         }
+
+        // Tạm dừng âm thanh im lặng
+        if (this.silentAudio) {
+          try {
+            this.silentAudio.pause();
+            this.silentAudio.currentTime = 0;
+          } catch (e) {}
+        }
+
+        // Cập nhật trạng thái Media Session
+        if (typeof window !== 'undefined' && 'mediaSession' in window.navigator) {
+          const nav = window.navigator as any;
+          nav.mediaSession.playbackState = 'none';
+          this.updateMediaSessionPositionState();
+        }
+
         if (this.onSongEndedCallback) {
           this.onSongEndedCallback();
         }
@@ -446,6 +463,9 @@ class AudioEngineService {
     await this.loadSongSoundbanks();
     this.resetMixerSettings();
     this.triggerStateChange();
+
+    // Cấu hình Media Session cho bài hát mới
+    this.updateMediaSession();
   }
 
 
@@ -554,10 +574,34 @@ class AudioEngineService {
       this.audioContext.resume();
     }
 
+    // Khởi tạo phần tử âm thanh im lặng nếu chưa tồn tại
+    if (!this.silentAudio && typeof Audio !== 'undefined') {
+      try {
+        this.silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+        this.silentAudio.loop = true;
+      } catch (e) {
+        console.error('Không thể tạo đối tượng Audio im lặng:', e);
+      }
+    }
+
+    // Phát âm thanh im lặng để kích hoạt điều khiển trên màn hình khóa
+    if (this.silentAudio) {
+      this.silentAudio.play().catch(e => {
+        console.warn('Không thể phát âm thanh im lặng (có thể do Autoplay Policy):', e);
+      });
+    }
+
     this.sequencer.play();
     this.isPlaying = true;
     this.triggerStateChange();
     this.startTimeLoop();
+
+    // Cập nhật trạng thái phát nhạc của Media Session
+    if (typeof window !== 'undefined' && 'mediaSession' in window.navigator) {
+      const nav = window.navigator as any;
+      nav.mediaSession.playbackState = 'playing';
+      this.updateMediaSessionPositionState();
+    }
   }
 
   public pause(): void {
@@ -566,6 +610,22 @@ class AudioEngineService {
     this.isPlaying = false;
     this.stopTimeLoop();
     this.triggerStateChange();
+
+    // Dừng âm thanh im lặng
+    if (this.silentAudio) {
+      try {
+        this.silentAudio.pause();
+      } catch (e) {
+        console.warn('Lỗi khi tạm dừng âm thanh im lặng:', e);
+      }
+    }
+
+    // Cập nhật trạng thái phát nhạc của Media Session
+    if (typeof window !== 'undefined' && 'mediaSession' in window.navigator) {
+      const nav = window.navigator as any;
+      nav.mediaSession.playbackState = 'paused';
+      this.updateMediaSessionPositionState();
+    }
   }
 
   public stop(): void {
@@ -579,6 +639,23 @@ class AudioEngineService {
     if (this.onTimeUpdateCallback) {
       this.onTimeUpdateCallback(0);
     }
+
+    // Dừng âm thanh im lặng và đặt lại vị trí
+    if (this.silentAudio) {
+      try {
+        this.silentAudio.pause();
+        this.silentAudio.currentTime = 0;
+      } catch (e) {
+        console.warn('Lỗi khi dừng âm thanh im lặng:', e);
+      }
+    }
+
+    // Cập nhật trạng thái phát nhạc của Media Session
+    if (typeof window !== 'undefined' && 'mediaSession' in window.navigator) {
+      const nav = window.navigator as any;
+      nav.mediaSession.playbackState = 'none';
+      this.updateMediaSessionPositionState();
+    }
   }
 
   // Seek vị trí phát nhạc (tính theo giây)
@@ -590,6 +667,18 @@ class AudioEngineService {
     if (this.onTimeUpdateCallback) {
       this.onTimeUpdateCallback(seconds);
     }
+
+    // Đồng bộ hóa vị trí của âm thanh im lặng nếu có thể
+    if (this.silentAudio) {
+      try {
+        this.silentAudio.currentTime = seconds % (this.silentAudio.duration || 1);
+      } catch (e) {
+        // Có thể lỗi nếu audio chưa tải hoặc không hỗ trợ
+      }
+    }
+
+    // Cập nhật vị trí của Media Session
+    this.updateMediaSessionPositionState();
   }
 
   private startTimeLoop(): void {
@@ -617,6 +706,19 @@ class AudioEngineService {
     this.playbackRate = rate;
     this.sequencer.playbackRate = rate;
     this.triggerStateChange();
+
+    // Đồng bộ hóa tốc độ phát của âm thanh im lặng
+    if (this.silentAudio) {
+      try {
+        this.silentAudio.defaultPlaybackRate = rate;
+        this.silentAudio.playbackRate = rate;
+      } catch (e) {
+        console.warn('Không thể thiết lập tốc độ phát cho âm thanh im lặng:', e);
+      }
+    }
+
+    // Cập nhật vị trí và tốc độ phát của Media Session
+    this.updateMediaSessionPositionState();
   }
 
   // Âm lượng tổng
@@ -892,6 +994,79 @@ class AudioEngineService {
     });
 
     this.triggerStateChange();
+  }
+
+  // Cấu hình Media Session Metadata và Action Handlers
+  private updateMediaSession(): void {
+    if (typeof window === 'undefined' || !('mediaSession' in window.navigator)) {
+      return;
+    }
+
+    const nav = window.navigator as any;
+    
+    // Thiết lập Metadata bản nhạc
+    if (typeof (window as any).MediaMetadata !== 'undefined') {
+      try {
+        nav.mediaSession.metadata = new (window as any).MediaMetadata({
+          title: this.currentSongName || 'Bản nhạc không tên',
+          artist: 'SynthScore',
+          album: 'SynthScore Web Player',
+          artwork: [
+            { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' }
+          ]
+        });
+      } catch (e) {
+        console.warn('Lỗi khi thiết lập MediaMetadata:', e);
+      }
+    }
+
+    // Thiết lập các Action Handlers
+    try {
+      nav.mediaSession.setActionHandler('play', () => {
+        this.play();
+      });
+      nav.mediaSession.setActionHandler('pause', () => {
+        this.pause();
+      });
+      nav.mediaSession.setActionHandler('stop', () => {
+        this.stop();
+      });
+      nav.mediaSession.setActionHandler('seekbackward', (details: any) => {
+        const offset = details.seekOffset || 10;
+        this.seek(Math.max(0, this.currentTime - offset));
+      });
+      nav.mediaSession.setActionHandler('seekforward', (details: any) => {
+        const offset = details.seekOffset || 10;
+        this.seek(Math.min(this.duration, this.currentTime + offset));
+      });
+      nav.mediaSession.setActionHandler('seekto', (details: any) => {
+        if (details.seekTime !== undefined && details.seekTime !== null) {
+          this.seek(details.seekTime);
+        }
+      });
+    } catch (e) {
+      console.warn('Lỗi khi thiết lập mediaSession action handlers:', e);
+    }
+  }
+
+  // Cập nhật vị trí phát nhạc của Media Session
+  private updateMediaSessionPositionState(): void {
+    if (typeof window === 'undefined' || !('mediaSession' in window.navigator)) {
+      return;
+    }
+
+    const nav = window.navigator as any;
+    if (typeof nav.mediaSession.setPositionState === 'function') {
+      try {
+        nav.mediaSession.setPositionState({
+          duration: Math.max(0, this.duration || 0),
+          playbackRate: Math.max(0.0625, this.playbackRate || 1.0),
+          position: Math.max(0, Math.min(this.duration || 0, this.currentTime || 0))
+        });
+      } catch (e) {
+        console.warn('Lỗi khi setPositionState cho mediaSession:', e);
+      }
+    }
   }
 
   // Quản lý sự kiện lắng nghe

@@ -71,3 +71,33 @@ vi.mock('../src/services/appCache', () => {
     cacheSoundfont: vi.fn().mockResolvedValue(undefined),
   };
 });
+
+// 4. Mock Media Session API & HTML5 Audio
+const mockMediaSession = {
+  metadata: null,
+  playbackState: 'none',
+  setActionHandler: vi.fn(),
+  setPositionState: vi.fn(),
+};
+
+if (typeof globalThis !== 'undefined') {
+  if (!(globalThis as any).navigator) {
+    (globalThis as any).navigator = {};
+  }
+  (globalThis as any).navigator.mediaSession = mockMediaSession;
+  
+  (globalThis as any).MediaMetadata = class MockMediaMetadata {
+    constructor(public metadata: any) {}
+  };
+
+  (globalThis as any).Audio = class MockAudio {
+    loop = false;
+    defaultPlaybackRate = 1.0;
+    playbackRate = 1.0;
+    currentTime = 0;
+    duration = 1.0;
+    play = vi.fn().mockResolvedValue(undefined);
+    pause = vi.fn();
+  };
+}
+

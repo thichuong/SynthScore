@@ -119,6 +119,38 @@ describe('audioEngine', () => {
     expect(AudioEngine.currentTime).toBe(0);
   });
 
+  it('should integrate with Media Session API and manage silent audio element', async () => {
+    const nav = navigator as any;
+    
+    // Clear mock calls
+    nav.mediaSession.setActionHandler.mockClear();
+    nav.mediaSession.setPositionState.mockClear();
+    nav.mediaSession.playbackState = 'none';
+
+    // 1. Initial State
+    expect(nav.mediaSession.playbackState).toBe('none');
+
+    // 2. Play
+    AudioEngine.play();
+    expect(nav.mediaSession.playbackState).toBe('playing');
+    expect(nav.mediaSession.setPositionState).toHaveBeenCalled();
+
+    // 3. Pause
+    AudioEngine.pause();
+    expect(nav.mediaSession.playbackState).toBe('paused');
+
+    // 4. Seek
+    nav.mediaSession.setPositionState.mockClear();
+    AudioEngine.seek(10);
+    expect(nav.mediaSession.setPositionState).toHaveBeenCalledWith(expect.objectContaining({
+      position: 10
+    }));
+
+    // 5. Stop
+    AudioEngine.stop();
+    expect(nav.mediaSession.playbackState).toBe('none');
+  });
+
   it('should update mixer values (volume, pan, mute, solo)', () => {
     // Mock tracks setup
     AudioEngine.tracks = [
