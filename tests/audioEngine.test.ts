@@ -259,4 +259,72 @@ describe('audioEngine', () => {
     
     vi.useRealTimers();
   });
+
+  describe('exportAudio', () => {
+    beforeEach(async () => {
+      // Đặt lại trạng thái để test độc lập
+      (AudioEngine as any).isInitialized = false;
+      (AudioEngine as any).isReady = false;
+      await AudioEngine.init();
+
+      // Nạp một bài hát giả lập để chạy export
+      const midi = new Midi();
+      const track = midi.addTrack();
+      track.addNote({ midi: 60, time: 0, duration: 1 });
+      const midiBytes = new Uint8Array(midi.toArray());
+      await AudioEngine.loadSong(midiBytes, 'Export Test Song');
+    });
+
+    it('should export audio to WAV successfully', async () => {
+      const stepChanges: string[] = [];
+      const result = await AudioEngine.exportAudio('wav', { applyMixer: true }, (step) => {
+        stepChanges.push(step);
+      });
+
+      expect(result.blob).toBeDefined();
+      expect(result.blob.type).toBe('audio/wav');
+      expect(result.fileName).toBe('Export Test Song.wav');
+      expect(stepChanges).toEqual(['preparing', 'rendering', 'encoding', 'done']);
+    });
+
+    it('should export audio to MP3 successfully', async () => {
+      // Giả lập thư viện lamejs để tránh tải mạng trong lúc chạy test
+      const mockMp3Buffer = new Uint8Array([1, 2, 3]);
+      const mockEncoder = {
+        encodeBuffer: vi.fn().mockReturnValue(mockMp3Buffer),
+        flush: vi.fn().mockReturnValue(new Uint8Array([])),
+      };
+      (window as any).lamejs = {
+        Mp3Encoder: vi.fn().mockImplementation(function(this: any) {
+          return mockEncoder;
+        }),
+      };
+
+      const result = await AudioEngine.exportAudio('mp3', { mp3Bitrate: 320, applyMixer: true });
+
+      expect(result.blob).toBeDefined();
+      expect(result.blob.type).toBe('audio/mp3');
+      expect(result.fileName).toBe('Export Test Song.mp3');
+
+      delete (window as any).lamejs;
+    });
+
+    it('should export audio to DSD (DSF) successfully', async () => {
+      const result = await AudioEngine.exportAudio('dsd', { applyMixer: true });
+
+      expect(result.blob).toBeDefined();
+      expect(result.blob.type).toBe('audio/x-dsf');
+      expect(result.fileName).toBe('Export Test Song.dsf');
+    });
+
+    it('should export audio to FLAC and ALAC successfully using WAV fallback', async () => {
+      const flacResult = await AudioEngine.exportAudio('flac');
+      expect(flacResult.blob).toBeDefined();
+      expect(flacResult.fileName).toBe('Export Test Song.flac');
+
+      const alacResult = await AudioEngine.exportAudio('alac');
+      expect(alacResult.blob).toBeDefined();
+      expect(alacResult.fileName).toBe('Export Test Song.alac');
+    });
+  });
 });

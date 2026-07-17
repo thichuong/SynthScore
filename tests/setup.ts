@@ -18,10 +18,29 @@ class MockAudioContext {
   });
 }
 
+class MockOfflineAudioContext {
+  audioWorklet = {
+    addModule: vi.fn().mockResolvedValue(undefined),
+  };
+  destination = {};
+  constructor(public numChannels: number, public length: number, public sampleRate: number) {}
+  startRendering = vi.fn().mockImplementation(async () => {
+    return {
+      sampleRate: this.sampleRate,
+      numberOfChannels: this.numChannels,
+      length: this.length,
+      duration: this.length / this.sampleRate,
+      getChannelData: vi.fn().mockReturnValue(new Float32Array(this.length)),
+    };
+  });
+}
+
 // Assign globally
 (globalThis as any).AudioContext = MockAudioContext;
+(globalThis as any).OfflineAudioContext = MockOfflineAudioContext;
 if (typeof window !== 'undefined') {
   (window as any).AudioContext = MockAudioContext;
+  (window as any).OfflineAudioContext = MockOfflineAudioContext;
 }
 
 // 2. Mock spessasynth_lib
@@ -40,6 +59,19 @@ vi.mock('spessasynth_lib', () => {
     midiChannels = Array.from({ length: 16 }, () => ({
       setSystemParameter: vi.fn(),
     }));
+    startOfflineRender = vi.fn().mockResolvedValue(undefined);
+    destroy = vi.fn();
+    getSnapshot = vi.fn().mockResolvedValue({
+      midiChannels: [],
+      keyMappings: [],
+      midiParameters: {},
+      lockedMIDIParameters: {},
+      systemParameters: {},
+      reverbProcessor: {},
+      chorusProcessor: {},
+      delayProcessor: {},
+      insertionProcessor: {}
+    });
   }
 
   class MockSequencer {
@@ -59,6 +91,7 @@ vi.mock('spessasynth_lib', () => {
   return {
     WorkletSynthesizer: MockWorkletSynthesizer,
     Sequencer: MockSequencer,
+    audioBufferToWav: vi.fn().mockReturnValue(new Blob(['fake wav'], { type: 'audio/wav' })),
   };
 });
 
