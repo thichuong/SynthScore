@@ -23,7 +23,7 @@ class MockWorker {
                 name: 'Piano Track',
                 instrumentName: 'Piano',
                 instrumentNumber: 0,
-                volume: 100,
+                volume: 80,
                 isMuted: false,
                 isSoloed: false,
                 noteCount: 5,

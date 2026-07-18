@@ -169,7 +169,7 @@ export class TrackManager {
       name: `Kênh mới ${newChan + 1}`,
       instrumentName: GM_INSTRUMENTS[0], // Acoustic Grand Piano
       instrumentNumber: 0,
-      volume: 100,
+      volume: 80,
       isMuted: false,
       isSoloed: false,
       noteCount: 0,
