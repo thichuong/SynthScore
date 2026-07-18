@@ -1,6 +1,6 @@
 import { type WorkletSynthesizer } from 'spessasynth_lib';
 import { GM_INSTRUMENTS } from '../../data/instruments';
-import { type TrackInfo, getDefaultTrackSettings } from '../midiGenerator';
+import { type TrackInfo } from '../midiGenerator';
 
 /**
  * Quản lý danh sách các bè nhạc (tracks) và cấu hình bàn trộn Mixer.

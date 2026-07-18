@@ -110,34 +110,12 @@ class AudioEngineService {
   }
 
   constructor() {
-    this.setupGestureListeners();
-  }
-
-  // Tự động lắng nghe tương tác đầu tiên của người dùng để khởi tạo Audio Engine
-  private setupGestureListeners(): void {
-    if (typeof window === 'undefined') return;
-
-    const autoInitOnGesture = async () => {
-      if (!this.isInitialized) {
-        console.log('[AudioEngine] Phát hiện tương tác người dùng, tự động khởi tạo Audio Engine...');
-        try {
-          await this.init();
-        } catch (e) {
-          console.error('[AudioEngine] Lỗi khi tự động khởi tạo Audio Engine trên tương tác:', e);
-        }
-      }
-      removeListeners();
-    };
-
-    const removeListeners = () => {
-      window.removeEventListener('click', autoInitOnGesture, true);
-      window.removeEventListener('touchstart', autoInitOnGesture, true);
-      window.removeEventListener('keydown', autoInitOnGesture, true);
-    };
-
-    window.addEventListener('click', autoInitOnGesture, true);
-    window.addEventListener('touchstart', autoInitOnGesture, true);
-    window.addEventListener('keydown', autoInitOnGesture, true);
+    if (typeof window !== 'undefined') {
+      console.log('[AudioEngine] Chủ động khởi tạo Audio Engine...');
+      this.init().catch(e => {
+        console.error('[AudioEngine] Lỗi khi chủ động khởi tạo Audio Engine:', e);
+      });
+    }
   }
 
   // Giao tiếp với Web Worker để xử lý luồng nền
