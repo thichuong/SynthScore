@@ -110,12 +110,8 @@ class AudioEngineService {
   }
 
   constructor() {
-    if (typeof window !== 'undefined') {
-      console.log('[AudioEngine] Chủ động khởi tạo Audio Engine...');
-      this.init().catch(e => {
-        console.error('[AudioEngine] Lỗi khi chủ động khởi tạo Audio Engine:', e);
-      });
-    }
+    // Không tự động khởi tạo khi import để tránh lỗi môi trường test.
+    // Việc khởi tạo sẽ được gọi chủ động từ phía ứng dụng (ví dụ: trong App.vue onMounted).
   }
 
   // Giao tiếp với Web Worker để xử lý luồng nền
@@ -160,6 +156,7 @@ class AudioEngineService {
   public async init(): Promise<void> {
     if (this.isInitialized) return;
 
+    console.log('[AudioEngine] Chủ động khởi tạo Audio Engine...');
     this.isLoadingSoundfont = true;
     this.triggerStateChange();
 
