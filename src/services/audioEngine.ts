@@ -71,6 +71,7 @@ class AudioEngineService {
   private timeUpdateInterval: any = null;
   private worker: Worker | null = null;
   private workerCallbacks: Map<string, { resolve: (val: any) => void; reject: (err: any) => void }> = new Map();
+  private initPromise: Promise<void> | null = null;
 
   // Getters tương thích ngược cho Audio Context nodes và cache
   public get audioContext(): AudioContext | null {
@@ -154,114 +155,124 @@ class AudioEngineService {
 
   // Khởi tạo Audio Engine
   public async init(): Promise<void> {
-    if (this.isInitialized) return;
+    if (this.isInitialized && this.synth) return;
+    if (this.initPromise) return this.initPromise;
 
-    console.log('[AudioEngine] Chủ động khởi tạo Audio Engine...');
-    this.isLoadingSoundfont = true;
-    this.triggerStateChange();
+    this.initPromise = (async () => {
+      console.log('[AudioEngine] Chủ động khởi tạo Audio Engine...');
+      this.isLoadingSoundfont = true;
+      this.triggerStateChange();
 
-    try {
-      // 1. Tạo AudioContext thông qua Context Manager
-      const audioCtx = await this.ctxManager.init();
+      try {
+        // 1. Tạo AudioContext thông qua Context Manager
+        const audioCtx = await this.ctxManager.init();
 
-      // 2. Khởi tạo Synthesizer
-      this.synth = new WorkletSynthesizer(audioCtx);
+        // 2. Khởi tạo Synthesizer
+        this.synth = new WorkletSynthesizer(audioCtx);
 
-      // 3. Kết nối các node âm thanh (Synth -> Analyser -> Compressor -> Output)
-      this.synth.connect(this.ctxManager.analyser!);
-      this.ctxManager.analyser!.connect(this.ctxManager.compressor!);
-      this.ctxManager.compressor!.connect(audioCtx.destination);
+        // 3. Kết nối các node âm thanh (Synth -> Analyser -> Compressor -> Output)
+        this.synth.connect(this.ctxManager.analyser!);
+        this.ctxManager.analyser!.connect(this.ctxManager.compressor!);
+        this.ctxManager.compressor!.connect(audioCtx.destination);
 
-      // 4. Khởi tạo Sequencer
-      this.sequencer = new Sequencer(this.synth);
+        // 4. Khởi tạo Sequencer
+        this.sequencer = new Sequencer(this.synth);
 
-      // 5. Đăng ký các sự kiện của Sequencer
-      this.sequencer.eventHandler.addEvent('timeChange', 'audio_engine_time', (time) => {
-        this.currentTime = time;
-        if (this.onTimeUpdateCallback) {
-          this.onTimeUpdateCallback(time);
+        // 5. Đăng ký các sự kiện của Sequencer
+        this.sequencer.eventHandler.addEvent('timeChange', 'audio_engine_time', (time) => {
+          this.currentTime = time;
+          if (this.onTimeUpdateCallback) {
+            this.onTimeUpdateCallback(time);
+          }
+        });
+
+        this.sequencer.eventHandler.addEvent('songChange', 'audio_engine_song', () => {
+          if (this.sequencer) {
+            this.duration = this.sequencer.duration || 0;
+            this.bpm = this.sequencer.currentTempo || 120;
+          }
+          this.triggerStateChange();
+        });
+
+        this.sequencer.eventHandler.addEvent('songEnded', 'audio_engine_end', () => {
+          this.isPlaying = false;
+          this.currentTime = 0;
+          this.stopTimeLoop();
+          this.triggerStateChange();
+          if (this.onTimeUpdateCallback) {
+            this.onTimeUpdateCallback(0);
+          }
+
+          // Cập nhật trạng thái Media Session
+          this.mediaSession.setPlaybackState('none');
+          this.updateMediaSessionPositionState();
+
+          if (this.onSongEndedCallback) {
+            this.onSongEndedCallback();
+          }
+        });
+
+        // 6. Tải nhạc cụ mặc định (Acoustic Grand Piano - 0)
+        await this.soundfontService.loadInstrumentSoundbank(this.synth, 0);
+
+        const defaults = getDefaultTrackSettings(0, 0);
+        this.tracks = [{
+          channel: 0,
+          name: 'Acoustic Grand Piano',
+          instrumentName: GM_INSTRUMENTS[0],
+          instrumentNumber: 0,
+          volume: 80,
+          isMuted: false,
+          isSoloed: false,
+          noteCount: 0,
+          pan: defaults.pan,
+          reverbSend: defaults.reverbSend,
+          chorusSend: defaults.chorusSend
+        }];
+
+        // Thiết lập âm lượng tổng ban đầu cho bộ tổng hợp âm với hệ số boost
+        this.synth.setSystemParameter('gain', (this.masterVolume / 100) * this.VOLUME_BOOST_FACTOR);
+
+        // Kích hoạt bộ xử lý hiệu ứng (Reverb/Chorus/Delay)
+        this.synth.setSystemParameter('effectsEnabled', true);
+        this.synth.setSystemParameter('reverbGain', this.masterReverbGain / 100);
+
+        // Cấu hình Reverb mặc định sang kiểu phòng hòa nhạc ấm
+        if ((this.synth as any).reverbProcessor) {
+          (this.synth as any).reverbProcessor.character = this.reverbCharacter;
+          (this.synth as any).reverbProcessor.time = this.reverbTime;
+          (this.synth as any).reverbProcessor.preDelayTime = this.reverbPreDelay;
         }
-      });
 
-      this.sequencer.eventHandler.addEvent('songChange', 'audio_engine_song', () => {
-        if (this.sequencer) {
-          this.duration = this.sequencer.duration || 0;
-          this.bpm = this.sequencer.currentTempo || 120;
-        }
+        this.isReady = true;
+        this.isLoadingSoundfont = false;
         this.triggerStateChange();
-      });
 
-      this.sequencer.eventHandler.addEvent('songEnded', 'audio_engine_end', () => {
-        this.isPlaying = false;
-        this.currentTime = 0;
-        this.stopTimeLoop();
+        // Đăng ký Media Session action handlers
+        this.mediaSession.setActionHandlers({
+          play: () => this.play(),
+          pause: () => this.pause(),
+          stop: () => this.stop(),
+          seekBackward: (offset) => this.seek(Math.max(0, this.currentTime - offset)),
+          seekForward: (offset) => this.seek(Math.min(this.duration, this.currentTime + offset)),
+          seekTo: (time) => this.seek(time)
+        });
+
+      } catch (error) {
+        console.error('Không thể khởi tạo Audio Engine:', error);
+        this.isInitialized = false;
+        this.isReady = false;
+        this.synth = null;
+        this.sequencer = null;
+        this.isLoadingSoundfont = false;
         this.triggerStateChange();
-        if (this.onTimeUpdateCallback) {
-          this.onTimeUpdateCallback(0);
-        }
-
-        // Cập nhật trạng thái Media Session
-        this.mediaSession.setPlaybackState('none');
-        this.updateMediaSessionPositionState();
-
-        if (this.onSongEndedCallback) {
-          this.onSongEndedCallback();
-        }
-      });
-
-      // 6. Tải nhạc cụ mặc định (Acoustic Grand Piano - 0)
-      await this.soundfontService.loadInstrumentSoundbank(this.synth, 0);
-
-      const defaults = getDefaultTrackSettings(0, 0);
-      this.tracks = [{
-        channel: 0,
-        name: 'Acoustic Grand Piano',
-        instrumentName: GM_INSTRUMENTS[0],
-        instrumentNumber: 0,
-        volume: 80,
-        isMuted: false,
-        isSoloed: false,
-        noteCount: 0,
-        pan: defaults.pan,
-        reverbSend: defaults.reverbSend,
-        chorusSend: defaults.chorusSend
-      }];
-
-      // Thiết lập âm lượng tổng ban đầu cho bộ tổng hợp âm với hệ số boost
-      this.synth.setSystemParameter('gain', (this.masterVolume / 100) * this.VOLUME_BOOST_FACTOR);
-
-      // Kích hoạt bộ xử lý hiệu ứng (Reverb/Chorus/Delay)
-      this.synth.setSystemParameter('effectsEnabled', true);
-      this.synth.setSystemParameter('reverbGain', this.masterReverbGain / 100);
-
-      // Cấu hình Reverb mặc định sang kiểu phòng hòa nhạc ấm
-      if ((this.synth as any).reverbProcessor) {
-        (this.synth as any).reverbProcessor.character = this.reverbCharacter;
-        (this.synth as any).reverbProcessor.time = this.reverbTime;
-        (this.synth as any).reverbProcessor.preDelayTime = this.reverbPreDelay;
+        throw error;
+      } finally {
+        this.initPromise = null;
       }
+    })();
 
-      this.isReady = true;
-      this.isLoadingSoundfont = false;
-      this.triggerStateChange();
-
-      // Đăng ký Media Session action handlers
-      this.mediaSession.setActionHandlers({
-        play: () => this.play(),
-        pause: () => this.pause(),
-        stop: () => this.stop(),
-        seekBackward: (offset) => this.seek(Math.max(0, this.currentTime - offset)),
-        seekForward: (offset) => this.seek(Math.min(this.duration, this.currentTime + offset)),
-        seekTo: (time) => this.seek(time)
-      });
-
-    } catch (error) {
-      console.error('Không thể khởi tạo Audio Engine:', error);
-      this.isInitialized = false;
-      this.isLoadingSoundfont = false;
-      this.triggerStateChange();
-      throw error;
-    }
+    return this.initPromise;
   }
 
   // Nạp bộ âm thanh nhạc cụ động
@@ -304,6 +315,9 @@ class AudioEngineService {
 
     // Tạm dừng phát nhạc hiện tại
     this.pause();
+
+    // Reset danh sách tracks cũ để tránh rò rỉ cấu hình mixer
+    this.tracks = [];
 
     // Lưu trữ dữ liệu gốc
     this.originalMidiBytes = midiBytes;
@@ -381,12 +395,8 @@ class AudioEngineService {
           chorusSend: existing.chorusSend,
           isMuted: existing.isMuted,
           isSoloed: existing.isSoloed,
-          instrumentNumber: (this.playbackMode === 'symphony' || this.playbackMode === 'concerto')
-            ? existing.instrumentNumber
-            : pt.instrumentNumber,
-          instrumentName: (this.playbackMode === 'symphony' || this.playbackMode === 'concerto')
-            ? existing.instrumentName
-            : pt.instrumentName,
+          instrumentNumber: pt.instrumentNumber,
+          instrumentName: pt.instrumentName,
         };
       }
       return pt;

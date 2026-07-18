@@ -251,6 +251,86 @@ describe('audioEngine', () => {
     expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Roland_SC-88.sf3'));
   });
 
+  it('should handle concurrent soundfont loading requests for the same soundfont without duplicate loads/fetches', async () => {
+    // Reset loaded Soundfonts and cache to force network/mock fetch
+    (AudioEngine as any).loadedSoundfonts.clear();
+    (AudioEngine as any).soundfontCache.clear();
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const addSoundBankSpy = vi.spyOn((AudioEngine as any).synth.soundBankManager, 'addSoundBank');
+
+    fetchSpy.mockClear();
+    addSoundBankSpy.mockClear();
+
+    // Call loadInstrumentSoundbank concurrently for two instruments that map to the same file:
+    // Program 40 -> Sonatina_Symphonic_Orchestra.sf3
+    // Program 60 -> Sonatina_Symphonic_Orchestra.sf3
+    const loadPromise1 = AudioEngine.loadInstrumentSoundbank(40, false);
+    const loadPromise2 = AudioEngine.loadInstrumentSoundbank(60, false);
+
+    await Promise.all([loadPromise1, loadPromise2]);
+
+    // Check that fetch was called exactly once for Sonatina_Symphonic_Orchestra.sf3
+    const matchingFetches = fetchSpy.mock.calls.filter(call => 
+      typeof call[0] === 'string' && call[0].includes('Sonatina_Symphonic_Orchestra.sf3')
+    );
+    expect(matchingFetches.length).toBe(1);
+
+    // Check that addSoundBank was called exactly once for Sonatina_Symphonic_Orchestra.sf3
+    const matchingAddSoundBanks = addSoundBankSpy.mock.calls.filter(call => 
+      call[1] === 'Sonatina_Symphonic_Orchestra.sf3'
+    );
+    expect(matchingAddSoundBanks.length).toBe(1);
+  });
+
+  it('should handle concurrent init calls and ensure full initialization before resolving', async () => {
+    // Reset singleton state
+    (AudioEngine as any).isInitialized = false;
+    (AudioEngine as any).isReady = false;
+    (AudioEngine as any).synth = null;
+    (AudioEngine as any).sequencer = null;
+
+    // Call init concurrently
+    const p1 = AudioEngine.init();
+    const p2 = AudioEngine.init();
+
+    await Promise.all([p1, p2]);
+
+    expect(AudioEngine.isInitialized).toBe(true);
+    expect(AudioEngine.isReady).toBe(true);
+    expect((AudioEngine as any).synth).not.toBeNull();
+    expect((AudioEngine as any).sequencer).not.toBeNull();
+  });
+
+  it('should completely reset initialization state and context on failure to allow clean retry', async () => {
+    // Reset singleton state
+    (AudioEngine as any).isInitialized = false;
+    (AudioEngine as any).isReady = false;
+    (AudioEngine as any).synth = null;
+    (AudioEngine as any).sequencer = null;
+    if ((AudioEngine as any).ctxManager) {
+      (AudioEngine as any).ctxManager.audioContext = null;
+      (AudioEngine as any).ctxManager.isInitialized = false;
+    }
+
+    // Mock addModule to throw an error once
+    const addModuleSpy = vi.spyOn((globalThis as any).AudioContext.prototype.audioWorklet, 'addModule');
+    addModuleSpy.mockRejectedValueOnce(new Error('Network error loading worklet'));
+
+    await expect(AudioEngine.init()).rejects.toThrow('Network error loading worklet');
+
+    // State should be reset on failure
+    expect(AudioEngine.isInitialized).toBe(false);
+    expect(AudioEngine.isReady).toBe(false);
+    expect((AudioEngine as any).synth).toBeNull();
+    
+    // The second initialization attempt should succeed and register everything
+    await AudioEngine.init();
+    expect(AudioEngine.isInitialized).toBe(true);
+    expect(AudioEngine.isReady).toBe(true);
+    expect((AudioEngine as any).synth).not.toBeNull();
+  });
+
   it('should play test note and trigger synthesizer noteOn/noteOff with correct timing', () => {
     vi.useFakeTimers();
     

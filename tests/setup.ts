@@ -3,9 +3,6 @@ import { vi } from 'vitest';
 // 1. Mock Web Audio API classes
 class MockAudioContext {
   state = 'suspended';
-  audioWorklet = {
-    addModule: vi.fn().mockResolvedValue(undefined),
-  };
   destination = {};
   createAnalyser() {
     return {
@@ -27,11 +24,11 @@ class MockAudioContext {
     (this as any).state = 'running';
   });
 }
+(MockAudioContext as any).prototype.audioWorklet = {
+  addModule: vi.fn().mockResolvedValue(undefined),
+};
 
 class MockOfflineAudioContext {
-  audioWorklet = {
-    addModule: vi.fn().mockResolvedValue(undefined),
-  };
   destination = {};
   constructor(public numChannels: number, public length: number, public sampleRate: number) {}
   createDynamicsCompressor() {
@@ -54,6 +51,9 @@ class MockOfflineAudioContext {
     };
   });
 }
+(MockOfflineAudioContext as any).prototype.audioWorklet = {
+  addModule: vi.fn().mockResolvedValue(undefined),
+};
 
 // Assign globally
 (globalThis as any).AudioContext = MockAudioContext;
