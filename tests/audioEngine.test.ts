@@ -119,7 +119,7 @@ describe('audioEngine', () => {
     expect(AudioEngine.currentTime).toBe(0);
   });
 
-  it('should integrate with Media Session API and manage silent audio element', async () => {
+  it('should integrate with Media Session API', async () => {
     const nav = navigator as any;
     
     // Clear mock calls
@@ -149,6 +149,23 @@ describe('audioEngine', () => {
     // 5. Stop
     AudioEngine.stop();
     expect(nav.mediaSession.playbackState).toBe('none');
+  });
+
+  it('should set Media Session metadata correctly when loading a song', async () => {
+    const nav = navigator as any;
+    const midi = new Midi();
+    const track = midi.addTrack();
+    track.addNote({ midi: 60, time: 0, duration: 1 });
+    const midiBytes = new Uint8Array(midi.toArray());
+
+    await AudioEngine.loadSong(midiBytes, 'Test Song', 'Test Composer');
+
+    expect(nav.mediaSession.metadata).toBeDefined();
+    expect(nav.mediaSession.metadata.metadata).toEqual(expect.objectContaining({
+      title: 'Test Song',
+      artist: 'Test Composer',
+      album: 'SynthScore Web Player'
+    }));
   });
 
   it('should update mixer values (volume, pan, mute, solo)', () => {

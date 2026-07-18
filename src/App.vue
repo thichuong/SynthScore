@@ -371,7 +371,7 @@ async function handleSongSelect(index: number) {
     fileData.value = song.uploadedData.midiBytes;
     fileType.value = song.uploadedData.type;
     rawText.value = song.uploadedData.rawText;
-    await AudioEngine.loadSong(song.uploadedData.midiBytes, song.name);
+    await AudioEngine.loadSong(song.uploadedData.midiBytes, song.name, song.composer);
   } else {
     // Bài hát thư viện chuẩn thì tải từ mạng
     await loadFromLibrary(song);
@@ -474,15 +474,11 @@ async function loadFromLibrary(song: SongEntry) {
     // Chuyển đổi MusicXML → MIDI bytes
     const midiBytes = parseMusicXmlToMidiBytes(xmlText);
 
-    const displayName = song.composer 
-      ? `${song.composer} — ${song.name}` 
-      : song.name;
-
     fileData.value = midiBytes;
     fileType.value = 'xml';
     rawText.value = xmlText;
 
-    await AudioEngine.loadSong(midiBytes, displayName);
+    await AudioEngine.loadSong(midiBytes, song.name, song.composer);
   } catch (error) {
     console.error('Lỗi khi nạp bản nhạc từ thư viện:', error);
   } finally {
