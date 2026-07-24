@@ -73,21 +73,33 @@
     <!-- Khung điều khiển phát nhạc ở đáy màn hình -->
     <footer class="app-footer">
       <PlaybackControls 
+        ref="playbackControlsRef"
         :isPlaying="isPlaying"
         :isReady="isReady"
         :currentTime="currentTime"
         :duration="duration"
         :bpm="bpm"
         :songName="songName"
+        :repeatMode="repeatMode"
+        :volume="masterVolume"
+        :playbackRate="playbackRate"
         @prev="handlePrevSong"
         @next="handleNextSong"
+        @toggleRepeat="toggleRepeatMode"
       />
     </footer>
+
+    <!-- Floating Toast Notification khi bấm phím tắt -->
+    <Transition name="toast-fade">
+      <div v-if="isToastVisible" class="shortcut-toast-floating">
+        {{ toastText }}
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, computed } from 'vue';
+import { ref, shallowRef, onMounted, onBeforeUnmount, computed } from 'vue';
 import { CheckCircle, AlertCircle } from 'lucide-vue-next';
 import FileUploader from './components/FileUploader.vue';
 import OrchestraMixer from './components/OrchestraMixer.vue';
@@ -116,12 +128,162 @@ const bpm = ref(120);
 const songName = ref('');
 const tracks = ref<TrackInfo[]>([]);
 const playbackMode = ref<'default' | 'symphony' | 'concerto'>('default');
+const repeatMode = ref<'off' | 'all' | 'one'>(AudioEngine.repeatMode);
+const masterVolume = ref(AudioEngine.masterVolume);
+const playbackRate = ref(AudioEngine.playbackRate);
+
+const playbackControlsRef = ref<InstanceType<typeof PlaybackControls> | null>(null);
 
 const fileData = shallowRef<Uint8Array | string | null>(null);
 const fileType = ref<'xml' | 'abc' | 'midi' | null>(null);
 const rawText = ref<string | null>(null);
 
 const selectedSongIndex = ref(-1);
+
+// Hiển thị Toast phản hồi phím tắt
+const toastText = ref('');
+const isToastVisible = ref(false);
+let toastTimeout: any = null;
+let lastMasterVolumeBeforeMute = 100;
+
+function showShortcutToast(msg: string) {
+  toastText.value = msg;
+  isToastVisible.value = true;
+  if (toastTimeout) clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => {
+    isToastVisible.value = false;
+  }, 1500);
+}
+
+function toggleRepeatMode() {
+  const newMode = AudioEngine.toggleRepeatMode();
+  repeatMode.value = newMode;
+  const labels: Record<string, string> = {
+    off: 'Chế độ Lặp lại: Tắt',
+    all: 'Lặp lại toàn bộ danh sách',
+    one: 'Lặp lại 1 bài hát'
+  };
+  showShortcutToast(labels[newMode]);
+}
+
+// Bắt phím tắt bàn phím toàn cục (Global Keyboard Shortcuts)
+function handleGlobalKeydown(e: KeyboardEvent) {
+  // Bỏ qua nếu đang gõ văn bản trong các ô input / textarea / select
+  const activeEl = document.activeElement;
+  const isInputActive = activeEl && (
+    activeEl.tagName === 'INPUT' ||
+    activeEl.tagName === 'TEXTAREA' ||
+    activeEl.tagName === 'SELECT' ||
+    (activeEl as HTMLElement).isContentEditable
+  );
+
+  if (isInputActive) {
+    return;
+  }
+
+  const key = e.key;
+  const code = e.code;
+  const isShift = e.shiftKey;
+
+  // 1. Play / Pause: Space or K or MediaPlayPause
+  if ((code === 'Space' && !isShift) || key.toLowerCase() === 'k' || code === 'MediaPlayPause') {
+    e.preventDefault();
+    if (!isReady.value) return;
+    if (isPlaying.value) {
+      AudioEngine.pause();
+      showShortcutToast('Tạm dừng phát');
+    } else {
+      AudioEngine.play();
+      showShortcutToast('Đang phát nhạc');
+    }
+  }
+  // 2. Stop: Shift + Space or S or MediaStop
+  else if ((code === 'Space' && isShift) || key.toLowerCase() === 's' || code === 'MediaStop') {
+    e.preventDefault();
+    if (!isReady.value) return;
+    AudioEngine.stop();
+    showShortcutToast('Dừng phát nhạc');
+  }
+  // 3. Next song: N or Shift + ArrowRight or MediaTrackNext
+  else if (key.toLowerCase() === 'n' || (code === 'ArrowRight' && isShift) || code === 'MediaTrackNext') {
+    e.preventDefault();
+    handleNextSong();
+    showShortcutToast('Bài tiếp theo');
+  }
+  // 4. Previous song: P or Shift + ArrowLeft or MediaTrackPrevious
+  else if (key.toLowerCase() === 'p' || (code === 'ArrowLeft' && isShift) || code === 'MediaTrackPrevious') {
+    e.preventDefault();
+    handlePrevSong();
+    showShortcutToast('Bài trước đó');
+  }
+  // 5. Seek Forward (5s): ArrowRight or L or .
+  else if ((code === 'ArrowRight' && !isShift) || key.toLowerCase() === 'l' || key === '.') {
+    e.preventDefault();
+    if (!isReady.value) return;
+    const newTime = Math.min(duration.value, currentTime.value + 5);
+    AudioEngine.seek(newTime);
+    showShortcutToast('Tua +5s');
+  }
+  // 6. Seek Backward (5s): ArrowLeft or J or ,
+  else if ((code === 'ArrowLeft' && !isShift) || key.toLowerCase() === 'j' || key === ',') {
+    e.preventDefault();
+    if (!isReady.value) return;
+    const newTime = Math.max(0, currentTime.value - 5);
+    AudioEngine.seek(newTime);
+    showShortcutToast('Tua -5s');
+  }
+  // 7. Volume Up: ArrowUp
+  else if (code === 'ArrowUp') {
+    e.preventDefault();
+    const newVol = Math.min(150, AudioEngine.masterVolume + 10);
+    AudioEngine.setMasterVolume(newVol);
+    showShortcutToast(`Âm lượng: ${newVol}%`);
+  }
+  // 8. Volume Down: ArrowDown
+  else if (code === 'ArrowDown') {
+    e.preventDefault();
+    const newVol = Math.max(0, AudioEngine.masterVolume - 10);
+    AudioEngine.setMasterVolume(newVol);
+    showShortcutToast(`Âm lượng: ${newVol}%`);
+  }
+  // 9. Mute toggle: M
+  else if (key.toLowerCase() === 'm') {
+    e.preventDefault();
+    if (AudioEngine.masterVolume > 0) {
+      lastMasterVolumeBeforeMute = AudioEngine.masterVolume;
+      AudioEngine.setMasterVolume(0);
+      showShortcutToast('Đã tắt tiếng (Mute)');
+    } else {
+      const restoreVol = lastMasterVolumeBeforeMute || 80;
+      AudioEngine.setMasterVolume(restoreVol);
+      showShortcutToast(`Bật tiếng: ${restoreVol}%`);
+    }
+  }
+  // 10. Speed Down: [
+  else if (key === '[') {
+    e.preventDefault();
+    const newRate = Math.max(0.5, Math.round((AudioEngine.playbackRate - 0.1) * 10) / 10);
+    AudioEngine.setPlaybackRate(newRate);
+    showShortcutToast(`Tốc độ: ${newRate.toFixed(1)}x`);
+  }
+  // 11. Speed Up: ]
+  else if (key === ']') {
+    e.preventDefault();
+    const newRate = Math.min(2.0, Math.round((AudioEngine.playbackRate + 0.1) * 10) / 10);
+    AudioEngine.setPlaybackRate(newRate);
+    showShortcutToast(`Tốc độ: ${newRate.toFixed(1)}x`);
+  }
+  // 12. Toggle Repeat mode: R
+  else if (key.toLowerCase() === 'r') {
+    e.preventDefault();
+    toggleRepeatMode();
+  }
+  // 13. Toggle Shortcuts guide modal: ? or H
+  else if (key === '?' || key.toLowerCase() === 'h') {
+    e.preventDefault();
+    playbackControlsRef.value?.toggleShortcutsModal();
+  }
+}
 
 // Định danh bài hát duy nhất bằng khóa
 function getSongKey(song: SongEntry): string {
@@ -194,6 +356,9 @@ onMounted(() => {
     songName.value = AudioEngine.currentSongName;
     tracks.value = [...AudioEngine.tracks];
     playbackMode.value = AudioEngine.playbackMode;
+    repeatMode.value = AudioEngine.repeatMode;
+    masterVolume.value = AudioEngine.masterVolume;
+    playbackRate.value = AudioEngine.playbackRate;
     if (AudioEngine.activeMidiBytes && fileData.value !== AudioEngine.activeMidiBytes) {
       fileData.value = AudioEngine.activeMidiBytes;
     }
@@ -203,12 +368,29 @@ onMounted(() => {
     currentTime.value = time;
   });
 
-  // Tự động chuyển bài khi kết thúc bài hát (chỉ chuyển bài thuộc danh sách đã lọc)
+  // Đăng ký nhận sự kiện chuyển bài từ Media Session API hoặc phím tắt
+  AudioEngine.onPreviousTrack(() => handlePrevSong());
+  AudioEngine.onNextTrack(() => handleNextSong());
+
+  // Tự động chuyển bài khi kết thúc bài hát (xử lý theo repeatMode: 'one' | 'all' | 'off')
   AudioEngine.onSongEnded(async () => {
+    if (repeatMode.value === 'one') {
+      AudioEngine.seek(0);
+      AudioEngine.play();
+      return;
+    }
+
     if (filteredSongs.value.length > 0) {
       const currentFilteredIdx = filteredSongs.value.findIndex(
         s => s.originalIndex === selectedSongIndex.value
       );
+
+      // Nếu không bật lặp lại ('off') và đã đến bài cuối cùng trong danh sách -> Dừng phát
+      if (repeatMode.value === 'off' && currentFilteredIdx === filteredSongs.value.length - 1) {
+        AudioEngine.stop();
+        return;
+      }
+
       let nextFilteredIdx = 0;
       if (currentFilteredIdx !== -1) {
         nextFilteredIdx = (currentFilteredIdx + 1) % filteredSongs.value.length;
@@ -219,6 +401,9 @@ onMounted(() => {
     }
   });
 
+  // Đăng ký sự kiện bàn phím toàn cục
+  window.addEventListener('keydown', handleGlobalKeydown);
+
   // Chủ động khởi tạo Audio Engine khi mount
   initializeEngine();
 
@@ -226,6 +411,10 @@ onMounted(() => {
   AudioEngine.preloadSoundfont(0).catch(e => {
     console.warn('Không thể tiền tải soundfont mặc định:', e);
   });
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown);
 });
 
 async function initializeEngine() {
@@ -678,5 +867,36 @@ async function loadFromLibrary(song: SongEntry) {
 
 .dashboard-sidebar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
+}
+
+/* Floating Shortcut Toast Notification */
+.shortcut-toast-floating {
+  position: fixed;
+  bottom: 95px;
+  right: 28px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #00f0ff;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(0, 240, 255, 0.25);
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  z-index: 1200;
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.3px;
+}
+
+.toast-fade-enter-active, .toast-fade-leave-active {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toast-fade-enter-from, .toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(12px) scale(0.95);
 }
 </style>

@@ -5,7 +5,7 @@
       <button 
         class="nav-btn prev-btn" 
         @click="emit('prev')" 
-        title="Bài trước"
+        title="Bài trước (Phím P hoặc Shift+Left)"
         :disabled="!isReady"
       >
         <SkipBack class="nav-icon" />
@@ -30,7 +30,7 @@
       <button 
         class="nav-btn next-btn" 
         @click="emit('next')" 
-        title="Bài tiếp theo"
+        title="Bài tiếp theo (Phím N hoặc Shift+Right)"
         :disabled="!isReady"
       >
         <SkipForward class="nav-icon" />
@@ -39,13 +39,13 @@
 
     <!-- Hàng 2: Nút bấm và các thanh trượt -->
     <div class="controls-row">
-      <!-- Cụm Nút Play/Pause/Stop -->
+      <!-- Cụm Nút Play/Pause/Stop/Repeat -->
       <div class="buttons-group">
         <button 
           class="play-btn" 
           :class="{ playing: isPlaying }"
           @click="togglePlay"
-          :title="isPlaying ? 'Tạm dừng' : 'Phát nhạc'"
+          :title="isPlaying ? 'Tạm dừng (Space / K)' : 'Phát nhạc (Space / K)'"
           :disabled="!isReady"
         >
           <Pause v-if="isPlaying" class="icon" />
@@ -55,10 +55,22 @@
         <button 
           class="stop-btn" 
           @click="stopPlay" 
-          title="Dừng phát"
+          title="Dừng phát (Shift+Space / S)"
           :disabled="!isReady"
         >
           <Square class="icon" />
+        </button>
+
+        <button 
+          class="repeat-btn" 
+          :class="{ active: repeatMode !== 'off', single: repeatMode === 'one' }"
+          @click="emit('toggleRepeat')"
+          :title="repeatMode === 'off' ? 'Chế độ Lặp lại: Tắt (Nhấn R để bật lặp danh sách)' : (repeatMode === 'all' ? 'Chế độ Lặp lại: Tất cả bài (Nhấn R để lặp 1 bài)' : 'Chế độ Lặp lại: 1 bài (Nhấn R để tắt lặp)')"
+          :disabled="!isReady"
+        >
+          <Repeat1 v-if="repeatMode === 'one'" class="icon" />
+          <Repeat v-else class="icon" />
+          <span v-if="repeatMode === 'one'" class="repeat-badge">1</span>
         </button>
       </div>
 
@@ -85,6 +97,7 @@
           v-model.number="localPlaybackRate" 
           @input="updatePlaybackRate"
           class="slider-input"
+          title="Tăng/Giảm tốc độ phát (Phím [ và ])"
         />
         <span class="slider-value">{{ localPlaybackRate.toFixed(1) }}x ({{ Math.round(bpm * localPlaybackRate) }} BPM)</span>
       </div>
@@ -100,13 +113,22 @@
           v-model.number="localVolume" 
           @input="updateVolume"
           class="slider-input"
-          title="Âm lượng tổng (mức trên 100% sử dụng bộ giới hạn tự động để tránh vỡ tiếng)"
+          title="Âm lượng tổng (Phím Mũi tên Lên/Xuống, M để Mute)"
         />
         <span class="slider-value">{{ localVolume }}%</span>
       </div>
 
-      <!-- Cụm xuất âm thanh -->
-      <div class="export-control">
+      <!-- Cụm tiện ích phụ & xuất âm thanh -->
+      <div class="actions-control">
+        <button 
+          class="shortcuts-btn"
+          @click="openShortcutsModal"
+          title="Bảng hướng dẫn phím tắt (Phím ? hoặc H)"
+        >
+          <Keyboard class="action-btn-icon" />
+          <span>Phím tắt</span>
+        </button>
+
         <button 
           class="export-btn"
           @click="openExportModal"
@@ -234,31 +256,177 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Modal Hướng dẫn Phím tắt Media -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="isShortcutsModalOpen" class="shortcuts-modal-overlay" @click.self="closeShortcutsModal">
+          <div class="shortcuts-modal-card glass-modal">
+            <div class="modal-header">
+              <div class="header-title-group">
+                <Keyboard class="header-icon animate-pulse" />
+                <h3>Bảng Hướng Dẫn Phím Tắt Media</h3>
+              </div>
+              <button class="close-btn" @click="closeShortcutsModal">
+                <X class="close-icon" />
+              </button>
+            </div>
+
+            <div class="modal-body">
+              <div class="shortcuts-grid">
+                <!-- Nhóm 1: Điều khiển phát nhạc -->
+                <div class="shortcuts-group">
+                  <div class="group-title">
+                    <Music class="group-icon" />
+                    <span>Phát &amp; Điều khiển</span>
+                  </div>
+                  <div class="shortcut-item">
+                    <span class="shortcut-desc">Phát / Tạm dừng</span>
+                    <div class="key-badges">
+                      <kbd>Space</kbd>
+                      <kbd>K</kbd>
+                    </div>
+                  </div>
+                  <div class="shortcut-item">
+                    <span class="shortcut-desc">Dừng phát</span>
+                    <div class="key-badges">
+                      <kbd>Shift + Space</kbd>
+                      <kbd>S</kbd>
+                    </div>
+                  </div>
+                  <div class="shortcut-item">
+                    <span class="shortcut-desc">Bài tiếp theo (Next)</span>
+                    <div class="key-badges">
+                      <kbd>N</kbd>
+                      <kbd>Shift + →</kbd>
+                    </div>
+                  </div>
+                  <div class="shortcut-item">
+                    <span class="shortcut-desc">Bài trước đó (Prev)</span>
+                    <div class="key-badges">
+                      <kbd>P</kbd>
+                      <kbd>Shift + ←</kbd>
+                    </div>
+                  </div>
+                  <div class="shortcut-item">
+                    <span class="shortcut-desc">Chế độ Lặp lại (Off / All / One)</span>
+                    <div class="key-badges">
+                      <kbd>R</kbd>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Nhóm 2: Tua & Âm lượng & Tốc độ -->
+                <div class="shortcuts-group">
+                  <div class="group-title">
+                    <Sliders class="group-icon" />
+                    <span>Âm lượng &amp; Tua nhạc</span>
+                  </div>
+                  <div class="shortcut-item">
+                    <span class="shortcut-desc">Tua tới / lùi 5 giây</span>
+                    <div class="key-badges">
+                      <kbd>←</kbd> <kbd>→</kbd> hoặc <kbd>J</kbd> <kbd>L</kbd>
+                    </div>
+                  </div>
+                  <div class="shortcut-item">
+                    <span class="shortcut-desc">Tăng / giảm âm lượng (±10%)</span>
+                    <div class="key-badges">
+                      <kbd>↑</kbd> <kbd>↓</kbd>
+                    </div>
+                  </div>
+                  <div class="shortcut-item">
+                    <span class="shortcut-desc">Tắt / bật tiếng (Mute)</span>
+                    <div class="key-badges">
+                      <kbd>M</kbd>
+                    </div>
+                  </div>
+                  <div class="shortcut-item">
+                    <span class="shortcut-desc">Tăng / giảm tốc độ (±0.1x)</span>
+                    <div class="key-badges">
+                      <kbd>[</kbd> <kbd>]</kbd>
+                    </div>
+                  </div>
+                  <div class="shortcut-item">
+                    <span class="shortcut-desc">Xem bảng phím tắt này</span>
+                    <div class="key-badges">
+                      <kbd>?</kbd> hoặc <kbd>H</kbd>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button class="btn-primary" @click="closeShortcutsModal">Đã hiểu</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
-import { Play, Pause, Square, Volume2, Gauge, Music, SkipBack, SkipForward, Download, X, Check, Sliders, Sparkles } from 'lucide-vue-next';
+import { 
+  Play, Pause, Square, Volume2, Gauge, Music, SkipBack, SkipForward, 
+  Download, X, Check, Sliders, Sparkles, Repeat, Repeat1, Keyboard 
+} from 'lucide-vue-next';
 import { AudioEngine } from '../services/audioEngine';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   isPlaying: boolean;
   isReady: boolean;
   currentTime: number;
   duration: number;
   bpm: number;
   songName: string;
-}>();
+  repeatMode?: 'off' | 'all' | 'one';
+  volume?: number;
+  playbackRate?: number;
+}>(), {
+  repeatMode: 'off',
+  volume: 100,
+  playbackRate: 1.0
+});
 
 const emit = defineEmits<{
   (e: 'prev'): void;
   (e: 'next'): void;
+  (e: 'toggleRepeat'): void;
 }>();
 
 const progressBarRef = ref<HTMLDivElement | null>(null);
-const localPlaybackRate = ref(1.0);
-const localVolume = ref(AudioEngine.masterVolume);
+const localPlaybackRate = ref(props.playbackRate);
+const localVolume = ref(props.volume);
+const isShortcutsModalOpen = ref(false);
+
+// Đồng bộ 2 chiều slider UI khi giá trị volume / playbackRate thay đổi từ phím tắt hoặc AudioEngine
+watch(() => props.volume, (newVol) => {
+  if (newVol !== undefined) {
+    localVolume.value = newVol;
+  }
+}, { immediate: true });
+
+watch(() => props.playbackRate, (newRate) => {
+  if (newRate !== undefined) {
+    localPlaybackRate.value = newRate;
+  }
+}, { immediate: true });
+
+function openShortcutsModal() {
+  isShortcutsModalOpen.value = true;
+}
+
+function closeShortcutsModal() {
+  isShortcutsModalOpen.value = false;
+}
+
+defineExpose({
+  openShortcutsModal,
+  closeShortcutsModal,
+  toggleShortcutsModal: () => { isShortcutsModalOpen.value = !isShortcutsModalOpen.value; }
+});
 
 // Tính phần trăm tiến độ
 const progressPercent = computed(() => {
@@ -1365,5 +1533,194 @@ async function startExport() {
 }
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
+}
+
+/* Nút Lặp lại (Repeat Button) */
+.repeat-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #8c8c9e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.repeat-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.repeat-btn.active {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: rgba(0, 240, 255, 0.4);
+  color: #00f0ff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+}
+
+.repeat-btn.single {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.5);
+  color: #c084fc;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.3);
+}
+
+.repeat-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 0.55rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff;
+  background: #a855f7;
+  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Cụm tiện ích phụ */
+.actions-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shortcuts-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shortcuts-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(0, 240, 255, 0.3);
+  color: #00f0ff;
+  transform: translateY(-1px);
+}
+
+.action-btn-icon {
+  width: 15px;
+  height: 15px;
+}
+
+/* Shortcuts Modal Overlay & Card */
+.shortcuts-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(5, 5, 8, 0.75);
+  backdrop-filter: blur(10px);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.shortcuts-modal-card {
+  width: 100%;
+  max-width: 680px;
+  background: rgba(18, 18, 26, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.shortcuts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 640px) {
+  .shortcuts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.shortcuts-group {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #00f0ff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+}
+
+.group-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.78rem;
+}
+
+.shortcut-desc {
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.key-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
 }
 </style>

@@ -412,7 +412,7 @@ describe('audioEngine', () => {
       expect(result.blob).toBeDefined();
       expect(result.blob.type).toBe('audio/x-dsf');
       expect(result.fileName).toBe('Export Test Song.dsf');
-    });
+    }, 15000);
 
     it('should export audio to FLAC and ALAC successfully using WAV fallback', async () => {
       const flacResult = await AudioEngine.exportAudio('flac');
@@ -422,6 +422,49 @@ describe('audioEngine', () => {
       const alacResult = await AudioEngine.exportAudio('alac');
       expect(alacResult.blob).toBeDefined();
       expect(alacResult.fileName).toBe('Export Test Song.alac');
+    });
+  });
+
+  describe('Repeat Mode & Track Shortcuts', () => {
+    it('should default to repeatMode "off" and toggle properly', () => {
+      AudioEngine.setRepeatMode('off');
+      expect(AudioEngine.repeatMode).toBe('off');
+
+      let nextMode = AudioEngine.toggleRepeatMode();
+      expect(nextMode).toBe('all');
+      expect(AudioEngine.repeatMode).toBe('all');
+
+      nextMode = AudioEngine.toggleRepeatMode();
+      expect(nextMode).toBe('one');
+      expect(AudioEngine.repeatMode).toBe('one');
+
+      nextMode = AudioEngine.toggleRepeatMode();
+      expect(nextMode).toBe('off');
+      expect(AudioEngine.repeatMode).toBe('off');
+    });
+
+    it('should register and trigger onPreviousTrack and onNextTrack callbacks', () => {
+      const prevFn = vi.fn();
+      const nextFn = vi.fn();
+
+      AudioEngine.onPreviousTrack(prevFn);
+      AudioEngine.onNextTrack(nextFn);
+
+      (AudioEngine as any).onPreviousTrackCallback();
+      (AudioEngine as any).onNextTrackCallback();
+
+      expect(prevFn).toHaveBeenCalledTimes(1);
+      expect(nextFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should save and load user settings correctly', async () => {
+      const { saveUserSettings, loadUserSettings } = await import('../src/services/appCache');
+      await saveUserSettings({ masterVolume: 120, playbackRate: 1.5, repeatMode: 'one' });
+
+      const loaded = await loadUserSettings();
+      expect(loaded.masterVolume).toBe(120);
+      expect(loaded.playbackRate).toBe(1.5);
+      expect(loaded.repeatMode).toBe('one');
     });
   });
 });

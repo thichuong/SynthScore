@@ -115,6 +115,12 @@ vi.mock('spessasynth_lib', () => {
   };
 });
 
+let mockUserSettings = {
+  masterVolume: 100,
+  playbackRate: 1.0,
+  repeatMode: 'off' as 'off' | 'all' | 'one'
+};
+
 // 3. Mock appCache to avoid DB issues in test environment
 vi.mock('../src/services/appCache', () => {
   return {
@@ -122,6 +128,10 @@ vi.mock('../src/services/appCache', () => {
     cacheSong: vi.fn().mockResolvedValue(undefined),
     getCachedSoundfont: vi.fn().mockResolvedValue(null),
     cacheSoundfont: vi.fn().mockResolvedValue(undefined),
+    loadUserSettings: vi.fn().mockImplementation(async () => ({ ...mockUserSettings })),
+    saveUserSettings: vi.fn().mockImplementation(async (newSettings: any) => {
+      mockUserSettings = { ...mockUserSettings, ...newSettings };
+    }),
   };
 });
 

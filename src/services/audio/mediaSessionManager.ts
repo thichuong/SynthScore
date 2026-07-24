@@ -37,6 +37,8 @@ export class MediaSessionManager {
     seekBackward: (offset: number) => void;
     seekForward: (offset: number) => void;
     seekTo: (time: number) => void;
+    previousTrack?: () => void;
+    nextTrack?: () => void;
   }): void {
     if (typeof window === 'undefined' || !('mediaSession' in window.navigator)) {
       return;
@@ -58,6 +60,12 @@ export class MediaSessionManager {
           handlers.seekTo(details.seekTime);
         }
       });
+      if (handlers.previousTrack) {
+        nav.mediaSession.setActionHandler('previoustrack', handlers.previousTrack);
+      }
+      if (handlers.nextTrack) {
+        nav.mediaSession.setActionHandler('nexttrack', handlers.nextTrack);
+      }
     } catch (e) {
       console.warn('Lỗi khi thiết lập mediaSession action handlers:', e);
     }

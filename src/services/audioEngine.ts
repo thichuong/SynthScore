@@ -15,6 +15,7 @@ import { SoundfontService } from './audio/soundfontService';
 import { TrackManager } from './audio/trackManager';
 import { AudioExporter } from './audio/audioExporter';
 import { MediaSessionManager } from './audio/mediaSessionManager';
+import { loadUserSettings, saveUserSettings } from './appCache';
 
 export type { TrackInfo };
 
@@ -59,6 +60,7 @@ class AudioEngineService {
   public reverbPreDelay = 40;   // 0 to 127
 
   public playbackMode: 'default' | 'symphony' | 'concerto' = 'default';
+  public repeatMode: 'off' | 'all' | 'one' = 'off';
   public activeMidiBytes: Uint8Array | null = null;
   private originalMidiBytes: Uint8Array | null = null;
   private originalSongName = '';
@@ -67,6 +69,8 @@ class AudioEngineService {
   private onTimeUpdateCallback: ((time: number) => void) | null = null;
   private onStateChangeCallback: (() => void) | null = null;
   private onSongEndedCallback: (() => void) | null = null;
+  private onPreviousTrackCallback: (() => void) | null = null;
+  private onNextTrackCallback: (() => void) | null = null;
 
   private timeUpdateInterval: any = null;
   private worker: Worker | null = null;
@@ -230,6 +234,16 @@ class AudioEngineService {
           chorusSend: defaults.chorusSend
         }];
 
+        // Nạp cấu hình cài đặt người dùng đã lưu (Volume, PlaybackRate, RepeatMode)
+        try {
+          const savedSettings = await loadUserSettings();
+          this.masterVolume = savedSettings.masterVolume;
+          this.playbackRate = savedSettings.playbackRate;
+          this.repeatMode = savedSettings.repeatMode;
+        } catch (e) {
+          console.warn('Lỗi nạp cấu hình cài đặt người dùng:', e);
+        }
+
         // Thiết lập âm lượng tổng ban đầu cho bộ tổng hợp âm với hệ số boost
         this.synth.setSystemParameter('gain', (this.masterVolume / 100) * this.VOLUME_BOOST_FACTOR);
 
@@ -255,7 +269,13 @@ class AudioEngineService {
           stop: () => this.stop(),
           seekBackward: (offset) => this.seek(Math.max(0, this.currentTime - offset)),
           seekForward: (offset) => this.seek(Math.min(this.duration, this.currentTime + offset)),
-          seekTo: (time) => this.seek(time)
+          seekTo: (time) => this.seek(time),
+          previousTrack: () => {
+            if (this.onPreviousTrackCallback) this.onPreviousTrackCallback();
+          },
+          nextTrack: () => {
+            if (this.onNextTrackCallback) this.onNextTrackCallback();
+          }
         });
 
       } catch (error) {
@@ -534,21 +554,29 @@ class AudioEngineService {
 
   // Tốc độ phát nhạc
   public setPlaybackRate(rate: number): void {
-    if (!this.sequencer) return;
     this.playbackRate = rate;
-    this.sequencer.playbackRate = rate;
+    if (this.sequencer) {
+      this.sequencer.playbackRate = rate;
+    }
     this.triggerStateChange();
 
     // Cập nhật vị trí và tốc độ phát của Media Session
     this.updateMediaSessionPositionState();
+
+    // Tự động lưu vào appCache
+    saveUserSettings({ playbackRate: rate });
   }
 
   // Âm lượng tổng
   public setMasterVolume(vol: number): void {
     this.masterVolume = vol;
-    if (!this.synth) return;
-    this.synth.setSystemParameter('gain', (vol / 100) * this.VOLUME_BOOST_FACTOR);
+    if (this.synth) {
+      this.synth.setSystemParameter('gain', (vol / 100) * this.VOLUME_BOOST_FACTOR);
+    }
     this.triggerStateChange();
+
+    // Tự động lưu vào appCache
+    saveUserSettings({ masterVolume: vol });
   }
 
   // Điều chỉnh âm lượng cho một track cụ thể
@@ -743,6 +771,33 @@ class AudioEngineService {
 
   public onSongEnded(cb: () => void): void {
     this.onSongEndedCallback = cb;
+  }
+
+  public onPreviousTrack(cb: () => void): void {
+    this.onPreviousTrackCallback = cb;
+  }
+
+  public onNextTrack(cb: () => void): void {
+    this.onNextTrackCallback = cb;
+  }
+
+  public setRepeatMode(mode: 'off' | 'all' | 'one'): void {
+    this.repeatMode = mode;
+    this.triggerStateChange();
+    saveUserSettings({ repeatMode: mode });
+  }
+
+  public toggleRepeatMode(): 'off' | 'all' | 'one' {
+    if (this.repeatMode === 'off') {
+      this.repeatMode = 'all';
+    } else if (this.repeatMode === 'all') {
+      this.repeatMode = 'one';
+    } else {
+      this.repeatMode = 'off';
+    }
+    this.triggerStateChange();
+    saveUserSettings({ repeatMode: this.repeatMode });
+    return this.repeatMode;
   }
 
   private triggerStateChange(): void {
