@@ -104,7 +104,15 @@
 
       <!-- Điều khiển Âm lượng tổng (Master Volume) -->
       <div class="slider-control volume-control">
-        <Volume2 class="slider-icon" />
+        <button 
+          class="volume-btn" 
+          @click="toggleMute" 
+          :title="localVolume === 0 ? 'Bật tiếng (Phím M)' : 'Tắt tiếng (Phím M)'"
+        >
+          <VolumeX v-if="localVolume === 0" class="slider-icon muted" />
+          <Volume1 v-else-if="localVolume <= 50" class="slider-icon" />
+          <Volume2 v-else class="slider-icon" />
+        </button>
         <span class="slider-label">Âm lượng:</span>
         <input 
           type="range" 
@@ -369,7 +377,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { 
-  Play, Pause, Square, Volume2, Gauge, Music, SkipBack, SkipForward, 
+  Play, Pause, Square, Volume2, Volume1, VolumeX, Gauge, Music, SkipBack, SkipForward, 
   Download, X, Check, Sliders, Sparkles, Repeat, Repeat1, Keyboard 
 } from 'lucide-vue-next';
 import { AudioEngine } from '../services/audioEngine';
@@ -465,6 +473,10 @@ function updatePlaybackRate() {
 
 function updateVolume() {
   AudioEngine.setMasterVolume(localVolume.value);
+}
+
+function toggleMute() {
+  AudioEngine.toggleMute();
 }
 
 // Xử lý tua bài hát bằng click vào thanh tiến độ
@@ -867,10 +879,32 @@ async function startExport() {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.volume-btn {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.volume-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
+}
+
 .slider-icon {
   width: 14px;
   height: 14px;
   color: #00f0ff;
+  transition: color 0.2s ease;
+}
+
+.slider-icon.muted {
+  color: #ff4d4f;
 }
 
 .slider-label {

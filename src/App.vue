@@ -144,7 +144,6 @@ const selectedSongIndex = ref(-1);
 const toastText = ref('');
 const isToastVisible = ref(false);
 let toastTimeout: any = null;
-let lastMasterVolumeBeforeMute = 100;
 
 function showShortcutToast(msg: string) {
   toastText.value = msg;
@@ -249,14 +248,11 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   // 9. Mute toggle: M
   else if (key.toLowerCase() === 'm') {
     e.preventDefault();
-    if (AudioEngine.masterVolume > 0) {
-      lastMasterVolumeBeforeMute = AudioEngine.masterVolume;
-      AudioEngine.setMasterVolume(0);
+    const newVol = AudioEngine.toggleMute();
+    if (newVol === 0) {
       showShortcutToast('Đã tắt tiếng (Mute)');
     } else {
-      const restoreVol = lastMasterVolumeBeforeMute || 80;
-      AudioEngine.setMasterVolume(restoreVol);
-      showShortcutToast(`Bật tiếng: ${restoreVol}%`);
+      showShortcutToast(`Bật tiếng: ${newVol}%`);
     }
   }
   // 10. Speed Down: [

@@ -52,6 +52,7 @@ class AudioEngineService {
   public bpm = 120;
   public playbackRate = 1.0;
   public masterVolume = 100; // 0 to 100
+  public lastMasterVolumeBeforeMute = 100;
 
   // Hiệu ứng không gian Master Reverb
   public masterReverbGain = 50; // 0 to 100 (50% mặc định)
@@ -569,6 +570,9 @@ class AudioEngineService {
 
   // Âm lượng tổng
   public setMasterVolume(vol: number): void {
+    if (vol > 0) {
+      this.lastMasterVolumeBeforeMute = vol;
+    }
     this.masterVolume = vol;
     if (this.synth) {
       this.synth.setSystemParameter('gain', (vol / 100) * this.VOLUME_BOOST_FACTOR);
@@ -577,6 +581,19 @@ class AudioEngineService {
 
     // Tự động lưu vào appCache
     saveUserSettings({ masterVolume: vol });
+  }
+
+  // Bật/tắt tiếng (Toggle Mute)
+  public toggleMute(): number {
+    if (this.masterVolume > 0) {
+      this.lastMasterVolumeBeforeMute = this.masterVolume;
+      this.setMasterVolume(0);
+      return 0;
+    } else {
+      const restoreVol = this.lastMasterVolumeBeforeMute || 80;
+      this.setMasterVolume(restoreVol);
+      return restoreVol;
+    }
   }
 
   // Điều chỉnh âm lượng cho một track cụ thể
