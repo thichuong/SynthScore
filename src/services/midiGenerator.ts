@@ -71,8 +71,8 @@ export const symphonicTracksInfo = [
   { name: 'Oboe (Woodwind)', program: 68, channel: 6 },
   { name: 'Clarinet (Woodwind)', program: 71, channel: 7 },
   { name: 'French Horn (Brass)', program: 60, channel: 8 },
-  { name: 'Orchestral Harp (Plucked)', program: 46, channel: 9 },
-  { name: 'Timpani (Percussion)', program: 47, channel: 10 },
+  { name: 'Timpani (Percussion)', program: 47, channel: 9 },
+  { name: 'Orchestral Harp (Plucked)', program: 46, channel: 10 },
 ];
 
 // Cấu hình 9 nhạc cụ concerto

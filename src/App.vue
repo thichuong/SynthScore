@@ -403,9 +403,9 @@ onMounted(() => {
   // Chủ động khởi tạo Audio Engine khi mount
   initializeEngine();
 
-  // Tiền tải bộ âm thanh nhạc cụ Piano mặc định khi mount để tránh trễ âm thanh
-  AudioEngine.preloadSoundfont(0).catch(e => {
-    console.warn('Không thể tiền tải soundfont mặc định:', e);
+  // Tiền tải tất cả 4 bộ âm thanh nhạc cụ Soundfont khi mount để đảm bảo bộ nhớ đệm đầy đủ
+  AudioEngine.preloadAllSoundfonts().catch(e => {
+    console.warn('Không thể tiền tải đầy đủ các soundfont:', e);
   });
 });
 

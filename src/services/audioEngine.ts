@@ -171,6 +171,11 @@ class AudioEngineService {
     return this.soundfontService.preloadSoundfont(programNumber, isDrum);
   }
 
+  // Tiền tải tất cả 4 bộ âm thanh Soundfont vào cache
+  public preloadAllSoundfonts(): Promise<void> {
+    return this.soundfontService.preloadAllSoundfonts();
+  }
+
   // Khởi tạo Audio Engine
   public async init(): Promise<void> {
     if (this.isInitialized && this.synth) return;

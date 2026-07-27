@@ -142,6 +142,24 @@ export class SoundfontService {
     return loadPromise.then(() => {});
   }
 
+  // Tiền tải tất cả 4 bộ âm thanh Soundfont vào bộ nhớ đệm (IndexedDB & Memory cache)
+  public async preloadAllSoundfonts(): Promise<void> {
+    const soundfontSpecs = [
+      { programNumber: 0, isDrum: false },   // MuseScore_General.sf3
+      { programNumber: 40, isDrum: false },  // Sonatina_Symphonic_Orchestra.sf3
+      { programNumber: 80, isDrum: false },  // FluidR3Mono_GM.sf3
+      { programNumber: 0, isDrum: true }     // Roland_SC-88.sf3
+    ];
+
+    await Promise.all(
+      soundfontSpecs.map(sf =>
+        this.preloadSoundfont(sf.programNumber, sf.isDrum).catch(err => {
+          console.warn(`[SoundfontService] Lỗi tiền tải soundfont cho program ${sf.programNumber} (isDrum: ${sf.isDrum}):`, err);
+        })
+      )
+    );
+  }
+
   // Nạp bộ âm thanh nhạc cụ (.sf3) động cho synthesizer
   public async loadInstrumentSoundbank(
     synth: WorkletSynthesizer,

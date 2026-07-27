@@ -251,6 +251,18 @@ describe('audioEngine', () => {
     expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Roland_SC-88.sf3'));
   });
 
+  it('should preload all 4 soundfonts into soundfontCache when calling preloadAllSoundfonts', async () => {
+    (AudioEngine as any).soundfontCache.clear();
+    await AudioEngine.preloadAllSoundfonts();
+
+    const cachedKeys = Array.from(AudioEngine.soundfontCache.keys());
+    expect(cachedKeys.length).toBe(4);
+    expect(cachedKeys.some(k => k.includes('MuseScore_General.sf3'))).toBe(true);
+    expect(cachedKeys.some(k => k.includes('Sonatina_Symphonic_Orchestra.sf3'))).toBe(true);
+    expect(cachedKeys.some(k => k.includes('FluidR3Mono_GM.sf3'))).toBe(true);
+    expect(cachedKeys.some(k => k.includes('Roland_SC-88.sf3'))).toBe(true);
+  });
+
   it('should handle concurrent soundfont loading requests for the same soundfont without duplicate loads/fetches', async () => {
     // Reset loaded Soundfonts and cache to force network/mock fetch
     (AudioEngine as any).loadedSoundfonts.clear();
