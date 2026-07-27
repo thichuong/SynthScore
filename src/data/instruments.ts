@@ -1,6 +1,7 @@
 export interface InstrumentInfo {
   number: number;
   name: string;
+  emoji: string;
   soundbankUrl?: string;
 }
 
@@ -51,12 +52,52 @@ export const GM_INSTRUMENTS: string[] = [
   'Guitar Fret Noise', 'Breath Noise', 'Seashore', 'Bird Tweet', 'Telephone Ring', 'Helicopter', 'Applause', 'Gunshot'
 ];
 
+export const INSTRUMENT_EMOJIS: Record<number, string> = {
+  // Piano (0-7)
+  0: '🎹', 1: '🎹', 2: '🎹', 3: '🎹', 4: '🎹', 5: '🎹', 6: '🎹', 7: '🎹',
+  // Chromatic Percussion (8-15)
+  8: '🔔', 9: '🔔', 10: '🎶', 11: '🪵', 12: '🪵', 13: '🪵', 14: '🔔', 15: '🪕',
+  // Organ (16-23)
+  16: '🎹', 17: '🎹', 18: '🎹', 19: '⛪', 20: '🪗', 21: '🪗', 22: '🎶', 23: '🪗',
+  // Guitar (24-31)
+  24: '🎸', 25: '🎸', 26: '🎸', 27: '🎸', 28: '🎸', 29: '🎸', 30: '🎸', 31: '🎸',
+  // Bass (32-39)
+  32: '🎻', 33: '🎸', 34: '🎸', 35: '🎸', 36: '🎸', 37: '🎸', 38: '🎛️', 39: '🎛️',
+  // Strings & Orchestral (40-47)
+  40: '🎻', 41: '🎻', 42: '🎻', 43: '🎻', 44: '🎻', 45: '🎻', 46: '🪕', 47: '🥁', // 47 Timpani is Drum 🥁
+  // Ensemble & Voice (48-55)
+  48: '🎻', 49: '🎻', 50: '🎹', 51: '🎹', 52: '🗣️', 53: '🗣️', 54: '🎙️', 55: '💥',
+  // Brass (56-63)
+  56: '🎺', 57: '🎺', 58: '🎺', 59: '🎺', 60: '📯', 61: '🎺', 62: '🎺', 63: '🎺',
+  // Reed (64-71)
+  64: '🎷', 65: '🎷', 66: '🎷', 67: '🎷', 68: '🪈', 69: '📯', 70: '🪈', 71: '🪈',
+  // Pipe (72-79)
+  72: '🪈', 73: '🪈', 74: '🪈', 75: '🪈', 76: '🍾', 77: '🪈', 78: '😙', 79: '🪈',
+  // Synth Lead (80-87)
+  80: '⚡', 81: '⚡', 82: '⚡', 83: '⚡', 84: '⚡', 85: '⚡', 86: '⚡', 87: '⚡',
+  // Synth Pad (88-95)
+  88: '🌌', 89: '🌌', 90: '🌌', 91: '🌌', 92: '🌌', 93: '🌌', 94: '🌌', 95: '🌌',
+  // Synth FX (96-103)
+  96: '✨', 97: '✨', 98: '✨', 99: '✨', 100: '✨', 101: '✨', 102: '✨', 103: '✨',
+  // Ethnic (104-111)
+  104: '🪕', 105: '🪕', 106: '🪕', 107: '🪕', 108: '🪵', 109: '🪈', 110: '🎻', 111: '🎷',
+  // Percussive (112-119)
+  112: '🔔', 113: '🔔', 114: '🥁', 115: '🪵', 116: '🥁', 117: '🥁', 118: '🥁', 119: '🥁',
+  // Sound FX (120-127)
+  120: '🎸', 121: '💨', 122: '🌊', 123: '🐦', 124: '☎️', 125: '🚁', 126: '👏', 127: '💥'
+};
+
+export function getInstrumentEmoji(programNumber: number): string {
+  return INSTRUMENT_EMOJIS[programNumber] || '🎵';
+}
+
 const createInstruments = (start: number, end: number): InstrumentInfo[] => {
   return GM_INSTRUMENTS.slice(start, end).map((name, i) => {
     const num = start + i;
     return {
       number: num,
       name,
+      emoji: getInstrumentEmoji(num),
       soundbankUrl: `/presets/instruments/${num}.sf3`
     };
   });
@@ -72,7 +113,7 @@ export const instrumentGroups: InstrumentGroup[] = [
     instruments: createInstruments(8, 16)
   },
   {
-    name: '💨 Organ',
+    name: '🎹 Organ',
     instruments: createInstruments(16, 24)
   },
   {
@@ -96,11 +137,11 @@ export const instrumentGroups: InstrumentGroup[] = [
     instruments: createInstruments(56, 64)
   },
   {
-    name: '💨 Kèn Gỗ Dăm (Reed)',
+    name: '🎷 Kèn Gỗ Dăm (Reed)',
     instruments: createInstruments(64, 72)
   },
   {
-    name: '💨 Kèn Gỗ Ống (Pipe)',
+    name: '🪈 Kèn Gỗ Ống (Pipe)',
     instruments: createInstruments(72, 80)
   },
   {
@@ -108,15 +149,15 @@ export const instrumentGroups: InstrumentGroup[] = [
     instruments: createInstruments(80, 88)
   },
   {
-    name: '⚡ Synth Pad',
+    name: '🌌 Synth Pad',
     instruments: createInstruments(88, 96)
   },
   {
-    name: '⚡ Synth FX',
+    name: '✨ Synth FX',
     instruments: createInstruments(96, 104)
   },
   {
-    name: '🌏 Cổ Truyền (Ethnic)',
+    name: '🪕 Cổ Truyền (Ethnic)',
     instruments: createInstruments(104, 112)
   },
   {

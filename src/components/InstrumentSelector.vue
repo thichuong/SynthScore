@@ -69,7 +69,7 @@
                   :class="{ 'is-selected': inst.number === modelValue }"
                   @click="selectInstrument(inst.number)"
                 >
-                  <span class="option-icon">{{ group.emoji }}</span>
+                  <span class="option-icon">{{ inst.emoji || group.emoji }}</span>
                   <span class="option-name">{{ inst.name }}</span>
                 </div>
               </div>
@@ -127,7 +127,7 @@ const allInstrumentsFlat = computed(() => {
     group.instruments.forEach(inst => {
       list.push({
         ...inst,
-        emoji: group.emoji,
+        emoji: inst.emoji || group.emoji,
         groupName: group.displayName
       });
     });

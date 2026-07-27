@@ -165,7 +165,10 @@
 
             <div class="track-details">
               <div class="track-name-row">
-                <span class="track-name" :title="track.name">{{ track.name }}</span>
+                <div class="track-name-with-icon">
+                  <span class="track-icon">{{ getInstrumentEmoji(track.instrumentNumber) }}</span>
+                  <span class="track-name" :title="track.name">{{ track.name }}</span>
+                </div>
                 <span class="voice-count-badge" v-if="liveVoices[track.channel] > 0">
                   {{ liveVoices[track.channel] }} v
                 </span>
@@ -319,6 +322,7 @@ import { AudioEngine } from '../services/audioEngine';
 import type { TrackInfo } from '../services/midiGenerator';
 import { getDefaultTrackSettings } from '../services/midiGenerator';
 import InstrumentSelector from './InstrumentSelector.vue';
+import { getInstrumentEmoji } from '../data/instruments';
 
 defineProps<{
   tracks: TrackInfo[];
@@ -520,6 +524,8 @@ onBeforeUnmount(() => { stopTrackingVoices(); });
 
 .track-details { flex: 1; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
 .track-name-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.track-name-with-icon { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+.track-icon { font-size: 0.85rem; flex-shrink: 0; }
 .track-name { font-size: 0.8rem; font-weight: 600; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .voice-count-badge { font-size: 0.65rem; background: rgba(57, 255, 20, 0.15); color: #39ff14; padding: 1px 4px; border-radius: 3px; font-weight: 700; }
 .volume-slider-container { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
