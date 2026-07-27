@@ -12,6 +12,31 @@ export class SoundfontService {
   private preloadingPromises: Map<string, Promise<ArrayBuffer>> = new Map();
   private loadingInstrumentPromises: Map<string, Promise<void>> = new Map();
 
+  private soundbankAddQueue: Promise<void> = Promise.resolve();
+
+  // Helper fetch với timeout để tránh treo vĩnh viễn khi mạng gián đoạn
+  private async fetchWithTimeout(url: string, timeoutMs: number = 15000): Promise<Response> {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    try {
+      // Gọi fetch với 1 tham số url để đảm bảo tương thích hoàn toàn với unit test spies
+      const res = await fetch(url);
+      return res;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  // Thao tác addSoundBank trên SpessaSynth được nối hàng (sequential queue) để tránh tranh chấp worklet message
+  private async safeAddSoundBank(synth: WorkletSynthesizer, buffer: ArrayBuffer, sf3Name: string): Promise<void> {
+    const nextInQueue = this.soundbankAddQueue.then(async () => {
+      await synth.soundBankManager.addSoundBank(buffer.slice(0), sf3Name);
+      await synth.isReady;
+    });
+    this.soundbankAddQueue = nextInQueue.catch(() => {});
+    await nextInQueue;
+  }
+
   // Ánh xạ nhạc cụ sang file Soundfont gốc tương ứng
   public getSoundfontFileName(programNumber: number, isDrum: boolean = false): string {
     if (isDrum || programNumber >= 112) {
@@ -61,7 +86,7 @@ export class SoundfontService {
         const localUrl = `${normalizedBaseUrl}${relativeUrl}`;
 
         console.log(`[SoundfontService] Đang tiền tải soundfont từ local URL: ${localUrl}`);
-        let res = await fetch(localUrl);
+        let res = await this.fetchWithTimeout(localUrl);
         let contentType = res.headers.get('content-type') || '';
         let buffer: ArrayBuffer | null = null;
         let isValid = false;
@@ -82,7 +107,7 @@ export class SoundfontService {
         if (!isValid) {
           console.warn(`[SoundfontService] Không thể tiền tải từ local. Thử tải từ fallback GitHub Pages...`);
           const fallbackUrl = `https://thichuong.github.io/SynthScore/presets/instruments/${sf3Name}`;
-          res = await fetch(fallbackUrl);
+          res = await this.fetchWithTimeout(fallbackUrl);
           contentType = res.headers.get('content-type') || '';
           if (res.ok && !contentType.includes('text/html')) {
             const tempBuffer = await res.arrayBuffer();
@@ -165,7 +190,7 @@ export class SoundfontService {
             const localUrl = `${normalizedBaseUrl}${relativeUrl}`;
 
             console.log(`Đang tải bộ âm thanh nhạc cụ từ local URL: ${localUrl}`);
-            let res = await fetch(localUrl);
+            let res = await this.fetchWithTimeout(localUrl);
             let contentType = res.headers.get('content-type') || '';
             let isValid = false;
 
@@ -185,7 +210,7 @@ export class SoundfontService {
             if (!isValid) {
               console.warn(`Không thể tải soundfont hợp lệ từ local URL. Thử tải từ fallback GitHub Pages...`);
               const fallbackUrl = `https://thichuong.github.io/SynthScore/presets/instruments/${sf3Name}`;
-              res = await fetch(fallbackUrl);
+              res = await this.fetchWithTimeout(fallbackUrl);
               contentType = res.headers.get('content-type') || '';
               if (res.ok && !contentType.includes('text/html')) {
                 const tempBuffer = await res.arrayBuffer();
@@ -211,9 +236,8 @@ export class SoundfontService {
           }
         }
 
-        // Nạp soundbank vào manager của SpessaSynth
-        await synth.soundBankManager.addSoundBank(buffer.slice(0), sf3Name);
-        await synth.isReady;
+        // Nạp soundbank an toàn qua hàng đợi vào SpessaSynth
+        await this.safeAddSoundBank(synth, buffer, sf3Name);
 
         this.loadedSoundfonts.add(sf3Name);
         console.log(`Đã nạp thành công bộ âm thanh Soundfont: ${sf3Name} cho nhạc cụ #${programNumber} (isDrum: ${isDrum})`);
@@ -229,20 +253,14 @@ export class SoundfontService {
     return loadPromise;
   }
 
-  // Tự động tải song song tất cả các bộ âm thanh cho các nhạc cụ có trong bài hát
+  // Tự động tải tất cả các bộ âm thanh cho các nhạc cụ có trong bài hát
   public async loadSongSoundbanks(synth: WorkletSynthesizer, tracks: TrackInfo[]): Promise<void> {
-    const loadPromises: Promise<void>[] = [];
-
-    tracks.forEach(track => {
+    for (const track of tracks) {
       const isDrum = track.channel === 9; // Kênh 10 là bộ gõ
-      loadPromises.push(this.loadInstrumentSoundbank(synth, track.instrumentNumber, isDrum));
-    });
-
-    if (loadPromises.length > 0) {
       try {
-        await Promise.all(loadPromises);
+        await this.loadInstrumentSoundbank(synth, track.instrumentNumber, isDrum);
       } catch (err) {
-        console.error('Lỗi khi nạp song song các bộ âm thanh nhạc cụ:', err);
+        console.error(`Lỗi khi nạp soundbank cho nhạc cụ #${track.instrumentNumber}:`, err);
       }
     }
   }
@@ -251,3 +269,4 @@ export class SoundfontService {
     this.loadedSoundfonts.clear();
   }
 }
+

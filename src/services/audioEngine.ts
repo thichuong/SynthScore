@@ -43,7 +43,20 @@ class AudioEngineService {
   // Trạng thái công khai (Public state)
   public isReady = false;
   public isLoadingSoundfont = false;
+  private loadingSoundfontCount = 0;
   public isPlaying = false;
+
+  private startSoundfontLoading(): void {
+    this.loadingSoundfontCount++;
+    this.isLoadingSoundfont = true;
+    this.triggerStateChange();
+  }
+
+  private stopSoundfontLoading(): void {
+    this.loadingSoundfontCount = Math.max(0, this.loadingSoundfontCount - 1);
+    this.isLoadingSoundfont = this.loadingSoundfontCount > 0;
+    this.triggerStateChange();
+  }
 
   public currentSongName = '';
   public currentComposer = '';
@@ -165,8 +178,7 @@ class AudioEngineService {
 
     this.initPromise = (async () => {
       console.log('[AudioEngine] Chủ động khởi tạo Audio Engine...');
-      this.isLoadingSoundfont = true;
-      this.triggerStateChange();
+      this.startSoundfontLoading();
 
       try {
         // 1. Tạo AudioContext thông qua Context Manager
@@ -260,8 +272,6 @@ class AudioEngineService {
         }
 
         this.isReady = true;
-        this.isLoadingSoundfont = false;
-        this.triggerStateChange();
 
         // Đăng ký Media Session action handlers
         this.mediaSession.setActionHandlers({
@@ -285,10 +295,9 @@ class AudioEngineService {
         this.isReady = false;
         this.synth = null;
         this.sequencer = null;
-        this.isLoadingSoundfont = false;
-        this.triggerStateChange();
         throw error;
       } finally {
+        this.stopSoundfontLoading();
         this.initPromise = null;
       }
     })();
@@ -303,27 +312,23 @@ class AudioEngineService {
     }
     if (!this.synth) return;
 
-    this.isLoadingSoundfont = true;
-    this.triggerStateChange();
+    this.startSoundfontLoading();
 
     try {
       await this.soundfontService.loadInstrumentSoundbank(this.synth, programNumber, isDrum);
     } finally {
-      this.isLoadingSoundfont = false;
-      this.triggerStateChange();
+      this.stopSoundfontLoading();
     }
   }
 
   // Tự động tải tất cả các bộ âm thanh cho các nhạc cụ có trong bài hát hiện tại
   private async loadSongSoundbanks(): Promise<void> {
     if (!this.synth) return;
-    this.isLoadingSoundfont = true;
-    this.triggerStateChange();
+    this.startSoundfontLoading();
     try {
       await this.soundfontService.loadSongSoundbanks(this.synth, this.tracks);
     } finally {
-      this.isLoadingSoundfont = false;
-      this.triggerStateChange();
+      this.stopSoundfontLoading();
     }
   }
 
