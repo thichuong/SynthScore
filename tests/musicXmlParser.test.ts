@@ -99,4 +99,94 @@ describe('parseMusicXmlToMidiBytes', () => {
     expect(notes[3].name).toBe('A4');
     expect(notes[3].time).toBeCloseTo(1.5, 2);
   });
+
+  it('should handle tied notes across measure boundaries', () => {
+    const xmlText = `<?xml version="1.0" encoding="UTF-8"?>
+    <score-partwise version="3.0">
+      <part-list>
+        <score-part id="P1"><part-name>Piano</part-name></score-part>
+      </part-list>
+      <part id="P1">
+        <measure number="1">
+          <attributes><divisions>1</divisions></attributes>
+          <note>
+            <pitch><step>C</step><octave>4</octave></pitch>
+            <duration>4</duration>
+            <tie type="start"/>
+          </note>
+        </measure>
+        <measure number="2">
+          <note>
+            <pitch><step>C</step><octave>4</octave></pitch>
+            <duration>4</duration>
+            <tie type="stop"/>
+          </note>
+        </measure>
+      </part>
+    </score-partwise>`;
+
+    const midiBytes = parseMusicXmlToMidiBytes(xmlText);
+    const midi = new Midi(midiBytes.buffer);
+    const notes = midi.tracks[0].notes;
+    
+    // Tied notes should be merged into 1 single note of 8 divisions (4 beats at 120bpm = 2s total duration)
+    expect(notes.length).toBe(1);
+    expect(notes[0].name).toBe('C4');
+    expect(notes[0].time).toBeCloseTo(0, 2);
+    expect(notes[0].duration).toBeCloseTo(4.0, 2);
+  });
+
+  it('should handle multi-voice measures with backup correctly', () => {
+    const xmlText = `<?xml version="1.0" encoding="UTF-8"?>
+    <score-partwise version="3.0">
+      <part-list>
+        <score-part id="P1"><part-name>Piano</part-name></score-part>
+      </part-list>
+      <part id="P1">
+        <measure number="1">
+          <attributes><divisions>1</divisions></attributes>
+          <!-- Voice 1: C4 (4 beats) -->
+          <note>
+            <pitch><step>C</step><octave>4</octave></pitch>
+            <duration>4</duration>
+            <voice>1</voice>
+          </note>
+          <backup><duration>4</duration></backup>
+          <!-- Voice 2: E4 (2 beats) then G4 (2 beats) -->
+          <note>
+            <pitch><step>E</step><octave>4</octave></pitch>
+            <duration>2</duration>
+            <voice>2</voice>
+          </note>
+          <note>
+            <pitch><step>G</step><octave>4</octave></pitch>
+            <duration>2</duration>
+            <voice>2</voice>
+          </note>
+        </measure>
+      </part>
+    </score-partwise>`;
+
+    const midiBytes = parseMusicXmlToMidiBytes(xmlText);
+    const midi = new Midi(midiBytes.buffer);
+    const notes = midi.tracks[0].notes;
+
+    expect(notes.length).toBe(3); // C4 at 0s (dur 4), E4 at 0s (dur 2), G4 at 1s (dur 2)
+    const c4 = notes.find(n => n.name === 'C4');
+    const e4 = notes.find(n => n.name === 'E4');
+    const g4 = notes.find(n => n.name === 'G4');
+
+    expect(c4).toBeDefined();
+    expect(e4).toBeDefined();
+    expect(g4).toBeDefined();
+
+    expect(c4?.time).toBeCloseTo(0, 2);
+    expect(c4?.duration).toBeCloseTo(2.0, 2); // 4 beats = 2.0s
+
+    expect(e4?.time).toBeCloseTo(0, 2);
+    expect(e4?.duration).toBeCloseTo(1.0, 2); // 2 beats = 1.0s
+
+    expect(g4?.time).toBeCloseTo(1.0, 2); // starts at 1.0s
+    expect(g4?.duration).toBeCloseTo(1.0, 2);
+  });
 });

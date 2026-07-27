@@ -78,6 +78,9 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
     const measures = firstPart.getElementsByTagNameNS('*', 'measure');
     for (let m = 0; m < measures.length; m++) {
       measureStartBeats[m] = beatOffset;
+      let currentVoice = '1';
+      const voiceOffsets = new Map<string, number>();
+
       const children = Array.from(measures[m].childNodes);
       children.forEach(child => {
         if (child.nodeType !== 1) return;
@@ -92,26 +95,37 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
         } else if (tagName === 'backup') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
-            beatOffset = Math.max(0, beatOffset - parseInt(durNode.textContent || '0', 10) / divisions);
+            const dur = parseInt(durNode.textContent || '0', 10) / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            voiceOffsets.set(currentVoice, Math.max(measureStartBeats[m], currentVal - dur));
+            beatOffset = Math.max(measureStartBeats[m], beatOffset - dur);
           }
         } else if (tagName === 'forward') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
-            beatOffset += parseInt(durNode.textContent || '0', 10) / divisions;
+            const dur = parseInt(durNode.textContent || '0', 10) / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            voiceOffsets.set(currentVoice, currentVal + dur);
+            beatOffset += dur;
           }
         } else if (tagName === 'note') {
+          const voiceNode = el.getElementsByTagNameNS('*', 'voice')[0];
+          if (voiceNode && voiceNode.textContent) {
+            currentVoice = voiceNode.textContent.trim();
+          }
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
-          const dur = durNode ? parseInt(durNode.textContent || '0', 10) : 0;
+          const dur = durNode ? parseInt(durNode.textContent || '0', 10) / divisions : 0;
           const isChord = el.getElementsByTagNameNS('*', 'chord').length > 0;
           if (!isChord) {
-            beatOffset += dur / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            voiceOffsets.set(currentVoice, currentVal + dur);
+            beatOffset = Math.max(beatOffset, currentVal + dur);
           }
         }
       });
     }
   }
 
-  // Helper làm tròn phách tránh sai lệch float nhỏ
   const roundBeat = (b: number) => Math.round(b * 10000) / 10000;
 
   // 2. Thu thập tất cả thay đổi tempo từ tất cả các bè
@@ -125,7 +139,9 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
       if (measureStartBeats[m] !== undefined) {
         beatOffset = measureStartBeats[m];
       }
-      
+      let currentVoice = '1';
+      const voiceOffsets = new Map<string, number>();
+
       const soundNodes = measures[m].getElementsByTagNameNS('*', 'sound');
       for (let s = 0; s < soundNodes.length; s++) {
         if (soundNodes[s].hasAttribute('tempo')) {
@@ -150,21 +166,31 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
         } else if (tagName === 'backup') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
-            const dur = parseInt(durNode.textContent || '0', 10);
-            beatOffset = Math.max(0, beatOffset - dur / divisions);
+            const dur = parseInt(durNode.textContent || '0', 10) / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            voiceOffsets.set(currentVoice, Math.max(measureStartBeats[m] || 0, currentVal - dur));
+            beatOffset = Math.max(measureStartBeats[m] || 0, beatOffset - dur);
           }
         } else if (tagName === 'forward') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
-            const dur = parseInt(durNode.textContent || '0', 10);
-            beatOffset += dur / divisions;
+            const dur = parseInt(durNode.textContent || '0', 10) / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            voiceOffsets.set(currentVoice, currentVal + dur);
+            beatOffset += dur;
           }
         } else if (tagName === 'note') {
+          const voiceNode = el.getElementsByTagNameNS('*', 'voice')[0];
+          if (voiceNode && voiceNode.textContent) {
+            currentVoice = voiceNode.textContent.trim();
+          }
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
-          const dur = durNode ? parseInt(durNode.textContent || '0', 10) : 0;
+          const dur = durNode ? parseInt(durNode.textContent || '0', 10) / divisions : 0;
           const isChord = el.getElementsByTagNameNS('*', 'chord').length > 0;
           if (!isChord) {
-            beatOffset += dur / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            voiceOffsets.set(currentVoice, currentVal + dur);
+            beatOffset = Math.max(beatOffset, currentVal + dur);
           }
         } else if (tagName === 'direction') {
           const soundNodes = el.getElementsByTagNameNS('*', 'sound');
@@ -227,17 +253,23 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
   // 3. Tiến hành phân tích nốt cho từng bè
   for (let p = 0; p < partElements.length; p++) {
     const partEl = partElements[p];
-    const notesList: DetailedNote[] = [];
+    const partNotes: DetailedNote[] = [];
     
     let divisions = 1;
     let beatOffset = 0;
-    let lastNoteStartBeat = 0;
+    const voiceOffsets = new Map<string, number>();
+    const lastNoteStartBeats = new Map<string, number>();
+    let currentVoice = '1';
     
+    const activeTies = new Map<string, DetailedNote>();
+
     const measures = partEl.getElementsByTagNameNS('*', 'measure');
     for (let m = 0; m < measures.length; m++) {
-      if (measureStartBeats[m] !== undefined) {
-        beatOffset = measureStartBeats[m];
-      }
+      const measureStart = measureStartBeats[m] !== undefined ? measureStartBeats[m] : beatOffset;
+      beatOffset = measureStart;
+      voiceOffsets.clear();
+      lastNoteStartBeats.clear();
+      currentVoice = '1';
 
       const children = Array.from(measures[m].childNodes);
       children.forEach(child => {
@@ -253,26 +285,44 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
         } else if (tagName === 'backup') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
-            const dur = parseInt(durNode.textContent || '0', 10);
-            beatOffset = Math.max(0, beatOffset - dur / divisions);
+            const dur = parseInt(durNode.textContent || '0', 10) / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            const newVal = Math.max(measureStart, currentVal - dur);
+            voiceOffsets.set(currentVoice, newVal);
+            beatOffset = Math.max(measureStart, beatOffset - dur);
           }
         } else if (tagName === 'forward') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
-            const dur = parseInt(durNode.textContent || '0', 10);
-            beatOffset += dur / divisions;
+            const dur = parseInt(durNode.textContent || '0', 10) / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            const newVal = currentVal + dur;
+            voiceOffsets.set(currentVoice, newVal);
+            beatOffset += dur;
           }
         } else if (tagName === 'note') {
+          const voiceNode = el.getElementsByTagNameNS('*', 'voice')[0];
+          if (voiceNode && voiceNode.textContent) {
+            currentVoice = voiceNode.textContent.trim();
+          }
+
           const isRest = el.getElementsByTagNameNS('*', 'rest').length > 0;
           const isChord = el.getElementsByTagNameNS('*', 'chord').length > 0;
           
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           const durationVal = durNode ? parseInt(durNode.textContent || '0', 10) : 0;
           const durationBeats = durationVal / divisions;
-          
-          if (isRest) {
-            beatOffset += durationBeats;
-          } else {
+
+          const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+          const startBeat = isChord ? (lastNoteStartBeats.get(currentVoice) ?? currentVal) : currentVal;
+
+          if (!isChord) {
+            lastNoteStartBeats.set(currentVoice, startBeat);
+            voiceOffsets.set(currentVoice, startBeat + durationBeats);
+            beatOffset = Math.max(beatOffset, startBeat + durationBeats);
+          }
+
+          if (!isRest) {
             const pitchNode = el.getElementsByTagNameNS('*', 'pitch')[0];
             if (pitchNode) {
               const stepNode = pitchNode.getElementsByTagNameNS('*', 'step')[0];
@@ -284,31 +334,73 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
               
               const noteName = getNoteName(step, alterVal, octave);
               
-              const startBeat = isChord ? lastNoteStartBeat : beatOffset;
-              if (!isChord) {
-                lastNoteStartBeat = beatOffset;
-              }
-              
               const startSec = convertBeatsToSeconds(startBeat);
               const endSec = convertBeatsToSeconds(startBeat + durationBeats);
               const durationSeconds = endSec - startSec;
               
-              notesList.push({
-                pitch: noteName,
-                time: startSec,
-                duration: durationSeconds
-              });
-              
-              if (!isChord) {
-                beatOffset += durationBeats;
+              // Check ties
+              const tieNodes = el.getElementsByTagNameNS('*', 'tie');
+              const tiedNodes = el.getElementsByTagNameNS('*', 'tied');
+              let isTieStart = false;
+              let isTieStop = false;
+
+              for (let t = 0; t < tieNodes.length; t++) {
+                const type = tieNodes[t].getAttribute('type');
+                if (type === 'start') isTieStart = true;
+                if (type === 'stop') isTieStop = true;
+              }
+              for (let t = 0; t < tiedNodes.length; t++) {
+                const type = tiedNodes[t].getAttribute('type');
+                if (type === 'start') isTieStart = true;
+                if (type === 'stop') isTieStop = true;
+              }
+
+              const tieKey = `${currentVoice}_${noteName}`;
+
+              if (isTieStop && activeTies.has(tieKey)) {
+                const existingNote = activeTies.get(tieKey)!;
+                existingNote.duration += durationSeconds;
+                if (!isTieStart) {
+                  activeTies.delete(tieKey);
+                }
+              } else {
+                const newNoteObj: DetailedNote = {
+                  pitch: noteName,
+                  time: startSec,
+                  duration: durationSeconds
+                };
+                partNotes.push(newNoteObj);
+                if (isTieStart) {
+                  activeTies.set(tieKey, newNoteObj);
+                }
               }
             }
           }
         }
       });
     }
+
+    // Sort notes by time then pitch
+    partNotes.sort((a, b) => a.time - b.time || a.pitch.localeCompare(b.pitch));
+
+    // Post-process to trim overlapping identical pitches
+    for (let i = 0; i < partNotes.length; i++) {
+      const curr = partNotes[i];
+      for (let j = i + 1; j < partNotes.length; j++) {
+        const next = partNotes[j];
+        if (next.time >= curr.time + curr.duration - 1e-4) break;
+        if (next.pitch === curr.pitch) {
+          if (Math.abs(next.time - curr.time) < 1e-4) {
+            // Duplicate
+          } else {
+            curr.duration = Math.max(0.01, next.time - curr.time);
+            break;
+          }
+        }
+      }
+    }
     
-    partsNotes.push(notesList);
+    partsNotes.push(partNotes);
   }
   
   return partsNotes;

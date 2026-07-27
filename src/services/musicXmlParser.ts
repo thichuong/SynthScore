@@ -1,8 +1,33 @@
 import { Midi } from '@tonejs/midi';
 
+export interface DetailedNote {
+  pitch: string;
+  time: number;      // in seconds
+  duration: number;  // in seconds
+}
+
+// Helper phụ để lấy tên nốt từ Pitch Step, Alter, Octave
+export function getNoteName(step: string, alter: number, octave: number): string {
+  const steps = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const stepIndex = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[step as 'C'|'D'|'E'|'F'|'G'|'A'|'B'] ?? 0;
+  let finalIndex = stepIndex + alter;
+  let finalOctave = octave;
+  
+  while (finalIndex < 0) {
+    finalIndex += 12;
+    finalOctave -= 1;
+  }
+  while (finalIndex >= 12) {
+    finalIndex -= 12;
+    finalOctave += 1;
+  }
+  
+  return `${steps[finalIndex]}${finalOctave}`;
+}
+
 /**
  * Trình phân tích cú pháp MusicXML cơ bản sang MIDI Binary.
- * Hỗ trợ các khái niệm chính: pitch, alter, octave, duration, chord, rest, backup, forward, tempo.
+ * Hỗ trợ các khái niệm chính: pitch, alter, octave, duration, chord, rest, backup, forward, tempo, voice, ties.
  */
 export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
   const parser = new DOMParser();
@@ -33,9 +58,12 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
     const measures = firstPart.getElementsByTagNameNS('*', 'measure');
     for (let m = 0; m < measures.length; m++) {
       measureStartBeats[m] = beatOffset;
+      let currentVoice = '1';
+      const voiceOffsets = new Map<string, number>();
+
       const children = Array.from(measures[m].childNodes);
       children.forEach(child => {
-        if (child.nodeType !== Node.ELEMENT_NODE) return;
+        if (child.nodeType !== 1) return;
         const el = child as HTMLElement;
         const tagName = el.localName.toLowerCase();
         
@@ -47,28 +75,38 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
         } else if (tagName === 'backup') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
-            const dur = parseInt(durNode.textContent || '0', 10);
-            beatOffset = Math.max(0, beatOffset - dur / divisions);
+            const dur = parseInt(durNode.textContent || '0', 10) / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            voiceOffsets.set(currentVoice, Math.max(measureStartBeats[m], currentVal - dur));
+            beatOffset = Math.max(measureStartBeats[m], beatOffset - dur);
           }
         } else if (tagName === 'forward') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
-            const dur = parseInt(durNode.textContent || '0', 10);
-            beatOffset += dur / divisions;
+            const dur = parseInt(durNode.textContent || '0', 10) / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            voiceOffsets.set(currentVoice, currentVal + dur);
+            beatOffset += dur;
           }
         } else if (tagName === 'note') {
+          const voiceNode = el.getElementsByTagNameNS('*', 'voice')[0];
+          if (voiceNode && voiceNode.textContent) {
+            currentVoice = voiceNode.textContent.trim();
+          }
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
-          const dur = durNode ? parseInt(durNode.textContent || '0', 10) : 0;
+          const dur = durNode ? parseInt(durNode.textContent || '0', 10) / divisions : 0;
           const isChord = el.getElementsByTagNameNS('*', 'chord').length > 0;
+          
           if (!isChord) {
-            beatOffset += dur / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            voiceOffsets.set(currentVoice, currentVal + dur);
+            beatOffset = Math.max(beatOffset, currentVal + dur);
           }
         }
       });
     }
   }
 
-  // Helper làm tròn phách tránh sai lệch float nhỏ
   const roundBeat = (b: number) => Math.round(b * 10000) / 10000;
 
   // 2. Thu thập tất cả thay đổi tempo từ tất cả các bè
@@ -82,7 +120,9 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
       if (measureStartBeats[m] !== undefined) {
         beatOffset = measureStartBeats[m];
       }
-      
+      let currentVoice = '1';
+      const voiceOffsets = new Map<string, number>();
+
       const soundNodes = measures[m].getElementsByTagNameNS('*', 'sound');
       for (let s = 0; s < soundNodes.length; s++) {
         if (soundNodes[s].hasAttribute('tempo')) {
@@ -95,7 +135,7 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
       
       const children = Array.from(measures[m].childNodes);
       children.forEach(child => {
-        if (child.nodeType !== Node.ELEMENT_NODE) return;
+        if (child.nodeType !== 1) return;
         const el = child as HTMLElement;
         const tagName = el.localName.toLowerCase();
         
@@ -107,21 +147,31 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
         } else if (tagName === 'backup') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
-            const dur = parseInt(durNode.textContent || '0', 10);
-            beatOffset = Math.max(0, beatOffset - dur / divisions);
+            const dur = parseInt(durNode.textContent || '0', 10) / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            voiceOffsets.set(currentVoice, Math.max(measureStartBeats[m] || 0, currentVal - dur));
+            beatOffset = Math.max(measureStartBeats[m] || 0, beatOffset - dur);
           }
         } else if (tagName === 'forward') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
-            const dur = parseInt(durNode.textContent || '0', 10);
-            beatOffset += dur / divisions;
+            const dur = parseInt(durNode.textContent || '0', 10) / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            voiceOffsets.set(currentVoice, currentVal + dur);
+            beatOffset += dur;
           }
         } else if (tagName === 'note') {
+          const voiceNode = el.getElementsByTagNameNS('*', 'voice')[0];
+          if (voiceNode && voiceNode.textContent) {
+            currentVoice = voiceNode.textContent.trim();
+          }
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
-          const dur = durNode ? parseInt(durNode.textContent || '0', 10) : 0;
+          const dur = durNode ? parseInt(durNode.textContent || '0', 10) / divisions : 0;
           const isChord = el.getElementsByTagNameNS('*', 'chord').length > 0;
           if (!isChord) {
-            beatOffset += dur / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            voiceOffsets.set(currentVoice, currentVal + dur);
+            beatOffset = Math.max(beatOffset, currentVal + dur);
           }
         } else if (tagName === 'direction') {
           const soundNodes = el.getElementsByTagNameNS('*', 'sound');
@@ -189,6 +239,7 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
     ticks: Math.round(tc.beat * ppq),
     time: tc.time
   }));
+  midi.header.update();
 
   let channelCounter = 0;
 
@@ -223,18 +274,25 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
 
     let divisions = 1;
     let beatOffset = 0;
-    let lastNoteStartBeat = 0;
+    const voiceOffsets = new Map<string, number>();
+    const lastNoteStartBeats = new Map<string, number>();
+    let currentVoice = '1';
+
+    const partNotes: DetailedNote[] = [];
+    const activeTies = new Map<string, DetailedNote>(); // key = pitch
 
     const measures = partEl.getElementsByTagNameNS('*', 'measure');
     for (let m = 0; m < measures.length; m++) {
-      if (measureStartBeats[m] !== undefined) {
-        beatOffset = measureStartBeats[m];
-      }
+      const measureStart = measureStartBeats[m] !== undefined ? measureStartBeats[m] : beatOffset;
+      beatOffset = measureStart;
+      voiceOffsets.clear();
+      lastNoteStartBeats.clear();
+      currentVoice = '1';
 
       const children = Array.from(measures[m].childNodes);
       
       children.forEach(child => {
-        if (child.nodeType !== Node.ELEMENT_NODE) return;
+        if (child.nodeType !== 1) return;
         const el = child as HTMLElement;
         const tagName = el.localName.toLowerCase();
 
@@ -247,18 +305,29 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
         else if (tagName === 'backup') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
-            const dur = parseInt(durNode.textContent || '0', 10);
-            beatOffset = Math.max(0, beatOffset - dur / divisions);
+            const dur = parseInt(durNode.textContent || '0', 10) / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            const newVal = Math.max(measureStart, currentVal - dur);
+            voiceOffsets.set(currentVoice, newVal);
+            beatOffset = Math.max(measureStart, beatOffset - dur);
           }
         } 
         else if (tagName === 'forward') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
-            const dur = parseInt(durNode.textContent || '0', 10);
-            beatOffset += dur / divisions;
+            const dur = parseInt(durNode.textContent || '0', 10) / divisions;
+            const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+            const newVal = currentVal + dur;
+            voiceOffsets.set(currentVoice, newVal);
+            beatOffset += dur;
           }
         } 
         else if (tagName === 'note') {
+          const voiceNode = el.getElementsByTagNameNS('*', 'voice')[0];
+          if (voiceNode && voiceNode.textContent) {
+            currentVoice = voiceNode.textContent.trim();
+          }
+
           const isRest = el.getElementsByTagNameNS('*', 'rest').length > 0;
           const isChord = el.getElementsByTagNameNS('*', 'chord').length > 0;
           
@@ -266,9 +335,16 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
           const durationVal = durNode ? parseInt(durNode.textContent || '0', 10) : 0;
           const durationBeats = durationVal / divisions;
 
-          if (isRest) {
-            beatOffset += durationBeats;
-          } else {
+          const currentVal = voiceOffsets.get(currentVoice) ?? beatOffset;
+          const startBeat = isChord ? (lastNoteStartBeats.get(currentVoice) ?? currentVal) : currentVal;
+
+          if (!isChord) {
+            lastNoteStartBeats.set(currentVoice, startBeat);
+            voiceOffsets.set(currentVoice, startBeat + durationBeats);
+            beatOffset = Math.max(beatOffset, startBeat + durationBeats);
+          }
+
+          if (!isRest) {
             const pitchNode = el.getElementsByTagNameNS('*', 'pitch')[0];
             if (pitchNode) {
               const stepNode = pitchNode.getElementsByTagNameNS('*', 'step')[0];
@@ -279,50 +355,83 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
               const alterVal = parseFloat(alterNode?.textContent || '0');
               
               const noteName = getNoteName(step, alterVal, octave);
-              
-              const startBeat = isChord ? lastNoteStartBeat : beatOffset;
-              if (!isChord) {
-                lastNoteStartBeat = beatOffset;
-              }
 
               const startSec = convertBeatsToSeconds(startBeat);
               const endSec = convertBeatsToSeconds(startBeat + durationBeats);
               const durationSeconds = endSec - startSec;
 
-              track.addNote({
-                name: noteName,
-                time: startSec,
-                duration: durationSeconds,
-                velocity: 0.8
-              });
+              // Check ties
+              const tieNodes = el.getElementsByTagNameNS('*', 'tie');
+              const tiedNodes = el.getElementsByTagNameNS('*', 'tied');
+              let isTieStart = false;
+              let isTieStop = false;
 
-              if (!isChord) {
-                beatOffset += durationBeats;
+              for (let t = 0; t < tieNodes.length; t++) {
+                const type = tieNodes[t].getAttribute('type');
+                if (type === 'start') isTieStart = true;
+                if (type === 'stop') isTieStop = true;
+              }
+              for (let t = 0; t < tiedNodes.length; t++) {
+                const type = tiedNodes[t].getAttribute('type');
+                if (type === 'start') isTieStart = true;
+                if (type === 'stop') isTieStop = true;
+              }
+
+              const tieKey = `${currentVoice}_${noteName}`;
+
+              if (isTieStop && activeTies.has(tieKey)) {
+                const existingNote = activeTies.get(tieKey)!;
+                existingNote.duration += durationSeconds;
+                if (!isTieStart) {
+                  activeTies.delete(tieKey);
+                }
+              } else {
+                const newNoteObj: DetailedNote = {
+                  pitch: noteName,
+                  time: startSec,
+                  duration: durationSeconds
+                };
+                partNotes.push(newNoteObj);
+                if (isTieStart) {
+                  activeTies.set(tieKey, newNoteObj);
+                }
               }
             }
           }
         }
       });
     }
-  }
-  return midi.toArray();
-}
 
-// Hàm phụ để lấy tên nốt từ Pitch Step, Alter, Octave
-function getNoteName(step: string, alter: number, octave: number): string {
-  const steps = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  const stepIndex = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[step as 'C'|'D'|'E'|'F'|'G'|'A'|'B'] ?? 0;
-  let finalIndex = stepIndex + alter;
-  let finalOctave = octave;
-  
-  while (finalIndex < 0) {
-    finalIndex += 12;
-    finalOctave -= 1;
+    // Sort notes by time then pitch
+    partNotes.sort((a, b) => a.time - b.time || a.pitch.localeCompare(b.pitch));
+
+    // Post-process to trim overlapping identical pitches in MIDI track
+    for (let i = 0; i < partNotes.length; i++) {
+      const curr = partNotes[i];
+      for (let j = i + 1; j < partNotes.length; j++) {
+        const next = partNotes[j];
+        if (next.time >= curr.time + curr.duration - 1e-4) break;
+        if (next.pitch === curr.pitch) {
+          if (Math.abs(next.time - curr.time) < 1e-4) {
+            // Same start time duplicate note
+          } else {
+            curr.duration = Math.max(0.01, next.time - curr.time);
+            break;
+          }
+        }
+      }
+    }
+
+    // Add notes to Midi track
+    partNotes.forEach(n => {
+      track.addNote({
+        name: n.pitch,
+        time: n.time,
+        duration: n.duration,
+        velocity: 0.8
+      });
+    });
   }
-  while (finalIndex >= 12) {
-    finalIndex -= 12;
-    finalOctave += 1;
-  }
-  
-  return `${steps[finalIndex]}${finalOctave}`;
+
+  return midi.toArray();
 }
