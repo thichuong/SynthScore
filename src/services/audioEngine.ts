@@ -11,13 +11,13 @@ import {
 } from './midiGenerator';
 
 import { AudioContextManager } from './audio/audioContextManager';
-import { SoundfontService } from './audio/soundfontService';
+import { SoundfontService, type SoundfontProgress } from './audio/soundfontService';
 import { TrackManager } from './audio/trackManager';
 import { AudioExporter } from './audio/audioExporter';
 import { MediaSessionManager } from './audio/mediaSessionManager';
 import { loadUserSettings, saveUserSettings } from './appCache';
 
-export type { TrackInfo };
+export type { TrackInfo, SoundfontProgress };
 
 /**
  * WARNING / CHÚ Ý QUAN TRỌNG:
@@ -43,6 +43,7 @@ class AudioEngineService {
   // Trạng thái công khai (Public state)
   public isReady = false;
   public isLoadingSoundfont = false;
+  public soundfontProgress: SoundfontProgress | null = null;
   private loadingSoundfontCount = 0;
   public isPlaying = false;
 
@@ -129,8 +130,11 @@ class AudioEngineService {
   }
 
   constructor() {
-    // Không tự động khởi tạo khi import để tránh lỗi môi trường test.
-    // Việc khởi tạo sẽ được gọi chủ động từ phía ứng dụng (ví dụ: trong App.vue onMounted).
+    // Lắng nghe tiến độ tải soundfont để cập nhật UI
+    this.soundfontService.onProgress((progress) => {
+      this.soundfontProgress = progress;
+      this.triggerStateChange();
+    });
   }
 
   // Giao tiếp với Web Worker để xử lý luồng nền

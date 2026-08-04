@@ -2,6 +2,16 @@ import { type WorkletSynthesizer } from 'spessasynth_lib';
 import { getCachedSoundfont, cacheSoundfont } from '../appCache';
 import { type TrackInfo } from '../midiGenerator';
 
+export interface SoundfontProgress {
+  sf3Name: string;
+  loaded: number;
+  total: number;
+  percent: number;
+  speed: number;       // bytes/second
+  etaSeconds: number;  // thời gian còn lại ước tính (giây)
+  isFallback: boolean;
+}
+
 /**
  * Quản lý tải, bộ nhớ đệm (cả IndexedDB và RAM)
  * và nạp bộ âm thanh Soundfont vào Synthesizer.
@@ -13,6 +23,22 @@ export class SoundfontService {
   private loadingInstrumentPromises: Map<string, Promise<void>> = new Map();
 
   private soundbankAddQueue: Promise<void> = Promise.resolve();
+  private progressListeners: Set<(progress: SoundfontProgress | null) => void> = new Set();
+
+  public onProgress(listener: (progress: SoundfontProgress | null) => void): () => void {
+    this.progressListeners.add(listener);
+    return () => this.progressListeners.delete(listener);
+  }
+
+  private notifyProgress(progress: SoundfontProgress | null): void {
+    for (const listener of this.progressListeners) {
+      try {
+        listener(progress);
+      } catch (e) {
+        console.error('[SoundfontService] Lỗi khi gọi progress listener:', e);
+      }
+    }
+  }
 
   // Helper fetch với timeout để tránh treo vĩnh viễn khi mạng gián đoạn
   private async fetchWithTimeout(url: string, timeoutMs: number = 15000): Promise<Response> {
@@ -25,6 +51,112 @@ export class SoundfontService {
     } finally {
       if (timer) clearTimeout(timer);
     }
+  }
+
+  // Đọc dữ liệu từ URL kèm đo đếm tiến độ, tốc độ và ETA
+  private async fetchAndReadWithProgress(
+    sf3Name: string,
+    url: string,
+    isFallback: boolean = false
+  ): Promise<{ buffer: ArrayBuffer | null; isValid: boolean }> {
+    let res: Response;
+    try {
+      res = await this.fetchWithTimeout(url);
+    } catch (err) {
+      return { buffer: null, isValid: false };
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok || contentType.includes('text/html')) {
+      return { buffer: null, isValid: false };
+    }
+
+    const contentLengthHeader = res.headers.get('content-length');
+    const total = contentLengthHeader ? parseInt(contentLengthHeader, 10) || 0 : 0;
+    let loaded = 0;
+    const startTime = performance.now();
+    let buffer: ArrayBuffer | null = null;
+
+    // Cập nhật trạng thái tải bắt đầu
+    this.notifyProgress({
+      sf3Name,
+      loaded: 0,
+      total,
+      percent: 0,
+      speed: 0,
+      etaSeconds: 0,
+      isFallback
+    });
+
+    try {
+      if (res.body && typeof res.body.getReader === 'function') {
+        const reader = res.body.getReader();
+        const chunks: Uint8Array[] = [];
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            chunks.push(value);
+            loaded += value.byteLength;
+
+            const elapsedTime = (performance.now() - startTime) / 1000;
+            const speed = elapsedTime > 0 ? loaded / elapsedTime : 0;
+            const remainingBytes = total > loaded ? total - loaded : 0;
+            const etaSeconds = speed > 0 ? Math.round(remainingBytes / speed) : 0;
+            const percent = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+
+            this.notifyProgress({
+              sf3Name,
+              loaded,
+              total,
+              percent,
+              speed,
+              etaSeconds,
+              isFallback
+            });
+          }
+        }
+
+        const combined = new Uint8Array(loaded);
+        let offset = 0;
+        for (const chunk of chunks) {
+          combined.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+        buffer = combined.buffer;
+      } else {
+        // Fallback khi môi trường không có res.body.getReader (ví dụ trong Vitest unit test)
+        const tempBuffer = await res.arrayBuffer();
+        loaded = tempBuffer.byteLength;
+        const elapsedTime = (performance.now() - startTime) / 1000;
+        const speed = elapsedTime > 0 ? loaded / elapsedTime : 0;
+
+        this.notifyProgress({
+          sf3Name,
+          loaded,
+          total: total || loaded,
+          percent: 100,
+          speed,
+          etaSeconds: 0,
+          isFallback
+        });
+        buffer = tempBuffer;
+      }
+    } catch (err) {
+      console.warn(`[SoundfontService] Lỗi khi tải dữ liệu stream từ ${url}:`, err);
+      return { buffer: null, isValid: false };
+    }
+
+    let isValid = false;
+    if (buffer && buffer.byteLength >= 4) {
+      const header = String.fromCharCode(...new Uint8Array(buffer, 0, 4));
+      if (header === 'RIFF' || header === 'RIFS') {
+        isValid = true;
+      }
+    }
+
+    return { buffer, isValid };
   }
 
   // Thao tác addSoundBank trên SpessaSynth được nối hàng (sequential queue) để tránh tranh chấp worklet message
@@ -86,41 +218,14 @@ export class SoundfontService {
         const localUrl = `${normalizedBaseUrl}${relativeUrl}`;
 
         console.log(`[SoundfontService] Đang tiền tải soundfont từ local URL: ${localUrl}`);
-        let res = await this.fetchWithTimeout(localUrl);
-        let contentType = res.headers.get('content-type') || '';
-        let buffer: ArrayBuffer | null = null;
-        let isValid = false;
-
-        if (res.ok && !contentType.includes('text/html')) {
-          const tempBuffer = await res.arrayBuffer();
-          if (tempBuffer.byteLength >= 4) {
-            const header = String.fromCharCode(...new Uint8Array(tempBuffer, 0, 4));
-            if (header === 'RIFF' || header === 'RIFS') {
-              buffer = tempBuffer;
-              isValid = true;
-            } else {
-              console.warn(`[SoundfontService] Local URL tiền tải trả về file không hợp lệ (header: ${header})`);
-            }
-          }
-        }
+        let { buffer, isValid } = await this.fetchAndReadWithProgress(sf3Name, localUrl, false);
 
         if (!isValid) {
           console.warn(`[SoundfontService] Không thể tiền tải từ local. Thử tải từ fallback GitHub Pages...`);
           const fallbackUrl = `https://thichuong.github.io/SynthScore/presets/instruments/${sf3Name}`;
-          res = await this.fetchWithTimeout(fallbackUrl);
-          contentType = res.headers.get('content-type') || '';
-          if (res.ok && !contentType.includes('text/html')) {
-            const tempBuffer = await res.arrayBuffer();
-            if (tempBuffer.byteLength >= 4) {
-              const header = String.fromCharCode(...new Uint8Array(tempBuffer, 0, 4));
-              if (header === 'RIFF' || header === 'RIFS') {
-                buffer = tempBuffer;
-                isValid = true;
-              } else {
-                console.warn(`[SoundfontService] Fallback URL tiền tải trả về file không hợp lệ (header: ${header})`);
-              }
-            }
-          }
+          const fallbackResult = await this.fetchAndReadWithProgress(sf3Name, fallbackUrl, true);
+          buffer = fallbackResult.buffer;
+          isValid = fallbackResult.isValid;
         }
 
         if (isValid && buffer) {
@@ -134,6 +239,7 @@ export class SoundfontService {
         console.error('[SoundfontService] Lỗi khi tiền tải soundfont:', e);
         throw e;
       } finally {
+        this.notifyProgress(null);
         this.preloadingPromises.delete(url);
       }
     })();
@@ -208,45 +314,21 @@ export class SoundfontService {
             const localUrl = `${normalizedBaseUrl}${relativeUrl}`;
 
             console.log(`Đang tải bộ âm thanh nhạc cụ từ local URL: ${localUrl}`);
-            let res = await this.fetchWithTimeout(localUrl);
-            let contentType = res.headers.get('content-type') || '';
-            let isValid = false;
-
-            if (res.ok && !contentType.includes('text/html')) {
-              const tempBuffer = await res.arrayBuffer();
-              if (tempBuffer.byteLength >= 4) {
-                const header = String.fromCharCode(...new Uint8Array(tempBuffer, 0, 4));
-                if (header === 'RIFF' || header === 'RIFS') {
-                  buffer = tempBuffer;
-                  isValid = true;
-                } else {
-                  console.warn(`Local URL trả về file không hợp lệ (header: ${header})`);
-                }
-              }
-            }
+            let { buffer: fetchedBuffer, isValid } = await this.fetchAndReadWithProgress(sf3Name, localUrl, false);
 
             if (!isValid) {
               console.warn(`Không thể tải soundfont hợp lệ từ local URL. Thử tải từ fallback GitHub Pages...`);
               const fallbackUrl = `https://thichuong.github.io/SynthScore/presets/instruments/${sf3Name}`;
-              res = await this.fetchWithTimeout(fallbackUrl);
-              contentType = res.headers.get('content-type') || '';
-              if (res.ok && !contentType.includes('text/html')) {
-                const tempBuffer = await res.arrayBuffer();
-                if (tempBuffer.byteLength >= 4) {
-                  const header = String.fromCharCode(...new Uint8Array(tempBuffer, 0, 4));
-                  if (header === 'RIFF' || header === 'RIFS') {
-                    buffer = tempBuffer;
-                    isValid = true;
-                  } else {
-                    console.warn(`Fallback URL trả về file không hợp lệ (header: ${header})`);
-                  }
-                }
-              }
+              const fallbackResult = await this.fetchAndReadWithProgress(sf3Name, fallbackUrl, true);
+              fetchedBuffer = fallbackResult.buffer;
+              isValid = fallbackResult.isValid;
 
               if (!isValid) {
                 throw new Error(`Không thể fetch Soundbank hợp lệ từ cả local và fallback URL`);
               }
             }
+
+            buffer = fetchedBuffer!;
 
             // Lưu cache
             this.soundfontCache.set(url, buffer);
@@ -263,6 +345,7 @@ export class SoundfontService {
         console.error(`Không thể nạp bộ âm thanh Soundfont ${sf3Name} cho nhạc cụ #${programNumber}:`, err);
         throw err;
       } finally {
+        this.notifyProgress(null);
         this.loadingInstrumentPromises.delete(sf3Name);
       }
     })();

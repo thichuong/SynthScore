@@ -9,9 +9,17 @@
 
       <!-- Trạng thái engine nhỏ gọn -->
       <div class="mobile-status-badge">
-        <span v-if="isLoadingSoundfont" class="m-badge loading">
-          <span class="mini-spinner"></span> Tải soundfont...
-        </span>
+        <div v-if="isLoadingSoundfont" class="m-badge loading m-sf-progress-badge">
+          <div class="m-sf-top">
+            <span class="mini-spinner"></span>
+            <span class="m-sf-text">
+              {{ soundfontProgress ? `${soundfontProgress.percent}% · ${formatEta(soundfontProgress.etaSeconds)}` : 'Tải soundfont...' }}
+            </span>
+          </div>
+          <div v-if="soundfontProgress" class="m-sf-track">
+            <div class="m-sf-fill" :style="{ width: soundfontProgress.percent + '%' }"></div>
+          </div>
+        </div>
         <span v-else-if="initializationFailed" class="m-badge error" @click="$emit('retryInit')">
           <AlertCircle class="m-icon" /> Lỗi âm thanh
         </span>
@@ -64,6 +72,7 @@ import { Download, CheckCircle, AlertCircle } from 'lucide-vue-next';
 import SongLibraryPicker from '../SongLibraryPicker.vue';
 import FileUploader from '../FileUploader.vue';
 import type { SongEntry } from '../../data/songLibrary';
+import type { SoundfontProgress } from '../../services/audio/soundfontService';
 
 interface FilteredSong extends SongEntry {
   originalIndex: number;
@@ -79,9 +88,18 @@ const props = defineProps<{
   activeFilter: 'tất cả' | 'có sẵn' | 'tải lên' | 'ưa thích';
   isInitialized: boolean;
   isLoadingSoundfont: boolean;
+  soundfontProgress?: SoundfontProgress | null;
   initializationFailed: boolean;
   isReady: boolean;
 }>();
+
+function formatEta(seconds: number): string {
+  if (!seconds || seconds <= 0 || !isFinite(seconds)) return 'Đang tải...';
+  if (seconds < 60) return `Còn ~${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `Còn ~${m}m ${s}s`;
+}
 
 const emit = defineEmits<{
   (e: 'update:searchQuery', val: string): void;
@@ -162,6 +180,40 @@ const activeFilter = computed({
   background: rgba(255, 170, 0, 0.15);
   color: #ffaa00;
   border: 1px solid rgba(255, 170, 0, 0.3);
+}
+
+.m-badge.loading.m-sf-progress-badge {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 4px 8px;
+}
+
+.m-sf-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.m-sf-text {
+  white-space: nowrap;
+}
+
+.m-sf-track {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.m-sf-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ffaa00 0%, #00f0ff 100%);
+  border-radius: 2px;
+  transition: width 0.2s ease;
 }
 
 .m-badge.ready {

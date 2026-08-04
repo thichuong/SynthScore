@@ -12,6 +12,7 @@
       v-model:activeFilter="activeFilter"
       :isInitialized="isInitialized"
       :isLoadingSoundfont="isLoadingSoundfont"
+      :soundfontProgress="soundfontProgress"
       :initializationFailed="initializationFailed"
       :isReady="isReady"
       @selectSong="handleSongSelect"
@@ -110,9 +111,21 @@
 
       <!-- Trạng thái Audio Engine -->
       <div class="engine-status">
-        <span v-if="isLoadingSoundfont" class="status-badge loading">
-          <span class="spinner"></span> Đang tải nhạc cụ...
-        </span>
+        <div v-if="isLoadingSoundfont" class="status-badge loading soundfont-progress-badge">
+          <div class="sf-progress-top">
+            <span class="spinner"></span>
+            <span class="sf-name" :title="soundfontProgress?.sf3Name">{{ soundfontProgress?.sf3Name || 'Đang tải nhạc cụ...' }}</span>
+            <span v-if="soundfontProgress" class="sf-percent">{{ soundfontProgress.percent }}%</span>
+          </div>
+          <div v-if="soundfontProgress" class="sf-progress-track">
+            <div class="sf-progress-fill" :style="{ width: soundfontProgress.percent + '%' }"></div>
+          </div>
+          <div v-if="soundfontProgress" class="sf-progress-details">
+            <span class="sf-eta">{{ formatEta(soundfontProgress.etaSeconds) }}</span>
+            <span v-if="soundfontProgress.speed > 0" class="sf-speed">{{ formatBytes(soundfontProgress.speed) }}/s</span>
+            <span v-if="soundfontProgress.isFallback" class="sf-fallback-tag" title="Đang tải từ GitHub Pages CDN">Fallback CDN</span>
+          </div>
+        </div>
         <span v-else-if="initializationFailed" class="status-badge error clickable" @click="initializeEngine" title="Nhấp để thử khởi tạo lại Audio Engine">
           <AlertCircle class="status-icon" /> Lỗi âm thanh (Nhấp để thử lại)
         </span>
@@ -191,7 +204,7 @@ import MobilePresentation from './components/mobile/MobilePresentation.vue';
 import MobileControls from './components/mobile/MobileControls.vue';
 import { useResponsive } from './composables/useResponsive';
 
-import { AudioEngine } from './services/audioEngine';
+import { AudioEngine, type SoundfontProgress } from './services/audioEngine';
 import type { TrackInfo } from './services/midiGenerator';
 import { parseMusicXmlToMidiBytes } from './services/musicXmlParser';
 import { parseMxl } from './services/mxlParser';
@@ -208,9 +221,26 @@ function handleTriggerExport() {
 const isInitialized = ref(false);
 const isReady = ref(false);
 const isLoadingSoundfont = ref(false);
+const soundfontProgress = ref<SoundfontProgress | null>(null);
 const isPlaying = ref(false);
 const isLoadingLibrarySong = ref(false);
 const initializationFailed = ref(false);
+
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes <= 0) return '0 B';
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${(bytes / 1024).toFixed(0)} KB`;
+}
+
+function formatEta(seconds: number): string {
+  if (!seconds || seconds <= 0 || !isFinite(seconds)) return 'Đang tải...';
+  if (seconds < 60) return `Còn ~${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `Còn ~${m}m ${s}s`;
+}
 
 const currentTime = ref(0);
 const duration = ref(0);
@@ -436,6 +466,7 @@ onMounted(() => {
     isInitialized.value = AudioEngine.isInitialized;
     isReady.value = AudioEngine.isReady;
     isLoadingSoundfont.value = AudioEngine.isLoadingSoundfont;
+    soundfontProgress.value = AudioEngine.soundfontProgress ? { ...AudioEngine.soundfontProgress } : null;
     isPlaying.value = AudioEngine.isPlaying;
     duration.value = AudioEngine.duration;
     bpm.value = AudioEngine.bpm;
@@ -880,6 +911,87 @@ async function loadFromLibrary(song: SongEntry) {
   background: rgba(0, 240, 255, 0.1);
   border: 1px solid rgba(0, 240, 255, 0.2);
   color: #00f0ff;
+}
+
+/* Soundfont Progress Badge */
+.status-badge.soundfont-progress-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  min-width: 190px;
+  padding: 8px 12px;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 240, 255, 0.12);
+  transition: all 0.2s ease;
+}
+
+.sf-progress-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: #00f0ff;
+}
+
+.sf-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.sf-percent {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #00f0ff;
+}
+
+.sf-progress-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sf-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00f0ff 0%, #7000ff 100%);
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+
+.sf-progress-details {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sf-eta {
+  color: #ffaa00;
+  font-weight: 600;
+}
+
+.sf-speed {
+  color: #8c8c9e;
+}
+
+.sf-fallback-tag {
+  background: rgba(255, 170, 0, 0.15);
+  color: #ffaa00;
+  border: 1px solid rgba(255, 170, 0, 0.3);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 0.6rem;
+  font-weight: 700;
 }
 
 .status-badge.active {
