@@ -1,5 +1,84 @@
 <template>
-  <div class="app-container">
+  <!-- Giao diện Mobile Web (1 màn hình duy nhất 100dvh) -->
+  <div v-if="isMobile" class="mobile-app-shell">
+    <!-- Phần 1: Header (Chọn nhạc & Xuất file) -->
+    <MobileHeader
+      :songs="songs"
+      :filteredSongs="filteredSongs"
+      :playingIndex="selectedSongIndex"
+      :isLoading="isLoadingLibrarySong"
+      :disabled="isLoadingSoundfont"
+      v-model:searchQuery="searchQuery"
+      v-model:activeFilter="activeFilter"
+      :isInitialized="isInitialized"
+      :isLoadingSoundfont="isLoadingSoundfont"
+      :initializationFailed="initializationFailed"
+      :isReady="isReady"
+      @selectSong="handleSongSelect"
+      @toggleFavorite="toggleFavorite"
+      @musicLoaded="handleMusicLoaded"
+      @triggerExport="handleTriggerExport"
+      @retryInit="initializeEngine"
+    />
+
+    <!-- Phần 2: Trình bài (Mixer, Thác nốt nhạc, Bản nhạc) -->
+    <MobilePresentation
+      :fileData="fileData"
+      :fileType="fileType"
+      :rawText="rawText"
+      :isPlaying="isPlaying"
+      :currentTime="currentTime"
+      :isReady="isReady"
+      :tracks="tracks"
+      :playbackMode="playbackMode"
+      @changeMode="handleModeChange"
+    />
+
+    <!-- Phần 3: Controls (Play/Pause, Seekbar, Drawer mở rộng) -->
+    <MobileControls
+      :isPlaying="isPlaying"
+      :isReady="isReady"
+      :currentTime="currentTime"
+      :duration="duration"
+      :bpm="bpm"
+      :songName="songName"
+      :repeatMode="repeatMode"
+      :volume="masterVolume"
+      :playbackRate="playbackRate"
+      @prev="handlePrevSong"
+      @next="handleNextSong"
+      @toggleRepeat="toggleRepeatMode"
+    />
+
+    <!-- PlaybackControls ẩn dùng để cung cấp Modal Export audio trên mobile -->
+    <div style="display: none;">
+      <PlaybackControls 
+        ref="playbackControlsRef"
+        :isPlaying="isPlaying"
+        :isReady="isReady"
+        :currentTime="currentTime"
+        :duration="duration"
+        :bpm="bpm"
+        :songName="songName"
+        :repeatMode="repeatMode"
+        :volume="masterVolume"
+        :playbackRate="playbackRate"
+        @prev="handlePrevSong"
+        @next="handleNextSong"
+        @toggleRepeat="toggleRepeatMode"
+      />
+    </div>
+
+    <!-- Floating Toast Notification khi bấm phím tắt -->
+    <Transition name="toast-fade">
+      <div v-if="isToastVisible" class="shortcut-toast-floating">
+        {{ toastText }}
+      </div>
+    </Transition>
+  </div>
+
+  <!-- Giao diện Desktop -->
+  <div v-else class="app-container">
     <!-- Header -->
     <header class="app-header">
       <div class="logo-area">
@@ -107,6 +186,11 @@ import SheetViewer from './components/SheetViewer.vue';
 import PlaybackControls from './components/PlaybackControls.vue';
 import SongLibraryPicker from './components/SongLibraryPicker.vue';
 
+import MobileHeader from './components/mobile/MobileHeader.vue';
+import MobilePresentation from './components/mobile/MobilePresentation.vue';
+import MobileControls from './components/mobile/MobileControls.vue';
+import { useResponsive } from './composables/useResponsive';
+
 import { AudioEngine } from './services/audioEngine';
 import type { TrackInfo } from './services/midiGenerator';
 import { parseMusicXmlToMidiBytes } from './services/musicXmlParser';
@@ -114,6 +198,12 @@ import { parseMxl } from './services/mxlParser';
 import { getCachedSong, cacheSong } from './services/appCache';
 import { songLibrary } from './data/songLibrary';
 import type { SongEntry } from './data/songLibrary';
+
+const { isMobile } = useResponsive();
+
+function handleTriggerExport() {
+  playbackControlsRef.value?.openExportModal();
+}
 
 const isInitialized = ref(false);
 const isReady = ref(false);
@@ -894,5 +984,17 @@ async function loadFromLibrary(song: SongEntry) {
 .toast-fade-enter-from, .toast-fade-leave-to {
   opacity: 0;
   transform: translateY(12px) scale(0.95);
+}
+
+/* Mobile App Shell Layout (100dvh Single Screen) */
+.mobile-app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: #09090e;
+  box-sizing: border-box;
 }
 </style>

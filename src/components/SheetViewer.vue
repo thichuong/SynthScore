@@ -87,6 +87,7 @@ const props = defineProps<{
   isPlaying: boolean;
   currentTime: number;
   isReady: boolean;
+  activeTab?: 'sheet' | 'visualizer';
 }>();
 
 const overlayIcon = ref<'play' | 'pause' | null>(null);
@@ -117,7 +118,13 @@ function togglePlay() {
 const osmdContainer = ref<HTMLDivElement | null>(null);
 const visualizerCanvas = ref<HTMLCanvasElement | null>(null);
 
-const activeTab = ref<'sheet' | 'visualizer'>('visualizer');
+const activeTab = ref<'sheet' | 'visualizer'>(props.activeTab || 'visualizer');
+
+watch(() => props.activeTab, (newTab) => {
+  if (newTab) {
+    activeTab.value = newTab;
+  }
+});
 const loading = ref(false);
 let osmd: OpenSheetMusicDisplay | null = null;
 let animationFrameId: number | null = null;

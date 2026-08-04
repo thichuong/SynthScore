@@ -433,7 +433,8 @@ function closeShortcutsModal() {
 defineExpose({
   openShortcutsModal,
   closeShortcutsModal,
-  toggleShortcutsModal: () => { isShortcutsModalOpen.value = !isShortcutsModalOpen.value; }
+  toggleShortcutsModal: () => { isShortcutsModalOpen.value = !isShortcutsModalOpen.value; },
+  openExportModal
 });
 
 // Tính phần trăm tiến độ
