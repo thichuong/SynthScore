@@ -91,6 +91,10 @@ const props = defineProps<{
   hideHeader?: boolean;
 }>();
 
+const emit = defineEmits<{
+  (e: 'update:activeTab', tab: 'sheet' | 'visualizer'): void;
+}>();
+
 const overlayIcon = ref<'play' | 'pause' | null>(null);
 let overlayTimeoutId: number | null = null;
 
@@ -122,10 +126,14 @@ const visualizerCanvas = ref<HTMLCanvasElement | null>(null);
 const activeTab = ref<'sheet' | 'visualizer'>(props.activeTab || 'visualizer');
 
 watch(() => props.activeTab, (newTab) => {
-  if (newTab) {
+  if (newTab && newTab !== activeTab.value) {
     activeTab.value = newTab;
   }
 });
+
+watch(activeTab, (newTab) => {
+  emit('update:activeTab', newTab);
+}, { immediate: true });
 const loading = ref(false);
 let osmd: OpenSheetMusicDisplay | null = null;
 let animationFrameId: number | null = null;

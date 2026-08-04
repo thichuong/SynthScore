@@ -5,7 +5,8 @@
       <button 
         class="segmented-btn"
         :class="{ active: currentView === 'sheet' }"
-        @click="currentView = 'sheet'"
+        :disabled="!hasSheet"
+        @click="hasSheet && (currentView = 'sheet')"
       >
         <Music class="seg-icon" />
         <span>Bản nhạc</span>
@@ -45,6 +46,7 @@
           :currentTime="currentTime"
           :isReady="isReady"
           :activeTab="currentView === 'sheet' ? 'sheet' : 'visualizer'"
+          @update:activeTab="handleTabUpdate"
           :hideHeader="true"
         />
       </div>
@@ -65,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Music, Layers, Sliders } from 'lucide-vue-next';
 import SheetViewer from '../SheetViewer.vue';
 import OrchestraMixer from '../OrchestraMixer.vue';
@@ -88,6 +90,22 @@ defineEmits<{
 
 // Chế độ xem mặc định trên mobile là Thác nốt nhạc (visualizer)
 const currentView = ref<'sheet' | 'visualizer' | 'mixer'>('visualizer');
+
+const hasSheet = computed(() => {
+  return props.fileType === 'xml' || props.fileType === 'abc';
+});
+
+watch(hasSheet, (newHasSheet) => {
+  if (!newHasSheet && currentView.value === 'sheet') {
+    currentView.value = 'visualizer';
+  }
+});
+
+function handleTabUpdate(tab: 'sheet' | 'visualizer') {
+  if (currentView.value !== 'mixer') {
+    currentView.value = tab;
+  }
+}
 </script>
 
 <style scoped>
@@ -130,6 +148,13 @@ const currentView = ref<'sheet' | 'visualizer' | 'mixer'>('visualizer');
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.segmented-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .segmented-btn.active {
