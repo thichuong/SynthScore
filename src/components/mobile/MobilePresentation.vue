@@ -45,6 +45,7 @@
           :currentTime="currentTime"
           :isReady="isReady"
           :activeTab="currentView === 'sheet' ? 'sheet' : 'visualizer'"
+          :hideHeader="true"
         />
       </div>
 

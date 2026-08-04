@@ -1,6 +1,6 @@
 <template>
-  <div class="sheet-viewer glass-card">
-    <div class="viewer-header">
+  <div class="sheet-viewer glass-card" :class="{ 'no-header': hideHeader }">
+    <div class="viewer-header" v-if="!hideHeader">
       <div class="viewer-tabs">
         <button 
           v-if="hasSheet"
@@ -88,6 +88,7 @@ const props = defineProps<{
   currentTime: number;
   isReady: boolean;
   activeTab?: 'sheet' | 'visualizer';
+  hideHeader?: boolean;
 }>();
 
 const overlayIcon = ref<'play' | 'pause' | null>(null);
@@ -197,11 +198,13 @@ function clearVisualizer() {
 async function renderSheetMusic() {
   clearSheetMusic();
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
   if (props.fileType === 'xml' && props.rawText && osmdContainer.value) {
     const { OpenSheetMusicDisplay } = await import('opensheetmusicdisplay');
     osmd = new OpenSheetMusicDisplay(osmdContainer.value, {
       autoResize: true,
-      backend: 'canvas',
+      backend: 'svg', // Dùng SVG thay cho canvas để tránh vượt quá giới hạn kích thước canvas trên mobile
       drawTitle: true,
       drawSubtitle: true,
       drawComposer: true,
@@ -209,6 +212,14 @@ async function renderSheetMusic() {
     });
 
     await osmd.load(props.rawText);
+    
+    // Scale thu nhỏ bản nhạc trên điện thoại để vừa vặn màn hình
+    if (isMobile) {
+      osmd.Zoom = 0.65;
+    } else {
+      osmd.Zoom = 1.0;
+    }
+
     osmd.render();
   } 
   else if (props.fileType === 'abc' && props.rawText) {
@@ -216,6 +227,7 @@ async function renderSheetMusic() {
     abcjs.default.renderAbc('abc-container', props.rawText, {
       responsive: 'resize',
       add_classes: true,
+      scale: isMobile ? 0.65 : 1.0,
     });
   }
 }
@@ -299,8 +311,13 @@ function initCanvas() {
   if (!canvas) return;
 
   const rect = canvas.parentElement?.getBoundingClientRect();
-  canvas.width = (rect?.width || 800) * window.devicePixelRatio;
-  canvas.height = (rect?.height || 500) * window.devicePixelRatio;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const rawW = rect?.width && rect.width > 0 ? rect.width : 800;
+  const rawH = rect?.height && rect.height > 0 ? rect.height : 500;
+
+  // Giới hạn chiều rộng và chiều cao tối đa của Canvas buffer tránh lỗi CanvasExceedsMaxSize trên Mobile
+  canvas.width = Math.min(Math.floor(rawW * dpr), 2048);
+  canvas.height = Math.min(Math.floor(rawH * dpr), 2048);
   canvas.style.width = '100%';
   canvas.style.height = '100%';
 }
