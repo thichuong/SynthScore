@@ -1,6 +1,6 @@
 <template>
   <header class="mobile-header">
-    <!-- Hàng trên: Logo & Trạng thái Audio Engine -->
+    <!-- Hàng 1: Logo & Trạng thái Audio Engine -->
     <div class="mobile-header-top">
       <div class="mobile-logo-area">
         <img src="../../assets/logo.svg" alt="SynthScore" class="mobile-logo-icon" />
@@ -24,25 +24,8 @@
       </div>
     </div>
 
-    <!-- Hàng dưới: Thư viện nhạc, Upload & Nút xuất file -->
-    <div class="mobile-header-actions">
-      <div class="picker-wrapper">
-        <SongLibraryPicker 
-          :songs="songs"
-          :filteredSongs="filteredSongs"
-          :playingIndex="playingIndex"
-          :isLoading="isLoading"
-          :disabled="disabled"
-          v-model:searchQuery="searchQuery"
-          v-model:activeFilter="activeFilter"
-          @select="$emit('selectSong', $event)"
-          @toggle-favorite="$emit('toggleFavorite', $event)"
-        />
-      </div>
-
-      <FileUploader @musicLoaded="$emit('musicLoaded', $event)" />
-
-      <!-- Nút Xuất file nhanh -->
+    <!-- Hàng 2: Các nút thao tác (Xuất file & Tải lên) -->
+    <div class="mobile-header-tools">
       <button 
         class="mobile-export-btn"
         @click="$emit('triggerExport')"
@@ -52,6 +35,25 @@
         <Download class="export-icon" />
         <span class="export-label">Xuất file</span>
       </button>
+
+      <div class="uploader-wrapper">
+        <FileUploader @musicLoaded="$emit('musicLoaded', $event)" />
+      </div>
+    </div>
+
+    <!-- Hàng 3 (Ở DƯỚI): Chọn bản nhạc -->
+    <div class="mobile-header-picker">
+      <SongLibraryPicker 
+        :songs="songs"
+        :filteredSongs="filteredSongs"
+        :playingIndex="playingIndex"
+        :isLoading="isLoading"
+        :disabled="disabled"
+        v-model:searchQuery="searchQuery"
+        v-model:activeFilter="activeFilter"
+        @select="$emit('selectSong', $event)"
+        @toggle-favorite="$emit('toggleFavorite', $event)"
+      />
     </div>
   </header>
 </template>
@@ -108,7 +110,7 @@ const activeFilter = computed({
   flex-direction: column;
   gap: 8px;
   padding: 8px 12px;
-  background: rgba(18, 18, 26, 0.85);
+  background: rgba(18, 18, 26, 0.9);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
@@ -188,30 +190,31 @@ const activeFilter = computed({
   height: 12px;
 }
 
-.mobile-header-actions {
+/* Hàng 2: Các nút Xuất file và Tải lên nằm ở trên */
+.mobile-header-tools {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
 }
 
-.picker-wrapper {
-  flex: 1;
-  min-width: 0;
+.uploader-wrapper {
+  display: flex;
+  align-items: center;
 }
 
 .mobile-export-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 12px;
+  padding: 6px 14px;
   height: 36px;
   border-radius: 10px;
   background: linear-gradient(135deg, rgba(0, 240, 255, 0.2) 0%, rgba(112, 0, 255, 0.2) 100%);
   border: 1px solid rgba(0, 240, 255, 0.4);
   color: #ffffff;
   font-family: inherit;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -234,6 +237,20 @@ const activeFilter = computed({
   width: 14px;
   height: 14px;
   color: #00f0ff;
+}
+
+/* Hàng 3: Ô chọn bản nhạc nằm ở DƯỚI */
+.mobile-header-picker {
+  width: 100%;
+}
+
+.mobile-header-picker :deep(.song-picker) {
+  width: 100%;
+}
+
+.mobile-header-picker :deep(.picker-trigger) {
+  width: 100%;
+  justify-content: space-between;
 }
 
 @keyframes spin {
