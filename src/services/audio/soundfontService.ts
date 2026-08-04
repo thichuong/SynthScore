@@ -3,13 +3,14 @@ import { getCachedSoundfont, cacheSoundfont } from '../appCache';
 import { type TrackInfo } from '../midiGenerator';
 
 export interface SoundfontProgress {
-  sf3Name: string;
-  loaded: number;
-  total: number;
-  percent: number;
-  speed: number;       // bytes/second
-  etaSeconds: number;  // thời gian còn lại ước tính (giây)
-  isFallback: boolean;
+  sf3Name: string;          // Tên file hiện tại hoặc tiêu đề tổng
+  activeCount: number;      // Số tệp đang nạp trong đợt
+  loaded: number;           // Tổng bytes đã tải của cả đợt
+  total: number;            // Tổng dung lượng dự kiến của cả đợt
+  percent: number;          // Phần trăm % tổng thể (0 đến 100)
+  speed: number;            // Tốc độ tải tổng thể (bytes/second)
+  etaSeconds: number;       // Thời gian còn lại ước tính tổng thể (giây)
+  isFallback: boolean;      // Có tệp nào dùng fallback GitHub Pages URL không
 }
 
 /**
@@ -24,6 +25,12 @@ export class SoundfontService {
 
   private soundbankAddQueue: Promise<void> = Promise.resolve();
   private progressListeners: Set<(progress: SoundfontProgress | null) => void> = new Set();
+
+  // Bộ quản lý tiến độ đợt tổng thể (Batch Progress Management)
+  private activeDownloads: Map<string, { loaded: number; total: number; isFallback: boolean }> = new Map();
+  private completedBatchLoaded: number = 0;
+  private completedBatchTotal: number = 0;
+  private batchStartTime: number = 0;
 
   public onProgress(listener: (progress: SoundfontProgress | null) => void): () => void {
     this.progressListeners.add(listener);
@@ -40,6 +47,71 @@ export class SoundfontService {
     }
   }
 
+  private registerDownloadStart(sf3Name: string, estimatedTotal: number, isFallback: boolean): void {
+    if (this.activeDownloads.size === 0) {
+      this.completedBatchLoaded = 0;
+      this.completedBatchTotal = 0;
+      this.batchStartTime = performance.now();
+    }
+    this.activeDownloads.set(sf3Name, { loaded: 0, total: estimatedTotal, isFallback });
+    this.updateBatchProgress(sf3Name);
+  }
+
+  private registerDownloadProgress(sf3Name: string, loaded: number, total: number, isFallback: boolean): void {
+    this.activeDownloads.set(sf3Name, { loaded, total: total || loaded, isFallback });
+    this.updateBatchProgress(sf3Name);
+  }
+
+  private registerDownloadEnd(sf3Name: string): void {
+    const item = this.activeDownloads.get(sf3Name);
+    if (item) {
+      this.completedBatchLoaded += item.loaded;
+      this.completedBatchTotal += item.total;
+    }
+    this.activeDownloads.delete(sf3Name);
+    if (this.activeDownloads.size === 0) {
+      this.notifyProgress(null);
+    } else {
+      const remainingFirst = this.activeDownloads.keys().next().value || sf3Name;
+      this.updateBatchProgress(remainingFirst);
+    }
+  }
+
+  private updateBatchProgress(currentSf3Name: string): void {
+    let activeLoadedSum = 0;
+    let activeTotalSum = 0;
+    let hasFallback = false;
+
+    for (const item of this.activeDownloads.values()) {
+      activeLoadedSum += item.loaded;
+      activeTotalSum += item.total;
+      if (item.isFallback) hasFallback = true;
+    }
+
+    const grandLoaded = this.completedBatchLoaded + activeLoadedSum;
+    const grandTotal = this.completedBatchTotal + activeTotalSum;
+
+    const elapsedTime = (performance.now() - (this.batchStartTime || performance.now())) / 1000;
+    const speed = elapsedTime > 0 ? grandLoaded / elapsedTime : 0;
+    const remainingBytes = grandTotal > grandLoaded ? grandTotal - grandLoaded : 0;
+    const etaSeconds = speed > 0 ? Math.round(remainingBytes / speed) : 0;
+    const percent = grandTotal > 0 ? Math.min(99, Math.round((grandLoaded / grandTotal) * 100)) : 0;
+
+    const count = this.activeDownloads.size;
+    const title = count > 1 ? `Đang tải ${count} bộ âm thanh...` : currentSf3Name;
+
+    this.notifyProgress({
+      sf3Name: title,
+      activeCount: count,
+      loaded: grandLoaded,
+      total: grandTotal,
+      percent,
+      speed,
+      etaSeconds,
+      isFallback: hasFallback
+    });
+  }
+
   // Helper fetch với timeout để tránh treo vĩnh viễn khi mạng gián đoạn
   private async fetchWithTimeout(url: string, timeoutMs: number = 15000): Promise<Response> {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -53,7 +125,7 @@ export class SoundfontService {
     }
   }
 
-  // Đọc dữ liệu từ URL kèm đo đếm tiến độ, tốc độ và ETA
+  // Đọc dữ liệu từ URL kèm đo đếm tiến độ, tốc độ và ETA gộp toàn đợt
   private async fetchAndReadWithProgress(
     sf3Name: string,
     url: string,
@@ -74,19 +146,9 @@ export class SoundfontService {
     const contentLengthHeader = res.headers.get('content-length');
     const total = contentLengthHeader ? parseInt(contentLengthHeader, 10) || 0 : 0;
     let loaded = 0;
-    const startTime = performance.now();
     let buffer: ArrayBuffer | null = null;
 
-    // Cập nhật trạng thái tải bắt đầu
-    this.notifyProgress({
-      sf3Name,
-      loaded: 0,
-      total,
-      percent: 0,
-      speed: 0,
-      etaSeconds: 0,
-      isFallback
-    });
+    this.registerDownloadStart(sf3Name, total, isFallback);
 
     try {
       if (res.body && typeof res.body.getReader === 'function') {
@@ -99,22 +161,7 @@ export class SoundfontService {
           if (value) {
             chunks.push(value);
             loaded += value.byteLength;
-
-            const elapsedTime = (performance.now() - startTime) / 1000;
-            const speed = elapsedTime > 0 ? loaded / elapsedTime : 0;
-            const remainingBytes = total > loaded ? total - loaded : 0;
-            const etaSeconds = speed > 0 ? Math.round(remainingBytes / speed) : 0;
-            const percent = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
-
-            this.notifyProgress({
-              sf3Name,
-              loaded,
-              total,
-              percent,
-              speed,
-              etaSeconds,
-              isFallback
-            });
+            this.registerDownloadProgress(sf3Name, loaded, total, isFallback);
           }
         }
 
@@ -129,22 +176,12 @@ export class SoundfontService {
         // Fallback khi môi trường không có res.body.getReader (ví dụ trong Vitest unit test)
         const tempBuffer = await res.arrayBuffer();
         loaded = tempBuffer.byteLength;
-        const elapsedTime = (performance.now() - startTime) / 1000;
-        const speed = elapsedTime > 0 ? loaded / elapsedTime : 0;
-
-        this.notifyProgress({
-          sf3Name,
-          loaded,
-          total: total || loaded,
-          percent: 100,
-          speed,
-          etaSeconds: 0,
-          isFallback
-        });
+        this.registerDownloadProgress(sf3Name, loaded, total || loaded, isFallback);
         buffer = tempBuffer;
       }
     } catch (err) {
       console.warn(`[SoundfontService] Lỗi khi tải dữ liệu stream từ ${url}:`, err);
+      this.registerDownloadEnd(sf3Name);
       return { buffer: null, isValid: false };
     }
 
@@ -156,6 +193,7 @@ export class SoundfontService {
       }
     }
 
+    this.registerDownloadEnd(sf3Name);
     return { buffer, isValid };
   }
 
@@ -239,7 +277,6 @@ export class SoundfontService {
         console.error('[SoundfontService] Lỗi khi tiền tải soundfont:', e);
         throw e;
       } finally {
-        this.notifyProgress(null);
         this.preloadingPromises.delete(url);
       }
     })();
@@ -345,7 +382,6 @@ export class SoundfontService {
         console.error(`Không thể nạp bộ âm thanh Soundfont ${sf3Name} cho nhạc cụ #${programNumber}:`, err);
         throw err;
       } finally {
-        this.notifyProgress(null);
         this.loadingInstrumentPromises.delete(sf3Name);
       }
     })();

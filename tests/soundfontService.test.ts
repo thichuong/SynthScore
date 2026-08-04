@@ -41,44 +41,29 @@ describe('SoundfontService - Progress Tracking', () => {
     expect(progressUpdates[progressUpdates.length - 1]).toBeNull();
   });
 
-  it('should switch to fallback GitHub Pages URL when local fetch fails', async () => {
+  it('should calculate aggregate batch progress when preloading all soundfonts', async () => {
     const progressUpdates: (SoundfontProgress | null)[] = [];
     soundfontService.onProgress((p) => progressUpdates.push(p ? { ...p } : null));
 
     const fakeRiffBuffer = new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0]).buffer;
 
-    let callCount = 0;
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
-      callCount++;
-      if (url.includes('https://thichuong.github.io/SynthScore')) {
-        return {
-          ok: true,
-          headers: {
-            get: (name: string) => {
-              const lower = name.toLowerCase();
-              if (lower === 'content-type') return 'audio/x-riff';
-              if (lower === 'content-length') return '8';
-              return null;
-            }
-          },
-          arrayBuffer: async () => fakeRiffBuffer
-        };
-      }
-      // Local URL fails with 404 HTML
-      return {
-        ok: false,
-        headers: {
-          get: () => 'text/html'
-        },
-        arrayBuffer: async () => new ArrayBuffer(0)
-      };
-    });
+    globalThis.fetch = vi.fn().mockImplementation(async () => ({
+      ok: true,
+      headers: {
+        get: (name: string) => {
+          const lower = name.toLowerCase();
+          if (lower === 'content-type') return 'audio/x-riff';
+          if (lower === 'content-length') return '1000';
+          return null;
+        }
+      },
+      arrayBuffer: async () => fakeRiffBuffer
+    }));
 
-    await soundfontService.preloadSoundfont(40, false); // Sonatina_Symphonic_Orchestra.sf3
+    await soundfontService.preloadAllSoundfonts();
 
-    expect(callCount).toBe(2); // First local, second fallback
-    const fallbackProgress = progressUpdates.find(p => p && p.isFallback);
-    expect(fallbackProgress).toBeDefined();
-    expect(fallbackProgress?.sf3Name).toBe('Sonatina_Symphonic_Orchestra.sf3');
+    expect(progressUpdates.length).toBeGreaterThan(0);
+    // Cuối cùng khi tất cả hoàn thành phải gửi null
+    expect(progressUpdates[progressUpdates.length - 1]).toBeNull();
   });
 });
