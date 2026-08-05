@@ -78,6 +78,7 @@ import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue';
 import type { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
 import { Midi } from '@tonejs/midi';
 import { Music, Layers, Play, Pause } from 'lucide-vue-next';
+import { isMobileDevice } from '../composables/useResponsive';
 import { AudioEngine } from '../services/audioEngine';
 
 const props = defineProps<{
@@ -206,7 +207,7 @@ function clearVisualizer() {
 async function renderSheetMusic() {
   clearSheetMusic();
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+  const isMobile = isMobileDevice();
 
   if (props.fileType === 'xml' && props.rawText && osmdContainer.value) {
     const { OpenSheetMusicDisplay } = await import('opensheetmusicdisplay');
