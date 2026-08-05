@@ -294,15 +294,29 @@ const activeFilter = computed({
 /* Hàng 3: Ô chọn bản nhạc nằm ở DƯỚI */
 .mobile-header-picker {
   width: 100%;
+  position: relative;
 }
 
 .mobile-header-picker :deep(.song-picker) {
   width: 100%;
+  position: relative;
 }
 
 .mobile-header-picker :deep(.picker-trigger) {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.mobile-header-picker :deep(.dropdown-panel) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
 }
 
 @keyframes spin {

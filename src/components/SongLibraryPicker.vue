@@ -264,8 +264,9 @@ watch(() => props.playingIndex, () => {
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  min-width: 340px;
+  min-width: 280px;
   max-width: 440px;
+  box-sizing: border-box;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -302,6 +303,7 @@ watch(() => props.playingIndex, () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .trigger-song-name {
@@ -330,8 +332,6 @@ watch(() => props.playingIndex, () => {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  right: 0;
-  min-width: 400px;
   max-height: 420px;
   background: rgba(16, 16, 22, 0.97);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -342,6 +342,34 @@ watch(() => props.playingIndex, () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Desktop mode: mở rộng bằng cả nút tìm kiếm bài hát + nút Tải tệp lên */
+@media (min-width: 641px) {
+  .picker-trigger {
+    min-width: 340px;
+    max-width: 440px;
+  }
+
+  .dropdown-panel {
+    min-width: 520px;
+    width: calc(100% + 170px);
+  }
+}
+
+/* Mobile mode */
+@media (max-width: 640px) {
+  .picker-trigger {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .dropdown-panel {
+    min-width: 0;
+    width: 100%;
+    right: 0;
+  }
 }
 
 /* Dropdown transition */
@@ -592,25 +620,33 @@ watch(() => props.playingIndex, () => {
 /* === Tag Filters === */
 .tag-filters {
   display: flex;
-  gap: 8px;
-  padding: 8px 14px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
   background: rgba(255, 255, 255, 0.02);
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .filter-tab {
+  flex: 1 1 0;
+  min-width: max-content;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
-  border: none;
+  border: 1px solid transparent;
   color: #8c8c9e;
   font-size: 0.65rem;
   font-weight: 700;
-  padding: 4px 10px;
+  padding: 5px 6px;
   border-radius: 6px;
   cursor: pointer;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
   transition: all 0.2s ease;
-  border: 1px solid transparent;
   text-transform: uppercase;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .filter-tab:hover {
