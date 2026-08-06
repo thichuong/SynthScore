@@ -101,23 +101,28 @@ pub fn encode_dsd_dsf_wasm(
     let _ = buf.write_u64::<LittleEndian>(data_chunk_size);
 
     // 4. Modulate PCM to DSD using 1st order Delta-Sigma Noise Shaping
-    let channels_data = vec![samples_l, samples_r];
-    let mut integrators = vec![0.0f32; num_channels as usize];
-    let mut outputs = vec![0.0f32; num_channels as usize];
+    let channels_data = [samples_l, samples_r];
+    let mut integrators = [0.0f32; 2];
+    let mut outputs = [0.0f32; 2];
+
+    let inv_factor = 1.0f32 / (factor as f32);
+    let mut block_buffer = vec![0u8; block_size];
 
     for b in 0..num_blocks {
         for c in 0..num_channels as usize {
             let channel_pcm = channels_data[c];
-            let mut block_buffer = vec![0u8; block_size];
+            block_buffer.fill(0);
+            let max_idx = channel_pcm.len().saturating_sub(1);
+            let mut integ = integrators[c];
+            let mut out_val = outputs[c];
 
             for bit_idx in 0..block_bits {
                 let dsd_sample_idx = b * block_bits + bit_idx;
                 let mut x = 0.0f32;
 
                 if dsd_sample_idx < total_dsd_samples && !channel_pcm.is_empty() {
-                    let pcm_idx_float = dsd_sample_idx as f32 / factor as f32;
-                    let max_idx = channel_pcm.len().saturating_sub(1);
-                    let idx_lower = (pcm_idx_float.floor() as usize).min(max_idx);
+                    let pcm_idx_float = (dsd_sample_idx as f32) * inv_factor;
+                    let idx_lower = (pcm_idx_float as usize).min(max_idx);
                     let idx_upper = (idx_lower + 1).min(max_idx);
                     let frac = pcm_idx_float - (idx_lower as f32);
 
@@ -126,22 +131,19 @@ pub fn encode_dsd_dsf_wasm(
                     x = pcm_val_lower + frac * (pcm_val_upper - pcm_val_lower);
                 }
 
-                integrators[c] += x - outputs[c];
-                let bit_value = if integrators[c] >= 0.0 {
-                    outputs[c] = 1.0;
-                    1u8
+                integ += x - out_val;
+                if integ >= 0.0 {
+                    out_val = 1.0;
+                    let byte_offset = bit_idx >> 3;
+                    let bit_offset = bit_idx & 7;
+                    block_buffer[byte_offset] |= 1 << bit_offset;
                 } else {
-                    outputs[c] = -1.0;
-                    0u8
-                };
-
-                let byte_offset_in_block = bit_idx / 8;
-                let bit_offset_in_byte = bit_idx % 8;
-                if bit_value == 1 {
-                    block_buffer[byte_offset_in_block] |= 1 << bit_offset_in_byte;
+                    out_val = -1.0;
                 }
             }
 
+            integrators[c] = integ;
+            outputs[c] = out_val;
             buf.extend_from_slice(&block_buffer);
         }
     }

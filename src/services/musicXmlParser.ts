@@ -1,4 +1,5 @@
 import { Midi } from '@tonejs/midi';
+import { getWasmModule, isWasmAvailable } from './wasmLoader';
 
 export interface DetailedNote {
   pitch: string;
@@ -30,6 +31,19 @@ export function getNoteName(step: string, alter: number, octave: number): string
  * Hỗ trợ các khái niệm chính: pitch, alter, octave, duration, chord, rest, backup, forward, tempo, voice, ties.
  */
 export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
+  if (isWasmAvailable()) {
+    try {
+      const wasm = getWasmModule() as any;
+      if (wasm && typeof wasm.parse_musicxml_to_midi_wasm === 'function') {
+        const wasmResult = wasm.parse_musicxml_to_midi_wasm(xmlText);
+        if (wasmResult && wasmResult.length > 0) {
+          return wasmResult;
+        }
+      }
+    } catch (e) {
+      console.warn('[MusicXML] Lỗi khi dùng WASM XML parser, chuyển sang JS fallback:', e);
+    }
+  }
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
   
