@@ -1,4 +1,4 @@
-# Simple workflow for deploying static content to Pages and Cloudflare
+# Simple workflow for deploying static content to Pages
 name: Deploy static content to Pages
 
 on:
@@ -22,8 +22,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Job 1: Build source code và đóng gói artifact
-  build:
+  # Single job for building and deploying to GitHub Pages
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -60,27 +63,6 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-dist
-          path: ./dist
-          retention-days: 1
-
-  # Job 2: Deploy lên GitHub Pages
-  deploy-github-pages:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: build-dist
-          path: ./dist
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
