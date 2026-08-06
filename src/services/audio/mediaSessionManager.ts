@@ -20,7 +20,7 @@ export class MediaSessionManager {
           artist: currentComposer || 'SynthScore',
           album: 'SynthScore Web Player',
           artwork: [
-            { src: new URL('/favicon.svg', window.location.href).href, sizes: 'any', type: 'image/svg+xml' }
+            { src: new URL('./favicon.svg', window.location.href).href, sizes: 'any', type: 'image/svg+xml' }
           ]
         });
       } catch (e) {
