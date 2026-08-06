@@ -3,6 +3,7 @@ import {
   generateSymphonyMidi,
   generateConcertoMidi
 } from './midiGenerator';
+import { getWasmModule } from './wasmLoader';
 
 // Định nghĩa interface cho worker messages
 interface WorkerMessage {
@@ -12,20 +13,31 @@ interface WorkerMessage {
 }
 
 // Bắt sự kiện từ main thread
-self.onmessage = (event: MessageEvent<WorkerMessage>) => {
+self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
   const { id, type, payload } = event.data;
 
   try {
+    const wasm = await getWasmModule();
+
     if (type === 'parseTracks') {
       const arrayBuffer = payload as ArrayBuffer;
-      const tracks = parseMidiTracks(arrayBuffer);
+      let tracks;
+      if (wasm) {
+        tracks = wasm.parse_midi_tracks_wasm(new Uint8Array(arrayBuffer));
+      } else {
+        tracks = parseMidiTracks(arrayBuffer);
+      }
       self.postMessage({ id, success: true, payload: tracks });
     } 
     else if (type === 'generateSymphony') {
       const originalMidiBytes = payload as Uint8Array;
-      const resultBytes = generateSymphonyMidi(originalMidiBytes);
+      let resultBytes: Uint8Array;
+      if (wasm) {
+        resultBytes = wasm.generate_symphony_midi_wasm(originalMidiBytes);
+      } else {
+        resultBytes = generateSymphonyMidi(originalMidiBytes);
+      }
       
-      // Sử dụng Transferable objects cho ArrayBuffer bên trong kết quả trả về
       const transferBuffer = resultBytes.buffer;
       self.postMessage(
         { id, success: true, payload: resultBytes },
@@ -34,7 +46,12 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     } 
     else if (type === 'generateConcerto') {
       const originalMidiBytes = payload as Uint8Array;
-      const resultBytes = generateConcertoMidi(originalMidiBytes);
+      let resultBytes: Uint8Array;
+      if (wasm) {
+        resultBytes = wasm.generate_concerto_midi_wasm(originalMidiBytes);
+      } else {
+        resultBytes = generateConcertoMidi(originalMidiBytes);
+      }
       
       const transferBuffer = resultBytes.buffer;
       self.postMessage(

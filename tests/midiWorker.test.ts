@@ -32,7 +32,7 @@ describe('midiWorker', () => {
     track.addNote({ midi: 60, time: 0, duration: 1 });
     const buffer = midi.toArray().buffer;
 
-    onmessage({
+    await onmessage({
       data: {
         id: 'id-1',
         type: 'parseTracks',
@@ -58,7 +58,7 @@ describe('midiWorker', () => {
     track.addNote({ midi: 64, time: 0, duration: 0.5 });
     const bytes = new Uint8Array(midi.toArray());
 
-    onmessage({
+    await onmessage({
       data: {
         id: 'id-2',
         type: 'generateSymphony',
@@ -81,7 +81,7 @@ describe('midiWorker', () => {
     const onmessage = (globalThis.self as any).onmessage;
 
     // Send generateSymphony with null to force a crash inside the worker
-    onmessage({
+    await onmessage({
       data: {
         id: 'id-3',
         type: 'generateSymphony',

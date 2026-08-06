@@ -7,12 +7,12 @@ import MobileControls from '../src/components/mobile/MobileControls.vue';
 
 describe('Mobile Web UI Architecture & Responsiveness', () => {
   it('should toggle isMobile state based on window.innerWidth', () => {
-    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 480 });
+    Object.defineProperty(navigator, 'userAgent', { writable: true, configurable: true, value: 'iPhone' });
     const { isMobile, checkMobile } = useResponsive();
     checkMobile();
     expect(isMobile.value).toBe(true);
 
-    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1200 });
+    Object.defineProperty(navigator, 'userAgent', { writable: true, configurable: true, value: 'Mozilla/5.0 Desktop' });
     checkMobile();
     expect(isMobile.value).toBe(false);
   });

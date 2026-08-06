@@ -29,5 +29,10 @@ public/presets/instruments/
 
 
 # Ignore test debug output
-/test.debug
 .test-cache/
+/test.debug
+
+# Rust / WebAssembly build artifacts
+target/
+crates/**/target/
+Cargo.lock

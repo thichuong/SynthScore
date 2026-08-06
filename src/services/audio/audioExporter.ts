@@ -1,5 +1,6 @@
 import { WorkletSynthesizer, audioBufferToWav } from 'spessasynth_lib';
 import { BasicMIDI } from 'spessasynth_core';
+import { getWasmModule } from '../wasmLoader';
 
 /**
  * Thực hiện xuất bản nhạc (WAV, MP3, FLAC, ALAC, DSD) offline
@@ -94,15 +95,31 @@ export class AudioExporter {
     let blob: Blob;
     let extension: string = format;
 
-    if (format === 'wav') {
-      blob = audioBufferToWav(audioBuffer);
+    const wasm = await getWasmModule();
+
+    if (format === 'wav' || format === 'flac' || format === 'alac') {
+      if (wasm) {
+        const samplesL = audioBuffer.getChannelData(0);
+        const samplesR = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : new Float32Array(0);
+        const wavBytes = wasm.encode_wav_wasm(samplesL, samplesR, audioBuffer.sampleRate, 16);
+        blob = new Blob([wavBytes.buffer as ArrayBuffer], { type: 'audio/wav' });
+      } else {
+        blob = audioBufferToWav(audioBuffer);
+      }
+      if (format === 'flac' || format === 'alac') {
+        extension = format;
+      }
     } else if (format === 'mp3') {
       blob = await this.encodeMp3(audioBuffer, options?.mp3Bitrate || 192);
-    } else if (format === 'flac' || format === 'alac') {
-      // Xuất file WAV với định dạng mở rộng mong muốn để tương thích tốt nhất trên trình duyệt.
-      blob = audioBufferToWav(audioBuffer);
     } else if (format === 'dsd') {
-      blob = this.encodeDsd(audioBuffer);
+      if (wasm) {
+        const samplesL = audioBuffer.getChannelData(0);
+        const samplesR = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : new Float32Array(0);
+        const dsfBytes = wasm.encode_dsd_dsf_wasm(samplesL, samplesR, audioBuffer.sampleRate, 64);
+        blob = new Blob([dsfBytes.buffer as ArrayBuffer], { type: 'audio/x-dsf' });
+      } else {
+        blob = this.encodeDsd(audioBuffer);
+      }
       extension = 'dsf';
     } else {
       throw new Error(`Định dạng không hỗ trợ: ${format}`);

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build:wasm": "cargo build --target wasm32-unknown-unknown --release --manifest-path crates/synthscore-wasm/Cargo.toml && wasm-bindgen crates/synthscore-wasm/target/wasm32-unknown-unknown/release/synthscore_wasm.wasm --out-dir src/wasm --target web",
+    "build": "npm run build:wasm && vue-tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run"
   },

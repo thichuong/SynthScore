@@ -45,8 +45,9 @@ SynthScore là một ứng dụng web hiện đại được xây dựng trên *
 ## 🛠️ Công nghệ sử dụng
 
 *   **Framework chính:** Vue 3 (Composition API với `<script setup>`)
-*   **Ngôn ngữ:** TypeScript
-*   **Công cụ build:** Vite
+*   **Ngôn ngữ:** TypeScript & Rust (WebAssembly)
+*   **Backend & DSP Engine:** Rust WebAssembly Module (`crates/synthscore-wasm`) giúp tăng tốc độ phân tích MusicXML, khởi tạo phối khí MIDI và mã hóa file âm thanh WAV / DSD (DSF format).
+*   **Công cụ build:** Vite & `wasm-bindgen`
 *   **Thư viện âm thanh & nhạc:**
     *   `spessasynth_lib` - Bộ tổng hợp và tuần tự hóa MIDI SoundFont (SoundFont MIDI Synthesizer & Sequencer).
     *   `opensheetmusicdisplay` - Trình kết xuất MusicXML.
@@ -61,6 +62,7 @@ SynthScore là một ứng dụng web hiện đại được xây dựng trên *
 
 ### Yêu cầu hệ thống
 *   Node.js (phiên bản 18.x trở lên được khuyến nghị)
+*   Rust Toolchain (`rustc`, `cargo` với target `wasm32-unknown-unknown`) & `wasm-bindgen-cli` (phiên bản 0.2.126)
 *   npm hoặc yarn / pnpm
 
 ### Các bước cài đặt
@@ -76,18 +78,23 @@ SynthScore là một ứng dụng web hiện đại được xây dựng trên *
     npm install
     ```
 
-3.  **Khởi động máy chủ phát triển (Development Server):**
+3.  **Biên dịch Rust WASM (Tùy chọn khi chỉnh sửa code Rust):**
+    ```bash
+    npm run build:wasm
+    ```
+
+4.  **Khởi động máy chủ phát triển (Development Server):**
     ```bash
     npm run dev
     ```
     Ứng dụng sẽ chạy tại địa chỉ mặc định `http://localhost:5173/`.
 
-4.  **Biên dịch để triển khai (Build production):**
+5.  **Biên dịch để triển khai (Build production):**
     ```bash
     npm run build
     ```
 
-5.  **Chạy bộ kiểm thử tự động (Run tests):**
+6.  **Chạy bộ kiểm thử tự động (Run tests):**
     ```bash
     npm run test
     ```
@@ -99,10 +106,11 @@ SynthScore là một ứng dụng web hiện đại được xây dựng trên *
 SynthScore tích hợp sẵn hệ thống kiểm thử tự động toàn diện được cấu hình bằng **Vitest** và **JSDOM** để kiểm tra tính ổn định của các dịch vụ âm thanh và bộ dịch nhạc thô:
 
 ### 1. Các thành phần được kiểm thử
+*   **Rust WASM Engine (`wasmEngine.test.ts`)**: Kiểm tra nạp module WASM, phân tích track nhị phân, sinh phối khí Giao hưởng/Concerto và xuất file mã hóa WAV / DSD (DSF).
 *   **MXL Parser (`mxlParser.ts`)**: Xác thực giải nén file nén `.mxl` sang MusicXML chuỗi thô.
 *   **MusicXML Parser (`musicXmlParser.ts`)**: Kiểm tra thuật toán biên dịch MusicXML sang tệp MIDI nhị phân.
 *   **MIDI Generator (`midiGenerator.ts`)**: Thử nghiệm thuật toán phân tách track nhạc cụ và sinh phối khí Giao hưởng (11 bè) / Concerto (9 bè).
-*   **MIDI Web Worker (`midiWorker.ts`)**: Giả lập thông điệp giữa luồng chính và luồng phụ.
+*   **MIDI Web Worker (`midiWorker.ts`)**: Giả lập thông điệp giữa luồng chính và luồng phụ (tích hợp Rust WASM).
 *   **Audio Engine (`audioEngine.ts`)**: Giả lập Web Audio API và `spessasynth_lib` để kiểm thử nạp Soundfont tự động theo mã General MIDI, các nút điều khiển âm lượng, tắt tiếng, hát đơn (solo) và phát thử nốt nhạc (`playTestNote`).
 
 ### 2. Đối chiếu sâu từng nốt nhạc (Reverse Note Audit)
@@ -116,6 +124,14 @@ SynthScore tích hợp sẵn hệ thống kiểm thử tự động toàn diện
 
 ```text
 SynthScore/
+├── crates/
+│   └── synthscore-wasm/        # Crate Rust WASM backend (midi, xml parser, dsp exporter)
+│       ├── Cargo.toml
+│       └── src/
+│           ├── lib.rs
+│           ├── midi_processor.rs
+│           ├── xml_parser.rs
+│           └── audio_dsp.rs
 ├── public/                     # Tài nguyên tĩnh
 │   ├── spessasynth_processor.min.js # File xử lý AudioWorklet của SpessaSynth
 │   ├── manifest.json           # Cấu hình PWA Web Manifest
@@ -133,9 +149,12 @@ SynthScore/
 │   │   └── songLibrary.ts      # Thư viện danh sách bài hát mẫu (.mxl)
 │   ├── services/               # Các dịch vụ xử lý logic nền
 │   │   ├── audioEngine.ts      # Lớp Singleton quản lý synthesizer, sequencer và âm thanh
+│   │   ├── wasmLoader.ts       # Dịch vụ nạp & quản lý đệm module Rust WASM
+│   │   ├── midiWorker.ts       # Web Worker offload xử lý MIDI bằng Rust WASM
 │   │   ├── musicXmlParser.ts   # Chuyển đổi tệp tin xml thô sang dữ liệu nhị phân MIDI
 │   │   ├── mxlParser.ts        # Giải nén tệp tin mxl để lấy xml thô
 │   │   └── appCache.ts         # Quản lý lưu trữ đệm bài hát và SoundFonts ngoại tuyến (IndexedDB)
+│   ├── wasm/                   # File WASM và JS binding do wasm-bindgen sinh ra
 │   ├── App.vue                 # Giao diện chính ráp nối các bộ phận (Dashboard)
 │   ├── main.ts                 # Điểm khởi tạo ứng dụng Vue
 │   └── style.css               # Định nghĩa các biến CSS màu sắc, giao diện Glassmorphism
