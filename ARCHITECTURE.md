@@ -46,7 +46,7 @@ SynthScore/
 │   │   ├── desktop/            # Giao diện dành riêng cho Desktop (Đối xứng 3 phần)
 │   │   │   ├── DesktopControls.vue     # Footer chứa bộ điều khiển phát nhạc Desktop
 │   │   │   ├── DesktopHeader.vue       # Header chứa logo, thư viện bài hát, nạp file, status badge
-│   │   │   └── DesktopPresentation.vue # Khung trung tâm (Mixer bên trái & SheetControlsHeader/Sheet/Waterfall bên phải)
+│   │   │   └── DesktopPresentation.vue # Khung trung tâm (Mixer bên trái, toolbar & Sheet/Waterfall bên phải)
 │   │   ├── header/             # Sub-components cho header
 │   │   │   └── EngineStatusBadge.vue   # Đèn trạng thái & tiến độ tải Soundfont ngoại tuyến
 │   │   ├── library/            # Sub-components cho thư viện bài hát
@@ -61,8 +61,7 @@ SynthScore/
 │   │   │   ├── MobileHeader.vue        # Header di động
 │   │   │   └── MobilePresentation.vue  # Khung trình bày trung tâm di động
 │   │   ├── sheet/              # Hiển thị bản nhạc Sheet Music (OSMD / Abcjs)
-│   │   │   ├── SheetViewer.vue         # Trình hiển thị bản nhạc (OSMD/Abcjs)
-│   │   │   └── SheetControlsHeader.vue # Toolbar đổi tab Bản nhạc / Thác nốt & Zoom
+│   │   │   └── SheetViewer.vue         # Trình hiển thị bản nhạc (OSMD/Abcjs)
 │   │   ├── visualizer/         # Trực quan hóa âm thanh & đồ họa thác nốt
 │   │   │   └── WaterfallCanvas.vue     # Canvas render thác nốt rơi (Piano Roll)
 │   │   ├── FileUploader.vue     # Bộ tải file kéo thả (.midi, .mxl, .abc)
