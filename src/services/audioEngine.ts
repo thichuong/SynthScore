@@ -13,11 +13,11 @@ import {
 import { AudioContextManager } from './audio/audioContextManager';
 import { SoundfontService, type SoundfontProgress } from './audio/soundfontService';
 import { TrackManager } from './audio/trackManager';
-import { AudioExporter } from './audio/audioExporter';
+import { AudioExporter, type ExportOptions } from './audio/audioExporter';
 import { MediaSessionManager } from './audio/mediaSessionManager';
 import { loadUserSettings, saveUserSettings } from './appCache';
 
-export type { TrackInfo, SoundfontProgress };
+export type { TrackInfo, SoundfontProgress, ExportOptions };
 
 /**
  * WARNING / CHÚ Ý QUAN TRỌNG:
@@ -776,9 +776,31 @@ class AudioEngineService {
   // Thực hiện xuất bản nhạc (WAV, MP3, FLAC, ALAC, DSD) offline
   public async exportAudio(
     format: 'wav' | 'mp3' | 'flac' | 'alac' | 'dsd',
-    options?: { mp3Bitrate?: number; applyMixer?: boolean },
+    options?: ExportOptions,
     onStepChange?: (step: 'preparing' | 'rendering' | 'encoding' | 'done') => void
   ): Promise<{ blob: Blob; fileName: string }> {
+    // Đảm bảo tất cả bộ âm thanh Soundfont của bài hát hiện tại đã nạp đủ vào cache RAM
+    if (this.synth) {
+      await this.loadSongSoundbanks();
+    }
+
+    // Tự động hợp nhất các cài đặt không gian Reverb & Master Volume từ Engine nếu chưa truyền
+    const mergedOptions: ExportOptions = {
+      applyMixer: true,
+      enableReverb: true,
+      masterReverbGain: this.masterReverbGain,
+      reverbCharacter: this.reverbCharacter,
+      reverbTime: this.reverbTime,
+      reverbPreDelay: this.reverbPreDelay,
+      masterVolume: this.masterVolume,
+      includeTail: true,
+      tailSeconds: 3.5,
+      normalizePeak: true,
+      targetPeakDb: -0.5,
+      wavBitDepth: 24,
+      ...options
+    };
+
     return this.exporter.exportAudio(
       this.activeMidiBytes,
       this.currentSongName,
@@ -786,7 +808,7 @@ class AudioEngineService {
       this.soundfontCache,
       this.synth,
       format,
-      options,
+      mergedOptions,
       onStepChange
     );
   }

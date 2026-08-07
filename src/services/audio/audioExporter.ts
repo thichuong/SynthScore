@@ -2,6 +2,22 @@ import { WorkletSynthesizer, audioBufferToWav } from 'spessasynth_lib';
 import { BasicMIDI } from 'spessasynth_core';
 import { getWasmModule } from '../wasmLoader';
 
+export interface ExportOptions {
+  mp3Bitrate?: number;
+  applyMixer?: boolean;
+  enableReverb?: boolean;
+  masterReverbGain?: number;   // 0 to 100 (phần trăm)
+  reverbCharacter?: number;    // 0 to 7 (3 = Concert Hall)
+  reverbTime?: number;         // 0 to 127
+  reverbPreDelay?: number;     // 0 to 127
+  masterVolume?: number;       // 0 to 100
+  includeTail?: boolean;       // Thêm đuôi âm vang tự nhiên ở cuối bài (mặc định true)
+  tailSeconds?: number;        // Độ dài đuôi âm vang (giây), mặc định 3.5s
+  normalizePeak?: boolean;     // Chuẩn hóa đỉnh âm thanh Peak Normalization (mặc định true)
+  targetPeakDb?: number;       // Mức peak mục tiêu (dBFS), mặc định -0.5 dBFS
+  wavBitDepth?: 16 | 24 | 32;  // Độ sâu bit WAV (16/24/32-bit)
+}
+
 /**
  * Thực hiện xuất bản nhạc (WAV, MP3, FLAC, ALAC, DSD) offline
  * sử dụng OfflineAudioContext và các thuật toán mã hóa (MP3, DSD modulation).
@@ -18,7 +34,7 @@ export class AudioExporter {
     soundfontCache: Map<string, ArrayBuffer>,
     liveSynth: WorkletSynthesizer | null,
     format: 'wav' | 'mp3' | 'flac' | 'alac' | 'dsd',
-    options?: { mp3Bitrate?: number; applyMixer?: boolean },
+    options?: ExportOptions,
     onStepChange?: (step: 'preparing' | 'rendering' | 'encoding' | 'done') => void
   ): Promise<{ blob: Blob; fileName: string }> {
     if (!activeMidiBytes) {
@@ -31,9 +47,14 @@ export class AudioExporter {
       throw new Error('Thời lượng bài hát không hợp lệ');
     }
 
+    // Tính toán thời lượng render bao gồm cả đuôi âm vang tự nhiên (Reverb Tail)
+    const includeTail = options?.includeTail !== false;
+    const tailSeconds = includeTail ? (options?.tailSeconds ?? 3.5) : 0;
+    const totalDuration = duration + tailSeconds;
+
     const sampleRate = 44100;
     const numChannels = 2;
-    const offlineCtx = new OfflineAudioContext(numChannels, Math.ceil(sampleRate * duration), sampleRate);
+    const offlineCtx = new OfflineAudioContext(numChannels, Math.ceil(sampleRate * totalDuration), sampleRate);
 
     // Kích hoạt Module AudioWorklet cho Offline Context
     const baseUrl = import.meta.env.BASE_URL || '/';
@@ -41,6 +62,23 @@ export class AudioExporter {
     await offlineCtx.audioWorklet.addModule(`${normalizedBaseUrl}spessasynth_processor.min.js`);
 
     const offlineSynth = new WorkletSynthesizer(offlineCtx);
+
+    // Đồng bộ cài đặt Master Reverb và hiệu ứng không gian 3D
+    const enableReverb = options?.enableReverb !== false;
+    offlineSynth.setSystemParameter('effectsEnabled', enableReverb);
+
+    const reverbGain = (options?.masterReverbGain ?? 50) / 100;
+    offlineSynth.setSystemParameter('reverbGain', reverbGain);
+
+    if ((offlineSynth as any).reverbProcessor) {
+      (offlineSynth as any).reverbProcessor.character = options?.reverbCharacter ?? 3;
+      (offlineSynth as any).reverbProcessor.time = options?.reverbTime ?? 90;
+      (offlineSynth as any).reverbProcessor.preDelayTime = options?.reverbPreDelay ?? 40;
+    }
+
+    // Đồng bộ Master Volume gain
+    const masterVol = options?.masterVolume ?? 100;
+    offlineSynth.setSystemParameter('gain', (masterVol / 100) * this.VOLUME_BOOST_FACTOR);
 
     // Tạo DynamicsCompressorNode cho offline context để đồng bộ giới hạn âm lượng và ngăn vỡ tiếng
     const offlineCompressor = offlineCtx.createDynamicsCompressor();
@@ -82,12 +120,17 @@ export class AudioExporter {
     }
 
     if (onStepChange) onStepChange('rendering');
-    const audioBuffer = await offlineCtx.startRendering();
+    let audioBuffer = await offlineCtx.startRendering();
 
     try {
       offlineSynth.destroy();
     } catch (e) {
       console.warn('Không thể hủy offline synth:', e);
+    }
+
+    // Áp dụng Peak Normalization nếu được bật (mặc định target -0.5 dBFS)
+    if (options?.normalizePeak !== false) {
+      audioBuffer = this.normalizeAudioBuffer(audioBuffer, options?.targetPeakDb ?? -0.5);
     }
 
     if (onStepChange) onStepChange('encoding');
@@ -98,10 +141,11 @@ export class AudioExporter {
     const wasm = await getWasmModule();
 
     if (format === 'wav' || format === 'flac' || format === 'alac') {
+      const bitDepth = options?.wavBitDepth || 24;
       if (wasm) {
         const samplesL = audioBuffer.getChannelData(0);
         const samplesR = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : new Float32Array(0);
-        const wavBytes = wasm.encode_wav_wasm(samplesL, samplesR, audioBuffer.sampleRate, 16);
+        const wavBytes = wasm.encode_wav_wasm(samplesL, samplesR, audioBuffer.sampleRate, bitDepth);
         blob = new Blob([wavBytes.buffer as ArrayBuffer], { type: 'audio/wav' });
       } else {
         blob = audioBufferToWav(audioBuffer);
@@ -131,6 +175,39 @@ export class AudioExporter {
     const fileName = `${cleanName}.${extension}`;
 
     return { blob, fileName };
+  }
+
+  /**
+   * Chuẩn hóa đỉnh âm thanh (Peak Normalization) về mức target dBFS (mặc định -0.5 dBFS).
+   */
+  private normalizeAudioBuffer(buffer: AudioBuffer, targetPeakDb: number = -0.5): AudioBuffer {
+    const numChannels = buffer.numberOfChannels;
+    const length = buffer.length;
+    let maxPeak = 0;
+
+    for (let c = 0; c < numChannels; c++) {
+      const data = buffer.getChannelData(c);
+      for (let i = 0; i < length; i++) {
+        const abs = Math.abs(data[i]);
+        if (abs > maxPeak) {
+          maxPeak = abs;
+        }
+      }
+    }
+
+    const targetLinear = Math.pow(10, targetPeakDb / 20);
+
+    if (maxPeak > 0 && Math.abs(maxPeak - targetLinear) > 1e-4) {
+      const scale = targetLinear / maxPeak;
+      for (let c = 0; c < numChannels; c++) {
+        const data = buffer.getChannelData(c);
+        for (let i = 0; i < length; i++) {
+          data[i] *= scale;
+        }
+      }
+    }
+
+    return buffer;
   }
 
   private async encodeMp3(audioBuffer: AudioBuffer, bitrate: number = 192): Promise<Blob> {

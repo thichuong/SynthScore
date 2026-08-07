@@ -46,6 +46,16 @@
               </div>
               
               <div class="settings-grid">
+                <!-- Tùy chọn WAV Bit Depth -->
+                <div v-if="selectedFormat === 'wav'" class="setting-item">
+                  <label for="wav-bit-depth">Độ sâu bit (Bit Depth):</label>
+                  <select id="wav-bit-depth" v-model="wavBitDepth" class="settings-select">
+                    <option :value="24">24-bit PCM (Mặc định High-Res Studio)</option>
+                    <option :value="16">16-bit PCM (CD Standard)</option>
+                    <option :value="32">32-bit Float (IEEE Studio Master)</option>
+                  </select>
+                </div>
+
                 <!-- Chất lượng MP3 -->
                 <div v-if="selectedFormat === 'mp3'" class="setting-item">
                   <label for="mp3-bitrate">Tốc độ bit (Bitrate):</label>
@@ -61,7 +71,34 @@
                   <label class="checkbox-label">
                     <input type="checkbox" v-model="applyMixer" />
                     <span class="checkbox-custom"></span>
-                    <span class="label-text">Áp dụng cấu hình Mixer &amp; hiệu ứng Reverb hiện tại</span>
+                    <span class="label-text">Áp dụng thiết lập âm lượng &amp; panning của Mixer</span>
+                  </label>
+                </div>
+
+                <!-- Áp dụng Master Reverb không gian -->
+                <div class="setting-item checkbox-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" v-model="enableReverb" />
+                    <span class="checkbox-custom"></span>
+                    <span class="label-text">Bật hiệu ứng không gian Reverb 3D (Concert Hall)</span>
+                  </label>
+                </div>
+
+                <!-- Đuôi âm vang tự nhiên ở cuối bài -->
+                <div class="setting-item checkbox-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" v-model="includeTail" />
+                    <span class="checkbox-custom"></span>
+                    <span class="label-text">Giữ đuôi âm vang tự nhiên cuối bài (+3.5s)</span>
+                  </label>
+                </div>
+
+                <!-- Chuẩn hóa đỉnh âm thanh Peak Normalization -->
+                <div class="setting-item checkbox-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" v-model="normalizePeak" />
+                    <span class="checkbox-custom"></span>
+                    <span class="label-text">Chuẩn hóa đỉnh âm thanh Peak Normalization (-0.5 dBFS)</span>
                   </label>
                 </div>
               </div>
@@ -95,15 +132,15 @@
           <div class="progress-steps">
             <div class="step-item" :class="{ active: exportStep === 'preparing', completed: isStepCompleted('preparing') }">
               <span class="step-dot"></span>
-              <span class="step-text">Chuẩn bị tài nguyên âm thanh...</span>
+              <span class="step-text">Chuẩn bị tài nguyên âm thanh &amp; Soundfonts...</span>
             </div>
             <div class="step-item" :class="{ active: exportStep === 'rendering', completed: isStepCompleted('rendering') }">
               <span class="step-dot"></span>
-              <span class="step-text">Đang tổng hợp nhạc offline...</span>
+              <span class="step-text">Tổng hợp âm thanh offline với Reverb 3D...</span>
             </div>
             <div class="step-item" :class="{ active: exportStep === 'encoding', completed: isStepCompleted('encoding') }">
               <span class="step-dot"></span>
-              <span class="step-text">Nén và mã hóa định dạng {{ selectedFormat.toUpperCase() }}...</span>
+              <span class="step-text">Chuẩn hóa Peak &amp; mã hóa định dạng {{ selectedFormat.toUpperCase() }}...</span>
             </div>
             <div class="step-item" :class="{ active: exportStep === 'done', completed: isStepCompleted('done') }">
               <span class="step-dot"></span>
@@ -133,14 +170,18 @@ const emit = defineEmits<{
 const isExporting = ref(false);
 const selectedFormat = ref<'wav' | 'mp3' | 'flac' | 'alac' | 'dsd'>('mp3');
 const mp3Bitrate = ref(320);
+const wavBitDepth = ref<16 | 24 | 32>(24);
 const applyMixer = ref(true);
+const enableReverb = ref(true);
+const includeTail = ref(true);
+const normalizePeak = ref(true);
 const exportStep = ref<'preparing' | 'rendering' | 'encoding' | 'done'>('preparing');
 
 const formats = [
   { id: 'mp3', name: 'MP3', label: 'MP3 Compressed', description: 'Định dạng phổ biến, kích thước nhỏ gọn phù hợp chia sẻ' },
   { id: 'flac', name: 'FLAC', label: 'FLAC Lossless', description: 'Nén không mất dữ liệu, tương thích cao (xuất dạng PCM lossless)' },
   { id: 'alac', name: 'ALAC', label: 'Apple Lossless', description: 'Tối ưu hóa cho hệ sinh thái Apple (xuất dạng PCM lossless)' },
-  { id: 'wav', name: 'WAV', label: 'WAV Lossless PCM', description: 'Âm thanh chất lượng phòng thu, không nén (16-bit / 44.1 kHz)' },
+  { id: 'wav', name: 'WAV', label: 'WAV Lossless PCM', description: 'Âm thanh chất lượng phòng thu, không nén (16-bit / 24-bit / 32-bit Float)' },
   { id: 'dsd', name: 'DSD', label: 'DSD64 (DSF)', description: 'Chất lượng Audiophile siêu cao cấp 1-bit / 2.8224 MHz' }
 ] as const;
 
@@ -164,7 +205,14 @@ async function startExport() {
   try {
     const { blob, fileName } = await AudioEngine.exportAudio(
       selectedFormat.value,
-      { mp3Bitrate: mp3Bitrate.value, applyMixer: applyMixer.value },
+      {
+        mp3Bitrate: mp3Bitrate.value,
+        applyMixer: applyMixer.value,
+        enableReverb: enableReverb.value,
+        includeTail: includeTail.value,
+        normalizePeak: normalizePeak.value,
+        wavBitDepth: wavBitDepth.value
+      },
       (step) => {
         exportStep.value = step;
       }

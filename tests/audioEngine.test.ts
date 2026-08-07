@@ -435,6 +435,33 @@ describe('audioEngine', () => {
       expect(alacResult.blob).toBeDefined();
       expect(alacResult.fileName).toBe('Export Test Song.alac');
     });
+
+    it('should export high-quality audio with Reverb spatial, Peak Normalization, and Tail Buffer', async () => {
+      const result = await AudioEngine.exportAudio('wav', {
+        applyMixer: true,
+        enableReverb: true,
+        masterReverbGain: 60,
+        reverbCharacter: 3,
+        reverbTime: 90,
+        reverbPreDelay: 40,
+        includeTail: true,
+        tailSeconds: 3.5,
+        normalizePeak: true,
+        targetPeakDb: -0.5,
+        wavBitDepth: 24
+      });
+
+      expect(result.blob).toBeDefined();
+      expect(result.blob.type).toBe('audio/wav');
+      expect(result.fileName).toBe('Export Test Song.wav');
+    });
+
+    it('should export 32-bit Float WAV audio successfully', async () => {
+      const result = await AudioEngine.exportAudio('wav', { wavBitDepth: 32 });
+      expect(result.blob).toBeDefined();
+      expect(result.blob.type).toBe('audio/wav');
+      expect(result.fileName).toBe('Export Test Song.wav');
+    });
   });
 
   describe('Repeat Mode & Track Shortcuts', () => {

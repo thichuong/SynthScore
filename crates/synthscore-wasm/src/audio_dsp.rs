@@ -5,8 +5,14 @@ use byteorder::{LittleEndian, WriteBytesExt};
 pub fn encode_wav_wasm(samples_l: &[f32], samples_r: &[f32], sample_rate: u32, bit_depth: u16) -> Vec<u8> {
     let num_channels = if samples_r.is_empty() { 1u16 } else { 2u16 };
     let num_samples = samples_l.len();
-    let _bytes_per_sample = (bit_depth / 8) as u32;
-    let block_align = num_channels * (bit_depth / 8);
+    let format_tag = if bit_depth == 32 { 3u16 } else { 1u16 }; // 1 = PCM, 3 = IEEE Float
+    let bytes_per_sample = match bit_depth {
+        24 => 3u16,
+        32 => 4u16,
+        _ => 2u16, // Mặc định 16-bit
+    };
+    let actual_bit_depth = bytes_per_sample * 8;
+    let block_align = num_channels * bytes_per_sample;
     let byte_rate = sample_rate * block_align as u32;
     let data_size = num_samples as u32 * block_align as u32;
     let file_size = 44 + data_size;
@@ -21,12 +27,12 @@ pub fn encode_wav_wasm(samples_l: &[f32], samples_r: &[f32], sample_rate: u32, b
     // fmt chunk
     buf.extend_from_slice(b"fmt ");
     let _ = buf.write_u32::<LittleEndian>(16); // Chunk size
-    let _ = buf.write_u16::<LittleEndian>(1);  // PCM format
+    let _ = buf.write_u16::<LittleEndian>(format_tag);  // PCM hoặc IEEE Float
     let _ = buf.write_u16::<LittleEndian>(num_channels);
     let _ = buf.write_u32::<LittleEndian>(sample_rate);
     let _ = buf.write_u32::<LittleEndian>(byte_rate);
     let _ = buf.write_u16::<LittleEndian>(block_align);
-    let _ = buf.write_u16::<LittleEndian>(bit_depth);
+    let _ = buf.write_u16::<LittleEndian>(actual_bit_depth);
 
     // data chunk
     buf.extend_from_slice(b"data");
@@ -34,13 +40,39 @@ pub fn encode_wav_wasm(samples_l: &[f32], samples_r: &[f32], sample_rate: u32, b
 
     for i in 0..num_samples {
         let sample_l = samples_l[i].clamp(-1.0, 1.0);
-        let val_l = (sample_l * 32767.0) as i16;
-        let _ = buf.write_i16::<LittleEndian>(val_l);
+        match actual_bit_depth {
+            24 => {
+                let val_l = (sample_l * 8388607.0) as i32;
+                buf.push((val_l & 0xFF) as u8);
+                buf.push(((val_l >> 8) & 0xFF) as u8);
+                buf.push(((val_l >> 16) & 0xFF) as u8);
+            }
+            32 => {
+                let _ = buf.write_f32::<LittleEndian>(sample_l);
+            }
+            _ => {
+                let val_l = (sample_l * 32767.0) as i16;
+                let _ = buf.write_i16::<LittleEndian>(val_l);
+            }
+        }
 
         if num_channels == 2 && i < samples_r.len() {
             let sample_r = samples_r[i].clamp(-1.0, 1.0);
-            let val_r = (sample_r * 32767.0) as i16;
-            let _ = buf.write_i16::<LittleEndian>(val_r);
+            match actual_bit_depth {
+                24 => {
+                    let val_r = (sample_r * 8388607.0) as i32;
+                    buf.push((val_r & 0xFF) as u8);
+                    buf.push(((val_r >> 8) & 0xFF) as u8);
+                    buf.push(((val_r >> 16) & 0xFF) as u8);
+                }
+                32 => {
+                    let _ = buf.write_f32::<LittleEndian>(sample_r);
+                }
+                _ => {
+                    let val_r = (sample_r * 32767.0) as i16;
+                    let _ = buf.write_i16::<LittleEndian>(val_r);
+                }
+            }
         }
     }
 
