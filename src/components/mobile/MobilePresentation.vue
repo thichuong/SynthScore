@@ -48,6 +48,9 @@
           :activeTab="currentView === 'sheet' ? 'sheet' : 'visualizer'"
           @update:activeTab="handleTabUpdate"
           :hideHeader="true"
+          :loading="loading"
+          :loadingProgress="loadingProgress"
+          :fileSize="fileSize"
         />
       </div>
 
@@ -82,6 +85,9 @@ const props = defineProps<{
   isReady: boolean;
   tracks: TrackInfo[];
   playbackMode: 'default' | 'symphony' | 'concerto';
+  loading?: boolean;
+  loadingProgress?: number;
+  fileSize?: number | string;
 }>();
 
 defineEmits<{

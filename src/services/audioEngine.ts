@@ -238,8 +238,13 @@ class AudioEngineService {
           }
         });
 
-        // 6. Tải nhạc cụ mặc định (Acoustic Grand Piano - 0)
-        await this.soundfontService.loadInstrumentSoundbank(this.synth, 0);
+        // 6. Tải tất cả các bộ âm thanh Soundfont chính vào Synthesizer Engine lúc khởi tạo
+        await this.soundfontService.loadSongSoundbanks(this.synth, [
+          { channel: 0, instrumentNumber: 0 } as any,   // MuseScore_General.sf3
+          { channel: 1, instrumentNumber: 40 } as any,  // Sonatina_Symphonic_Orchestra.sf3
+          { channel: 2, instrumentNumber: 80 } as any,  // FluidR3Mono_GM.sf3
+          { channel: 9, instrumentNumber: 0 } as any,   // Roland_SC-88.sf3 (Drums)
+        ]);
 
         const defaults = getDefaultTrackSettings(0, 0);
         this.tracks = [{

@@ -19,10 +19,6 @@
     </div>
 
     <div class="viewer-actions">
-      <div class="viewer-status" v-if="loading">
-        <span class="spinner"></span> Đang tải bản nhạc...
-      </div>
-
       <button 
         class="viewer-play-btn" 
         :class="{ playing: isPlaying }"
@@ -43,7 +39,6 @@ import { Music, Layers, Play, Pause } from 'lucide-vue-next';
 defineProps<{
   activeTab: 'sheet' | 'visualizer';
   hasSheet: boolean;
-  loading: boolean;
   isPlaying: boolean;
   isReady: boolean;
   hideHeader?: boolean;
@@ -106,27 +101,6 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.viewer-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
-  color: #00f0ff;
-}
-
-.spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(0, 240, 255, 0.3);
-  border-top-color: #00f0ff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 .viewer-play-btn {

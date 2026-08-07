@@ -388,16 +388,15 @@ export class SoundfontService {
     return loadPromise;
   }
 
-  // Tự động tải tất cả các bộ âm thanh cho các nhạc cụ có trong bài hát
+  // Tự động tải tất cả các bộ âm thanh cho các nhạc cụ có trong bài hát (tải song song qua Promise.all)
   public async loadSongSoundbanks(synth: WorkletSynthesizer, tracks: TrackInfo[]): Promise<void> {
-    for (const track of tracks) {
+    const promises = tracks.map(track => {
       const isDrum = track.channel === 9; // Kênh 10 là bộ gõ
-      try {
-        await this.loadInstrumentSoundbank(synth, track.instrumentNumber, isDrum);
-      } catch (err) {
+      return this.loadInstrumentSoundbank(synth, track.instrumentNumber, isDrum).catch(err => {
         console.error(`Lỗi khi nạp soundbank cho nhạc cụ #${track.instrumentNumber}:`, err);
-      }
-    }
+      });
+    });
+    await Promise.all(promises);
   }
 
   public clearLoadedSet(): void {

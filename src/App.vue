@@ -32,6 +32,9 @@
       :isReady="isReady"
       :tracks="tracks"
       :playbackMode="playbackMode"
+      :loading="isLoadingLibrarySong"
+      :loadingProgress="songDownloadProgress"
+      :fileSize="songFileSize"
       @changeMode="handleModeChange"
     />
 
@@ -139,6 +142,9 @@
           :isPlaying="isPlaying"
           :currentTime="currentTime"
           :isReady="isReady"
+          :loading="isLoadingLibrarySong"
+          :loadingProgress="songDownloadProgress"
+          :fileSize="songFileSize"
         />
       </div>
     </main>
@@ -206,6 +212,8 @@ const isLoadingSoundfont = ref(false);
 const soundfontProgress = ref<SoundfontProgress | null>(null);
 const isPlaying = ref(false);
 const isLoadingLibrarySong = ref(false);
+const songDownloadProgress = ref<number>(0);
+const songFileSize = ref<number | string>(0);
 const initializationFailed = ref(false);
 
 const currentTime = ref(0);
@@ -584,6 +592,8 @@ async function loadFromLibrary(song: SongEntry) {
 
   const url = song.url;
   isLoadingLibrarySong.value = true;
+  songDownloadProgress.value = 10;
+  songFileSize.value = 0;
 
   try {
     let buffer: ArrayBuffer;
@@ -591,12 +601,43 @@ async function loadFromLibrary(song: SongEntry) {
     const cached = await getCachedSong(url);
     if (cached) {
       buffer = cached;
+      songFileSize.value = cached.byteLength;
+      songDownloadProgress.value = 100;
     } else {
+      songDownloadProgress.value = 30;
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      buffer = await response.arrayBuffer();
+      const contentLength = response.headers.get('content-length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+      if (total > 0) songFileSize.value = total;
+
+      if (response.body && total > 0) {
+        const reader = response.body.getReader();
+        let loaded = 0;
+        const chunks: Uint8Array[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            chunks.push(value);
+            loaded += value.byteLength;
+            songDownloadProgress.value = Math.min(95, Math.round(30 + (loaded / total) * 65));
+          }
+        }
+        const concatenated = new Uint8Array(loaded);
+        let offset = 0;
+        for (const chunk of chunks) {
+          concatenated.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+        buffer = concatenated.buffer;
+      } else {
+        buffer = await response.arrayBuffer();
+        songFileSize.value = buffer.byteLength;
+      }
+      songDownloadProgress.value = 100;
       await cacheSong(url, buffer);
     }
     
