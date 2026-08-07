@@ -44,6 +44,39 @@ describe('Rust WASM Engine Integration', () => {
     expect(concBytes.length).toBeGreaterThan(0);
   });
 
+  it('should parse MusicXML to MIDI binary via WASM module', async () => {
+    const wasm = await getWasmModule();
+    if (!wasm) return;
+
+    const sampleXml = `<?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+      <score-partwise version="3.1">
+        <work><work-title>Test Wasm Song</work-title></work>
+        <part-list>
+          <score-part id="P1"><part-name>Flute</part-name></score-part>
+        </part-list>
+        <part id="P1">
+          <measure number="1">
+            <attributes>
+              <divisions>4</divisions>
+            </attributes>
+            <sound tempo="120"/>
+            <note>
+              <pitch><step>C</step><octave>4</octave></pitch>
+              <duration>4</duration>
+              <voice>1</voice>
+            </note>
+          </measure>
+        </part>
+      </score-partwise>`;
+
+    const midiBytes = wasm.parse_musicxml_to_midi_wasm(sampleXml);
+    expect(midiBytes instanceof Uint8Array).toBe(true);
+    expect(midiBytes.length).toBeGreaterThan(14);
+    // MIDI magic header "MThd"
+    expect(String.fromCharCode(midiBytes[0], midiBytes[1], midiBytes[2], midiBytes[3])).toBe('MThd');
+  });
+
   it('should encode WAV and DSD (DSF) audio via WASM module', async () => {
     const wasm = await getWasmModule();
     if (!wasm) return;
@@ -65,3 +98,4 @@ describe('Rust WASM Engine Integration', () => {
     expect(String.fromCharCode(dsfBytes[0], dsfBytes[1], dsfBytes[2], dsfBytes[3])).toBe('DSD ');
   });
 });
+

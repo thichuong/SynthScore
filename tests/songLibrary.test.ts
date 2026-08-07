@@ -573,7 +573,11 @@ describe('Song Library Note Reading Audit', () => {
 
     // Generate and write Markdown report
     const markdownReport = generateMarkdownReport(results);
-    const reportPath = path.resolve(__dirname, '../tests-report.md');
+    const reportDir = path.resolve(__dirname, '../test-report');
+    if (!fs.existsSync(reportDir)) {
+      fs.mkdirSync(reportDir, { recursive: true });
+    }
+    const reportPath = path.join(reportDir, 'song-library-report.md');
     fs.writeFileSync(reportPath, markdownReport, 'utf8');
     
     console.log(`Đã xuất báo cáo đối chiếu sâu ra tệp: ${reportPath}`);

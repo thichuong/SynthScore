@@ -1,5 +1,21 @@
 import { vi } from 'vitest';
 
+// Suppress verbose Soundfont & AudioEngine logs during test runs
+const originalLog = console.log;
+console.log = (...args: any[]) => {
+  const msg = args[0] ? String(args[0]) : '';
+  if (
+    msg.includes('Soundfont') ||
+    msg.includes('AudioEngine') ||
+    msg.includes('bộ âm thanh') ||
+    msg.includes('tiền tải') ||
+    msg.includes('Đang tải')
+  ) {
+    return;
+  }
+  originalLog(...args);
+};
+
 // 1. Mock Web Audio API classes
 class MockAudioContext {
   state = 'suspended';

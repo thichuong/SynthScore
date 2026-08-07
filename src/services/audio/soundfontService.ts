@@ -312,13 +312,11 @@ export class SoundfontService {
     const sf3Name = this.getSoundfontFileName(programNumber, isDrum);
 
     if (this.loadedSoundfonts.has(sf3Name)) {
-      console.log(`Đã nạp thành công bộ âm thanh Soundfont: ${sf3Name} cho nhạc cụ #${programNumber} (isDrum: ${isDrum}) (đã nạp trước đó)`);
       return; // Đã nạp rồi, không cần nạp lại
     }
 
     if (this.loadingInstrumentPromises.has(sf3Name)) {
       await this.loadingInstrumentPromises.get(sf3Name)!;
-      console.log(`Đã nạp thành công bộ âm thanh Soundfont: ${sf3Name} cho nhạc cụ #${programNumber} (isDrum: ${isDrum}) (sử dụng tiến trình đang nạp)`);
       return;
     }
 
