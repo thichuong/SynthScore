@@ -56,7 +56,22 @@ async function parseMidiForVisualizer() {
       if (props.fileType === 'abc') {
         const abcjs = await import('abcjs');
         const midiBin = abcjs.default.synth.getMidiFile(props.rawText || '', { midiOutputType: 'binary' }) as any;
-        arrayBuffer = midiBin.buffer as ArrayBuffer;
+        let raw = Array.isArray(midiBin) ? midiBin[0] : midiBin;
+        let uint8: Uint8Array;
+        if (typeof raw === 'string') {
+          uint8 = new Uint8Array(raw.length);
+          for (let i = 0; i < raw.length; i++) uint8[i] = raw.charCodeAt(i) & 0xff;
+        } else if (raw instanceof Uint8Array) {
+          uint8 = raw;
+        } else if (raw && raw.buffer) {
+          uint8 = new Uint8Array(raw.buffer);
+        } else {
+          uint8 = new Uint8Array(0);
+        }
+        arrayBuffer = uint8.buffer.slice(
+          uint8.byteOffset,
+          uint8.byteOffset + uint8.byteLength
+        );
       } else {
         return; 
       }
@@ -67,18 +82,22 @@ async function parseMidiForVisualizer() {
     let tempMax = 0;
 
     midi.tracks.forEach((track, trackIndex) => {
+      const channel = track.channel !== undefined ? track.channel : trackIndex;
       track.notes.forEach(note => {
         midiNotes.push({
           midi: note.midi,
           time: note.time,
           duration: note.duration,
-          trackIndex: trackIndex
+          trackIndex: channel
         });
 
         if (note.midi < tempMin) tempMin = note.midi;
         if (note.midi > tempMax) tempMax = note.midi;
       });
     });
+
+    // Sắp xếp midiNotes theo thời gian tăng dần để binarySearch và vòng lặp vẽ hiển thị đầy đủ tất cả các kênh (channels / tracks)
+    midiNotes.sort((a, b) => a.time - b.time);
 
     minMidi = Math.max(21, tempMin - 5);
     maxMidi = Math.min(108, tempMax + 5);

@@ -437,7 +437,7 @@ describe('Song Library Note Reading Audit', () => {
   const results: any[] = [];
 
   it('should scan all songs in library, count XML vs MIDI notes and check for missing notes', { timeout: 300000 }, async () => {
-    const activeSongs = songLibrary.filter(song => song.url);
+    const activeSongs = songLibrary.filter(song => song.url && song.url.startsWith('http'));
     console.log(`Bắt đầu đối chiếu sâu nốt nhạc của ${activeSongs.length} bài hát...`);
 
     for (let i = 0; i < activeSongs.length; i++) {

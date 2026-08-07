@@ -445,7 +445,18 @@ async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xm
     const abcText = payload.data as string;
     const abcjs = await import('abcjs');
     const midiBin = abcjs.default.synth.getMidiFile(abcText, { midiOutputType: 'binary' }) as any;
-    midiBytes = new Uint8Array(midiBin);
+    let raw = Array.isArray(midiBin) ? midiBin[0] : midiBin;
+    if (typeof raw === 'string') {
+      const buf = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i) & 0xff;
+      midiBytes = buf;
+    } else if (raw instanceof Uint8Array) {
+      midiBytes = raw;
+    } else if (raw && raw.buffer) {
+      midiBytes = new Uint8Array(raw.buffer);
+    } else {
+      midiBytes = new Uint8Array(0);
+    }
     rawTextValue = abcText;
   }
 
@@ -589,12 +600,44 @@ async function loadFromLibrary(song: SongEntry) {
       await cacheSong(url, buffer);
     }
     
-    const xmlText = await parseMxl(buffer);
-    const midiBytes = parseMusicXmlToMidiBytes(xmlText);
+    const lowerUrl = url.toLowerCase();
+    let midiBytes: Uint8Array;
+    let type: 'xml' | 'abc' | 'midi' = 'xml';
+    let text: string | null = null;
+
+    if (lowerUrl.endsWith('.mid') || lowerUrl.endsWith('.midi')) {
+      type = 'midi';
+      midiBytes = new Uint8Array(buffer);
+    } else if (lowerUrl.endsWith('.abc')) {
+      type = 'abc';
+      text = new TextDecoder('utf-8').decode(buffer);
+      const abcjs = await import('abcjs');
+      const midiBin = abcjs.default.synth.getMidiFile(text, { midiOutputType: 'binary' }) as any;
+      let raw = Array.isArray(midiBin) ? midiBin[0] : midiBin;
+      if (typeof raw === 'string') {
+        const buf = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i) & 0xff;
+        midiBytes = buf;
+      } else if (raw instanceof Uint8Array) {
+        midiBytes = raw;
+      } else if (raw && raw.buffer) {
+        midiBytes = new Uint8Array(raw.buffer);
+      } else {
+        midiBytes = new Uint8Array(0);
+      }
+    } else if (lowerUrl.endsWith('.xml') || lowerUrl.endsWith('.musicxml')) {
+      type = 'xml';
+      text = new TextDecoder('utf-8').decode(buffer);
+      midiBytes = parseMusicXmlToMidiBytes(text);
+    } else {
+      type = 'xml';
+      text = await parseMxl(buffer);
+      midiBytes = parseMusicXmlToMidiBytes(text);
+    }
 
     fileData.value = midiBytes;
-    fileType.value = 'xml';
-    rawText.value = xmlText;
+    fileType.value = type;
+    rawText.value = text;
 
     await AudioEngine.loadSong(midiBytes, song.name, song.composer);
   } catch (error) {
