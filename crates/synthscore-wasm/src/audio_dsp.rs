@@ -1,8 +1,14 @@
-use wasm_bindgen::prelude::*;
 use byteorder::{LittleEndian, WriteBytesExt};
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-pub fn encode_wav_wasm(samples_l: &[f32], samples_r: &[f32], sample_rate: u32, bit_depth: u16) -> Vec<u8> {
+#[must_use]
+pub fn encode_wav_wasm(
+    samples_l: &[f32],
+    samples_r: &[f32],
+    sample_rate: u32,
+    bit_depth: u16,
+) -> Vec<u8> {
     let num_channels = if samples_r.is_empty() { 1u16 } else { 2u16 };
     let num_samples = samples_l.len();
     let format_tag = if bit_depth == 32 { 3u16 } else { 1u16 }; // 1 = PCM, 3 = IEEE Float
@@ -13,8 +19,8 @@ pub fn encode_wav_wasm(samples_l: &[f32], samples_r: &[f32], sample_rate: u32, b
     };
     let actual_bit_depth = bytes_per_sample * 8;
     let block_align = num_channels * bytes_per_sample;
-    let byte_rate = sample_rate * block_align as u32;
-    let data_size = num_samples as u32 * block_align as u32;
+    let byte_rate = sample_rate * u32::from(block_align);
+    let data_size = num_samples as u32 * u32::from(block_align);
     let file_size = 44 + data_size;
 
     let mut buf = Vec::with_capacity(file_size as usize);
@@ -27,7 +33,7 @@ pub fn encode_wav_wasm(samples_l: &[f32], samples_r: &[f32], sample_rate: u32, b
     // fmt chunk
     buf.extend_from_slice(b"fmt ");
     let _ = buf.write_u32::<LittleEndian>(16); // Chunk size
-    let _ = buf.write_u16::<LittleEndian>(format_tag);  // PCM hoặc IEEE Float
+    let _ = buf.write_u16::<LittleEndian>(format_tag); // PCM hoặc IEEE Float
     let _ = buf.write_u16::<LittleEndian>(num_channels);
     let _ = buf.write_u32::<LittleEndian>(sample_rate);
     let _ = buf.write_u32::<LittleEndian>(byte_rate);
@@ -80,6 +86,7 @@ pub fn encode_wav_wasm(samples_l: &[f32], samples_r: &[f32], sample_rate: u32, b
 }
 
 #[wasm_bindgen]
+#[must_use]
 pub fn encode_dsd_dsf_wasm(
     samples_l: &[f32],
     samples_r: &[f32],
@@ -88,14 +95,19 @@ pub fn encode_dsd_dsf_wasm(
 ) -> Vec<u8> {
     let num_channels = if samples_r.is_empty() { 1u32 } else { 2u32 };
     let original_length = samples_l.len();
-    let factor = if oversample_factor == 0 { 64 } else { oversample_factor };
+    let factor = if oversample_factor == 0 {
+        64
+    } else {
+        oversample_factor
+    };
 
     let dsd_sample_rate = sample_rate * factor;
     let total_dsd_samples = original_length * factor as usize;
 
     let block_size = 4096;
     let block_bits = block_size * 8;
-    let num_blocks = (total_dsd_samples + block_bits - 1) / block_bits;
+    let num_blocks = total_dsd_samples.div_ceil(block_bits);
+
     let padded_dsd_samples = num_blocks * block_bits;
 
     let dsd_data_size = (num_blocks * block_size * num_channels as usize) as u64;
@@ -150,9 +162,7 @@ pub fn encode_dsd_dsf_wasm(
 
             for bit_idx in 0..block_bits {
                 let dsd_sample_idx = b * block_bits + bit_idx;
-                let mut x = 0.0f32;
-
-                if dsd_sample_idx < total_dsd_samples && !channel_pcm.is_empty() {
+                let x = if dsd_sample_idx < total_dsd_samples && !channel_pcm.is_empty() {
                     let pcm_idx_float = (dsd_sample_idx as f32) * inv_factor;
                     let idx_lower = (pcm_idx_float as usize).min(max_idx);
                     let idx_upper = (idx_lower + 1).min(max_idx);
@@ -160,8 +170,10 @@ pub fn encode_dsd_dsf_wasm(
 
                     let pcm_val_lower = channel_pcm[idx_lower];
                     let pcm_val_upper = channel_pcm[idx_upper];
-                    x = pcm_val_lower + frac * (pcm_val_upper - pcm_val_lower);
-                }
+                    pcm_val_lower + frac * (pcm_val_upper - pcm_val_lower)
+                } else {
+                    0.0f32
+                };
 
                 integ += x - out_val;
                 if integ >= 0.0 {

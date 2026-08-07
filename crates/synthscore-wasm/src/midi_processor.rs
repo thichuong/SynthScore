@@ -1,19 +1,20 @@
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
-use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct TrackInfoWasm {
     pub channel: u8,
     pub name: String,
-    pub instrumentName: String,
-    pub instrumentNumber: u8,
+    pub instrument_name: String,
+    pub instrument_number: u8,
     pub volume: u8,
-    pub isMuted: bool,
-    pub isSoloed: bool,
-    pub noteCount: u32,
+    pub is_muted: bool,
+    pub is_soloed: bool,
+    pub note_count: u32,
     pub pan: i8,
-    pub reverbSend: u8,
-    pub chorusSend: u8,
+    pub reverb_send: u8,
+    pub chorus_send: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -26,22 +27,30 @@ pub struct RawNote {
 
 #[derive(Debug, Clone)]
 struct ParsedMidiTrackInfo {
-    channel: u8,
+    _channel: u8,
     name: String,
     program: u8,
     note_count: u32,
 }
 
 // Function to calculate default spatial and effect settings based on instrument and channel
+#[must_use]
 pub fn get_default_track_settings(program: u8, channel: u8) -> (i8, u8, u8) {
     if (40..=47).contains(&program) {
         let pan = match program {
-            40 => if channel % 2 == 0 { -30 } else { -15 },
+            40 => {
+                if channel.is_multiple_of(2) {
+                    -30
+                } else {
+                    -15
+                }
+            }
             41 => -10,
             42 => 20,
             43 => 40,
             _ => -5,
         };
+
         let reverb_send = 90;
         let chorus_send = if program == 40 { 40 } else { 25 };
         (pan, reverb_send, chorus_send)
@@ -61,7 +70,7 @@ fn read_vlq(bytes: &[u8], offset: &mut usize) -> Result<u32, &'static str> {
         }
         let byte = bytes[*offset];
         *offset += 1;
-        result = (result << 7) | ((byte & 0x7F) as u32);
+        result = (result << 7) | u32::from(byte & 0x7F);
         if (byte & 0x80) == 0 {
             return Ok(result);
         }
@@ -93,6 +102,7 @@ fn write_vlq(vec: &mut Vec<u8>, mut val: u32) {
 pub struct MidiParserHelper;
 
 impl MidiParserHelper {
+    #[must_use]
     pub fn parse_all_notes(bytes: &[u8]) -> (Vec<RawNote>, u32) {
         let mut notes = Vec::new();
         let mut tempo_bpm = 120.0;
@@ -102,7 +112,11 @@ impl MidiParserHelper {
         }
 
         let division = u16::from_be_bytes([bytes[12], bytes[13]]);
-        let ppq = if division & 0x8000 == 0 { division as f64 } else { 480.0 };
+        let ppq = if division & 0x8000 == 0 {
+            f64::from(division)
+        } else {
+            480.0
+        };
 
         let mut offset = 14;
 
@@ -124,11 +138,11 @@ impl MidiParserHelper {
             let mut active_notes: Vec<(u8, u8, u64, f32)> = Vec::new(); // (channel, midi, start_tick, velocity)
 
             while offset < track_end {
-                let delta = match read_vlq(bytes, &mut offset) {
-                    Ok(d) => d,
-                    Err(_) => break,
+                let Ok(delta) = read_vlq(bytes, &mut offset) else {
+                    break;
                 };
-                current_tick += delta as u64;
+
+                current_tick += u64::from(delta);
 
                 if offset >= track_end {
                     break;
@@ -144,7 +158,9 @@ impl MidiParserHelper {
 
                 if b == 0xFF {
                     // Meta event
-                    if offset >= track_end { break; }
+                    if offset >= track_end {
+                        break;
+                    }
                     let meta_type = bytes[offset];
                     offset += 1;
                     let meta_len = match read_vlq(bytes, &mut offset) {
@@ -152,11 +168,11 @@ impl MidiParserHelper {
                         Err(_) => break,
                     };
                     if meta_type == 0x51 && meta_len == 3 && offset + 3 <= track_end {
-                        let tempo_us = ((bytes[offset] as u32) << 16)
-                            | ((bytes[offset + 1] as u32) << 8)
-                            | (bytes[offset + 2] as u32);
+                        let tempo_us = (u32::from(bytes[offset]) << 16)
+                            | (u32::from(bytes[offset + 1]) << 8)
+                            | u32::from(bytes[offset + 2]);
                         if tempo_us > 0 {
-                            tempo_bpm = 60_000_000.0 / tempo_us as f64;
+                            tempo_bpm = 60_000_000.0 / f64::from(tempo_us);
                         }
                     }
                     offset += meta_len;
@@ -173,22 +189,35 @@ impl MidiParserHelper {
 
                     match cmd {
                         0x80 | 0x90 => {
-                            if offset + 2 > track_end { break; }
+                            if offset + 2 > track_end {
+                                break;
+                            }
                             let key = bytes[offset];
                             let vel = bytes[offset + 1];
                             offset += 2;
 
                             let is_on = cmd == 0x90 && vel > 0;
                             if is_on {
-                                active_notes.push((channel, key, current_tick, vel as f32 / 127.0));
+                                active_notes.push((
+                                    channel,
+                                    key,
+                                    current_tick,
+                                    f32::from(vel) / 127.0,
+                                ));
                             } else {
                                 // Match Note Off
-                                if let Some(pos) = active_notes.iter().position(|n| n.0 == channel && n.1 == key) {
-                                    let (ch, note_key, start_tick, velocity) = active_notes.remove(pos);
-                                    if ch != 9 { // Skip percussion channel
+                                if let Some(pos) = active_notes
+                                    .iter()
+                                    .position(|n| n.0 == channel && n.1 == key)
+                                {
+                                    let (ch, note_key, start_tick, velocity) =
+                                        active_notes.remove(pos);
+                                    if ch != 9 {
+                                        // Skip percussion channel
                                         let seconds_per_tick = 60.0 / (tempo_bpm * ppq);
                                         let start_time = start_tick as f64 * seconds_per_tick;
-                                        let duration = (current_tick - start_tick) as f64 * seconds_per_tick;
+                                        let duration =
+                                            (current_tick - start_tick) as f64 * seconds_per_tick;
                                         notes.push(RawNote {
                                             midi: note_key,
                                             time: start_time,
@@ -201,9 +230,6 @@ impl MidiParserHelper {
                         }
                         0xA0 | 0xB0 | 0xE0 => {
                             offset += 2;
-                        }
-                        0xC0 | 0xD0 => {
-                            offset += 1;
                         }
                         _ => {
                             offset += 1;
@@ -231,8 +257,10 @@ impl MidiParserHelper {
 }
 
 #[wasm_bindgen]
+#[must_use]
 pub fn parse_midi_tracks_wasm(bytes: &[u8]) -> JsValue {
-    let mut channel_map: std::collections::HashMap<u8, ParsedMidiTrackInfo> = std::collections::HashMap::new();
+    let mut channel_map: std::collections::HashMap<u8, ParsedMidiTrackInfo> =
+        std::collections::HashMap::new();
 
     if bytes.len() >= 14 && &bytes[0..4] == b"MThd" {
         let mut offset = 14;
@@ -256,11 +284,12 @@ pub fn parse_midi_tracks_wasm(bytes: &[u8]) -> JsValue {
             let mut running_status = 0u8;
 
             while offset < track_end {
-                let _delta = match read_vlq(bytes, &mut offset) {
-                    Ok(d) => d,
-                    Err(_) => break,
+                let Ok(_delta) = read_vlq(bytes, &mut offset) else {
+                    break;
                 };
-                if offset >= track_end { break; }
+                if offset >= track_end {
+                    break;
+                }
 
                 let mut b = bytes[offset];
                 if b & 0x80 != 0 {
@@ -271,7 +300,9 @@ pub fn parse_midi_tracks_wasm(bytes: &[u8]) -> JsValue {
                 }
 
                 if b == 0xFF {
-                    if offset >= track_end { break; }
+                    if offset >= track_end {
+                        break;
+                    }
                     let meta_type = bytes[offset];
                     offset += 1;
                     let meta_len = match read_vlq(bytes, &mut offset) {
@@ -304,35 +335,44 @@ pub fn parse_midi_tracks_wasm(bytes: &[u8]) -> JsValue {
                                 }
                             }
                         }
-                        0x80 => { offset += 2; }
+                        0x80 | 0xA0 | 0xB0 | 0xE0 => {
+                            offset += 2;
+                        }
                         0xC0 => {
-                            if offset + 1 <= track_end {
+                            if offset < track_end {
                                 current_program = bytes[offset];
                                 offset += 1;
                             }
                         }
-                        0xA0 | 0xB0 | 0xE0 => { offset += 2; }
-                        0xD0 => { offset += 1; }
-                        _ => { offset += 1; }
+                        _ => {
+                            offset += 1;
+                        }
                     }
                 }
             }
 
             if note_count > 0 {
-                let entry = channel_map.entry(current_channel).or_insert(ParsedMidiTrackInfo {
-                    channel: current_channel,
-                    name: if track_name.is_empty() { format!("Kênh {}", current_channel + 1) } else { track_name },
-                    program: current_program,
-                    note_count: 0,
-                });
+                let entry =
+                    channel_map
+                        .entry(current_channel)
+                        .or_insert_with(|| ParsedMidiTrackInfo {
+                            _channel: current_channel,
+                            name: if track_name.is_empty() {
+                                format!("Kênh {}", current_channel + 1)
+                            } else {
+                                track_name
+                            },
+                            program: current_program,
+                            note_count: 0,
+                        });
                 entry.note_count += note_count;
             }
         }
     }
 
     let mut result_tracks: Vec<TrackInfoWasm> = Vec::new();
-    let mut channels: Vec<u8> = channel_map.keys().cloned().collect();
-    channels.sort();
+    let mut channels: Vec<u8> = channel_map.keys().copied().collect();
+    channels.sort_unstable();
 
     if channels.is_empty() {
         // Fallback 16 channels
@@ -342,16 +382,24 @@ pub fn parse_midi_tracks_wasm(bytes: &[u8]) -> JsValue {
             let (pan, reverb, chorus) = get_default_track_settings(prog, i);
             result_tracks.push(TrackInfoWasm {
                 channel: i,
-                name: if is_drum { "Bộ trống (Drums)".to_string() } else { format!("Bè Kênh {}", i + 1) },
-                instrumentName: if is_drum { "Drum Kit".to_string() } else { "Acoustic Piano".to_string() },
-                instrumentNumber: prog,
+                name: if is_drum {
+                    "Bộ trống (Drums)".to_string()
+                } else {
+                    format!("Bè Kênh {}", i + 1)
+                },
+                instrument_name: if is_drum {
+                    "Drum Kit".to_string()
+                } else {
+                    "Acoustic Piano".to_string()
+                },
+                instrument_number: prog,
                 volume: 80,
-                isMuted: false,
-                isSoloed: false,
-                noteCount: 1,
+                is_muted: false,
+                is_soloed: false,
+                note_count: 1,
                 pan,
-                reverbSend: reverb,
-                chorusSend: chorus,
+                reverb_send: reverb,
+                chorus_send: chorus,
             });
         }
     } else {
@@ -361,15 +409,15 @@ pub fn parse_midi_tracks_wasm(bytes: &[u8]) -> JsValue {
                 result_tracks.push(TrackInfoWasm {
                     channel: chan,
                     name: info.name.clone(),
-                    instrumentName: format!("Program #{}", info.program),
-                    instrumentNumber: info.program,
+                    instrument_name: format!("Program #{}", info.program),
+                    instrument_number: info.program,
                     volume: 80,
-                    isMuted: false,
-                    isSoloed: false,
-                    noteCount: info.note_count,
+                    is_muted: false,
+                    is_soloed: false,
+                    note_count: info.note_count,
                     pan,
-                    reverbSend: reverb,
-                    chorusSend: chorus,
+                    reverb_send: reverb,
+                    chorus_send: chorus,
                 });
             }
         }
@@ -386,29 +434,109 @@ pub(crate) struct TrackDefinition {
 }
 
 const SYMPHONIC_TRACKS: [TrackDefinition; 11] = [
-    TrackDefinition { name: "Violin I (Treble Strings)", program: 40, channel: 0 },
-    TrackDefinition { name: "Violin II (Treble Strings)", program: 40, channel: 1 },
-    TrackDefinition { name: "Viola (Alto Strings)", program: 41, channel: 2 },
-    TrackDefinition { name: "Cello (Bass Strings)", program: 42, channel: 3 },
-    TrackDefinition { name: "Contrabass (Deep Strings)", program: 43, channel: 4 },
-    TrackDefinition { name: "Flute (Woodwind)", program: 73, channel: 5 },
-    TrackDefinition { name: "Oboe (Woodwind)", program: 68, channel: 6 },
-    TrackDefinition { name: "Clarinet (Woodwind)", program: 71, channel: 7 },
-    TrackDefinition { name: "French Horn (Brass)", program: 60, channel: 8 },
-    TrackDefinition { name: "Timpani (Percussion)", program: 47, channel: 9 },
-    TrackDefinition { name: "Orchestral Harp (Plucked)", program: 46, channel: 10 },
+    TrackDefinition {
+        name: "Violin I (Treble Strings)",
+        program: 40,
+        channel: 0,
+    },
+    TrackDefinition {
+        name: "Violin II (Treble Strings)",
+        program: 40,
+        channel: 1,
+    },
+    TrackDefinition {
+        name: "Viola (Alto Strings)",
+        program: 41,
+        channel: 2,
+    },
+    TrackDefinition {
+        name: "Cello (Bass Strings)",
+        program: 42,
+        channel: 3,
+    },
+    TrackDefinition {
+        name: "Contrabass (Deep Strings)",
+        program: 43,
+        channel: 4,
+    },
+    TrackDefinition {
+        name: "Flute (Woodwind)",
+        program: 73,
+        channel: 5,
+    },
+    TrackDefinition {
+        name: "Oboe (Woodwind)",
+        program: 68,
+        channel: 6,
+    },
+    TrackDefinition {
+        name: "Clarinet (Woodwind)",
+        program: 71,
+        channel: 7,
+    },
+    TrackDefinition {
+        name: "French Horn (Brass)",
+        program: 60,
+        channel: 8,
+    },
+    TrackDefinition {
+        name: "Timpani (Percussion)",
+        program: 47,
+        channel: 9,
+    },
+    TrackDefinition {
+        name: "Orchestral Harp (Plucked)",
+        program: 46,
+        channel: 10,
+    },
 ];
 
 const CONCERTO_TRACKS: [TrackDefinition; 9] = [
-    TrackDefinition { name: "Solo Grand Piano", program: 0, channel: 0 },
-    TrackDefinition { name: "Violin I (Orchestra)", program: 40, channel: 1 },
-    TrackDefinition { name: "Violin II (Orchestra)", program: 40, channel: 2 },
-    TrackDefinition { name: "Viola (Orchestra)", program: 41, channel: 3 },
-    TrackDefinition { name: "Cello (Orchestra)", program: 42, channel: 4 },
-    TrackDefinition { name: "Contrabass (Orchestra)", program: 43, channel: 5 },
-    TrackDefinition { name: "Flute (Orchestra)", program: 73, channel: 6 },
-    TrackDefinition { name: "French Horn (Orchestra)", program: 60, channel: 7 },
-    TrackDefinition { name: "Timpani (Orchestra)", program: 47, channel: 8 },
+    TrackDefinition {
+        name: "Solo Grand Piano",
+        program: 0,
+        channel: 0,
+    },
+    TrackDefinition {
+        name: "Violin I (Orchestra)",
+        program: 40,
+        channel: 1,
+    },
+    TrackDefinition {
+        name: "Violin II (Orchestra)",
+        program: 40,
+        channel: 2,
+    },
+    TrackDefinition {
+        name: "Viola (Orchestra)",
+        program: 41,
+        channel: 3,
+    },
+    TrackDefinition {
+        name: "Cello (Orchestra)",
+        program: 42,
+        channel: 4,
+    },
+    TrackDefinition {
+        name: "Contrabass (Orchestra)",
+        program: 43,
+        channel: 5,
+    },
+    TrackDefinition {
+        name: "Flute (Orchestra)",
+        program: 73,
+        channel: 6,
+    },
+    TrackDefinition {
+        name: "French Horn (Orchestra)",
+        program: 60,
+        channel: 7,
+    },
+    TrackDefinition {
+        name: "Timpani (Orchestra)",
+        program: 47,
+        channel: 8,
+    },
 ];
 
 pub(crate) struct PreparedNoteEvent {
@@ -419,7 +547,11 @@ pub(crate) struct PreparedNoteEvent {
     pub(crate) velocity: u8,
 }
 
-pub(crate) fn build_midi_file(tracks_def: &[TrackDefinition], events: Vec<PreparedNoteEvent>, bpm: u32) -> Vec<u8> {
+pub(crate) fn build_midi_file(
+    tracks_def: &[TrackDefinition],
+    events: Vec<PreparedNoteEvent>,
+    bpm: u32,
+) -> Vec<u8> {
     let ppq: u16 = 480;
     let mut out = Vec::new();
 
@@ -503,13 +635,18 @@ pub(crate) fn build_midi_file(tracks_def: &[TrackDefinition], events: Vec<Prepar
 }
 
 #[wasm_bindgen]
+#[must_use]
 pub fn generate_symphony_midi_wasm(bytes: &[u8]) -> Vec<u8> {
     let (mut all_notes, bpm) = MidiParserHelper::parse_all_notes(bytes);
     if all_notes.is_empty() {
         return bytes.to_vec();
     }
 
-    all_notes.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap_or(std::cmp::Ordering::Equal));
+    all_notes.sort_by(|a, b| {
+        a.time
+            .partial_cmp(&b.time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // Note Thinning
     let max_voices_per_window = 8;
@@ -519,11 +656,15 @@ pub fn generate_symphony_midi_wasm(bytes: &[u8]) -> Vec<u8> {
     let mut window_start = -f64::INFINITY;
     let mut window_notes: Vec<RawNote> = Vec::new();
 
-    let mut flush_win = |w_notes: &mut Vec<RawNote>, t_notes: &mut Vec<RawNote>| {
+    let flush_win = |w_notes: &mut Vec<RawNote>, t_notes: &mut Vec<RawNote>| {
         if w_notes.len() <= max_voices_per_window {
             t_notes.append(w_notes);
         } else {
-            w_notes.sort_by(|a, b| b.velocity.partial_cmp(&a.velocity).unwrap_or(std::cmp::Ordering::Equal));
+            w_notes.sort_by(|a, b| {
+                b.velocity
+                    .partial_cmp(&a.velocity)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             t_notes.extend(w_notes.drain(0..max_voices_per_window));
             w_notes.clear();
         }
@@ -538,10 +679,14 @@ pub fn generate_symphony_midi_wasm(bytes: &[u8]) -> Vec<u8> {
     }
     flush_win(&mut window_notes, &mut thinned_notes);
 
-    thinned_notes.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap_or(std::cmp::Ordering::Equal));
+    thinned_notes.sort_by(|a, b| {
+        a.time
+            .partial_cmp(&b.time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let ppq = 480.0;
-    let sec_per_tick = 60.0 / (bpm as f64 * ppq);
+    let sec_per_tick = 60.0 / (f64::from(bpm) * ppq);
 
     let mut prepared_events = Vec::new();
     let mut violin_alternator = 0u32;
@@ -568,8 +713,9 @@ pub fn generate_symphony_midi_wasm(bytes: &[u8]) -> Vec<u8> {
         };
 
         if m >= 64 {
-            if violin_alternator % 2 == 0 {
+            if violin_alternator.is_multiple_of(2) {
                 add_note(&mut prepared_events, 0, m, 1.0);
+
                 add_note(&mut prepared_events, 1, m, 0.35);
             } else {
                 add_note(&mut prepared_events, 1, m, 0.85);
@@ -620,16 +766,21 @@ pub fn generate_symphony_midi_wasm(bytes: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+#[must_use]
 pub fn generate_concerto_midi_wasm(bytes: &[u8]) -> Vec<u8> {
     let (mut all_notes, bpm) = MidiParserHelper::parse_all_notes(bytes);
     if all_notes.is_empty() {
         return bytes.to_vec();
     }
 
-    all_notes.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap_or(std::cmp::Ordering::Equal));
+    all_notes.sort_by(|a, b| {
+        a.time
+            .partial_cmp(&b.time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let ppq = 480.0;
-    let sec_per_tick = 60.0 / (bpm as f64 * ppq);
+    let sec_per_tick = 60.0 / (f64::from(bpm) * ppq);
 
     let mut prepared_events = Vec::new();
     let mut last_timpani_time = -5.0f64;
