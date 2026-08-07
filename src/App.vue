@@ -683,13 +683,13 @@ async function loadFromLibrary(song: SongEntry) {
 .dashboard-grid {
   flex: 1;
   display: flex;
-  gap: 16px;
+  gap: 12px;
   overflow: hidden;
   margin-bottom: 16px;
 }
 
 .dashboard-sidebar {
-  width: 320px;
+  width: 420px;
   display: flex;
   flex-direction: column;
   gap: 16px;

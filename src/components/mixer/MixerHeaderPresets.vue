@@ -158,10 +158,15 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
+.mixer-header-presets {
+  padding: 12px 10px 0 10px;
+}
+
 .mixer-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
   margin-bottom: 14px;
 }
 
@@ -184,30 +189,47 @@ const emit = defineEmits<{
   margin: 0;
 }
 
+.mixer-actions {
+  width: 100%;
+}
+
 .mode-selector {
   display: flex;
-  background: rgba(255, 255, 255, 0.04);
-  padding: 3px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  width: 100%;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 5px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 6px;
 }
 
 .mode-btn {
-  background: transparent;
-  border: none;
-  color: #8c8c9e;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 0.72rem;
+  flex: 1;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #a0a0b0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.mode-btn:hover:not(.active) {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: rgba(0, 240, 255, 0.3);
+  color: #ffffff;
 }
 
 .mode-btn.active {
   background: #00f0ff;
+  border-color: #00f0ff;
   color: #0b0b12;
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
 }
 
 .master-fx-panel {

@@ -236,10 +236,10 @@ onBeforeUnmount(() => { stopTrackingVoices(); });
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
-.mixer-body { flex: 1; padding: 16px; overflow-y: auto; background: rgba(13, 13, 18, 0.6); }
+.mixer-body { flex: 1; padding: 12px 10px; overflow-y: auto; background: rgba(13, 13, 18, 0.6); }
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #606078; gap: 8px; }
 .empty-icon { width: 32px; height: 32px; opacity: 0.5; }
-.tracks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.tracks-grid { display: flex; flex-direction: column; gap: 12px; width: 100%; }
 
 .add-track-btn-bottom, .add-track-btn-center { 
   display: flex; 

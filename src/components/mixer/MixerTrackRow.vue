@@ -214,6 +214,11 @@ function formatPanValue(pan: number): string {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.track-card.dropdown-active {
+  overflow: visible;
+  z-index: 100;
+}
+
 .track-card.muted {
   opacity: 0.5;
   filter: grayscale(0.6);
@@ -267,7 +272,7 @@ function formatPanValue(pan: number): string {
 
 .track-details {
   flex: 1;
-  padding: 12px;
+  padding: 10px 8px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -313,6 +318,8 @@ function formatPanValue(pan: number): string {
 
 .instrument-selector-container {
   width: 100%;
+  position: relative;
+  z-index: 20;
 }
 
 .volume-slider-container {
@@ -359,29 +366,79 @@ function formatPanValue(pan: number): string {
 .mixer-buttons {
   display: flex;
   align-items: center;
+  width: 100%;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .btn-test, .btn-fx-toggle, .btn-mute, .btn-solo, .btn-delete {
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 0.68rem;
+  flex: 1;
+  justify-content: center;
+  padding: 6px 8px;
+  border-radius: 7px;
+  font-size: 0.72rem;
   font-weight: 700;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
   color: #a0a0b0;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
   transition: all 0.2s ease;
 }
 
-.btn-test:hover { background: rgba(0, 240, 255, 0.15); color: #00f0ff; }
-.btn-fx-toggle.active { background: rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.4); color: #c084fc; }
-.btn-mute.active { background: rgba(255, 77, 79, 0.2); border-color: rgba(255, 77, 79, 0.4); color: #ff4d4f; }
-.btn-solo.active { background: rgba(255, 215, 0, 0.2); border-color: rgba(255, 215, 0, 0.4); color: #ffd700; }
-.btn-delete:hover { background: rgba(255, 77, 79, 0.15); color: #ff4d4f; }
+.btn-test:hover { 
+  background: rgba(0, 240, 255, 0.15); 
+  border-color: rgba(0, 240, 255, 0.4); 
+  color: #00f0ff; 
+}
+
+.btn-fx-toggle:hover:not(.active) {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.3);
+  color: #e9d5ff;
+}
+
+.btn-fx-toggle.active { 
+  background: rgba(168, 85, 247, 0.25); 
+  border-color: rgba(168, 85, 247, 0.6); 
+  color: #c084fc; 
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+}
+
+.btn-mute:hover:not(.active) {
+  background: rgba(255, 77, 79, 0.15);
+  border-color: rgba(255, 77, 79, 0.3);
+  color: #ff7875;
+}
+
+.btn-mute.active { 
+  background: rgba(255, 77, 79, 0.25); 
+  border-color: rgba(255, 77, 79, 0.6); 
+  color: #ff4d4f; 
+  box-shadow: 0 0 10px rgba(255, 77, 79, 0.3);
+}
+
+.btn-solo:hover:not(.active) {
+  background: rgba(255, 215, 0, 0.15);
+  border-color: rgba(255, 215, 0, 0.3);
+  color: #ffec3d;
+}
+
+.btn-solo.active { 
+  background: rgba(255, 215, 0, 0.25); 
+  border-color: rgba(255, 215, 0, 0.6); 
+  color: #ffd700; 
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+.btn-delete:hover { 
+  background: rgba(255, 77, 79, 0.2); 
+  border-color: rgba(255, 77, 79, 0.5); 
+  color: #ff4d4f; 
+}
 
 .btn-icon { width: 12px; height: 12px; }
 
