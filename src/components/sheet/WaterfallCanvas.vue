@@ -349,6 +349,11 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
 }
 
 function startAnimation() {
+  if (!props.isActive || (typeof document !== 'undefined' && document.hidden)) {
+    stopAnimation();
+    return;
+  }
+
   parseMidiForVisualizer();
   stopAnimation();
   
@@ -365,6 +370,11 @@ function startAnimation() {
   lastFrameTimestamp = 0;
 
   const renderLoop = (timestamp: number) => {
+    if (!props.isActive || (typeof document !== 'undefined' && document.hidden)) {
+      stopAnimation();
+      return;
+    }
+
     if (lastFrameTimestamp > 0) {
       const dt = Math.min(Math.max((timestamp - lastFrameTimestamp) / 1000, 0), 0.1);
       if (props.isPlaying) {
@@ -397,6 +407,15 @@ function stopAnimation() {
   }
 }
 
+function handleVisibilityChange() {
+  if (typeof document !== 'undefined' && document.hidden) {
+    stopAnimation();
+  } else if (props.isActive) {
+    initCanvas();
+    startAnimation();
+  }
+}
+
 watch(() => props.fileData, () => {
   if (props.isActive) {
     initCanvas();
@@ -419,11 +438,17 @@ onMounted(() => {
     startAnimation();
   }
   window.addEventListener('resize', initCanvas);
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+  }
 });
 
 onBeforeUnmount(() => {
   stopAnimation();
   window.removeEventListener('resize', initCanvas);
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }
 });
 </script>
 
