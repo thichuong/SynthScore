@@ -30,15 +30,15 @@ let midiNotes: RenderNote[] = [];
 let maxMidi = 88;
 let minMidi = 36;
 
-const NEON_COLORS = [
-  '#00f0ff',
-  '#ff007f',
-  '#ffaa00',
-  '#39ff14',
-  '#8a2be2',
-  '#ff3b30',
-  '#00ffcc',
-  '#e2f105',
+const NOTE_COLORS = [
+  '#3b82f6', // Xanh dương
+  '#10b981', // Xanh lá
+  '#f59e0b', // Cam hổ phách
+  '#8b5cf6', // Tím nhạt
+  '#ec4899', // Hồng dịu
+  '#06b6d4', // Xanh ngọc
+  '#f97316', // Cam tươi
+  '#6366f1', // Xanh chàm
 ];
 
 async function parseMidiForVisualizer() {
@@ -170,15 +170,6 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
 
   const startIdx = binarySearchFirstNoteIndex(windowStart);
 
-  let visibleCount = 0;
-  for (let i = startIdx; i < midiNotes.length; i++) {
-    const note = midiNotes[i];
-    if (note.time > windowEnd) break;
-    visibleCount++;
-  }
-
-  const useShadow = visibleCount <= 200;
-
   for (let i = startIdx; i < midiNotes.length; i++) {
     const note = midiNotes[i];
     if (note.time > windowEnd) break;
@@ -197,26 +188,15 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
     const noteW = keyWidth - 2;
     const noteH = yEnd - Math.max(0, yStart);
 
-    const colorIndex = note.trackIndex % NEON_COLORS.length;
-    const color = NEON_COLORS[colorIndex];
+    const colorIndex = note.trackIndex % NOTE_COLORS.length;
+    const color = NOTE_COLORS[colorIndex];
 
     ctx.fillStyle = color;
-    if (useShadow) {
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 10;
-    }
-    
-    const radius = Math.min(noteW / 2, 5);
+    const radius = Math.min(noteW / 2, 4);
     ctx.beginPath();
     ctx.roundRect(noteX, noteY, noteW, noteH, radius);
     ctx.fill();
-    
-    if (useShadow) {
-      ctx.shadowBlur = 0;
-    }
   }
-
-  ctx.shadowBlur = 0;
 
   ctx.fillStyle = '#161622';
   ctx.fillRect(0, playAreaHeight, w, pianoHeight);
@@ -229,10 +209,10 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
     const isActive = activeKeys.has(m);
 
     if (isBlack) {
-      ctx.fillStyle = isActive ? '#ff007f' : '#000000';
+      ctx.fillStyle = isActive ? '#2563eb' : '#000000';
       ctx.fillRect(x + 1, playAreaHeight, keyWidth - 2, pianoHeight * 0.65);
     } else {
-      ctx.fillStyle = isActive ? '#00f0ff' : '#ffffff';
+      ctx.fillStyle = isActive ? '#60a5fa' : '#ffffff';
       ctx.fillRect(x, playAreaHeight, keyWidth - 1, pianoHeight);
     }
   }
