@@ -196,7 +196,7 @@ import { AudioEngine, type SoundfontProgress } from './services/audioEngine';
 import type { TrackInfo } from './services/midiGenerator';
 import { parseMusicXmlToMidiBytes } from './services/musicXmlParser';
 import { parseMxl } from './services/mxlParser';
-import { getCachedSong, cacheSong } from './services/appCache';
+import { getCachedSong, cacheSong, saveUploadedSong, getAllUploadedSongs, ensureUint8Array, type CachedUploadedSong } from './services/appCache';
 import { songLibrary } from './data/songLibrary';
 import type { SongEntry } from './data/songLibrary';
 
@@ -310,6 +310,64 @@ onMounted(() => {
   } catch (e) {
     console.error('Không thể đọc danh sách ưa thích từ localStorage:', e);
   }
+
+  // Tải các bản nhạc người dùng đã tải lên trước đó từ IndexedDB
+  getAllUploadedSongs().then(async cachedUploadedSongs => {
+    if (cachedUploadedSongs && cachedUploadedSongs.length > 0) {
+      let favoriteKeys: string[] = [];
+      try {
+        const saved = localStorage.getItem('synthscore_favorites');
+        if (saved) favoriteKeys = JSON.parse(saved);
+      } catch {}
+
+      const existingKeys = new Set(songs.value.map(s => getSongKey(s)));
+      const restoredEntries: SongEntry[] = [];
+
+      for (const item of cachedUploadedSongs) {
+        const midiBytes = ensureUint8Array(item.midiBytes);
+        const data = item.type === 'midi' ? ensureUint8Array(item.data) : item.data;
+        const songKey = `uploaded_${item.composer || ''}_${item.name}`;
+
+        const entry: SongEntry = {
+          name: item.name,
+          composer: item.composer,
+          tags: ['tải lên'],
+          isUploaded: true,
+          isFavorite: favoriteKeys.includes(songKey),
+          uploadedData: {
+            data,
+            type: item.type,
+            midiBytes,
+            rawText: item.rawText
+          }
+        };
+
+        if (!existingKeys.has(getSongKey(entry))) {
+          restoredEntries.push(entry);
+          existingKeys.add(getSongKey(entry));
+        }
+      }
+
+      if (restoredEntries.length > 0) {
+        songs.value.push(...restoredEntries);
+      }
+    }
+
+    // Tự động chọn lại bản nhạc đã nghe lần gần nhất
+    try {
+      const lastSongKey = localStorage.getItem('synthscore_last_song');
+      if (lastSongKey) {
+        const targetIdx = songs.value.findIndex(s => getSongKey(s) === lastSongKey);
+        if (targetIdx !== -1) {
+          await handleSongSelect(targetIdx);
+        }
+      }
+    } catch (e) {
+      console.warn('Không thể khôi phục bản nhạc đã chọn trước đó:', e);
+    }
+  }).catch(e => {
+    console.warn('Lỗi tải danh sách bản nhạc đã lưu từ IndexedDB:', e);
+  });
 
   AudioEngine.onStateChange(() => {
     isInitialized.value = AudioEngine.isInitialized;
@@ -504,6 +562,25 @@ async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xm
     }
   };
 
+  // Lưu bản nhạc vào IndexedDB để lần sau mở lên vẫn còn
+  const uploadedSongId = `uploaded_${Date.now()}_${extractedName}`;
+  const cachedItem: CachedUploadedSong = {
+    id: uploadedSongId,
+    name: extractedName,
+    composer: extractedComposer,
+    type: payload.type,
+    data: payload.data,
+    midiBytes,
+    rawText: rawTextValue,
+    createdAt: Date.now()
+  };
+  try {
+    await saveUploadedSong(cachedItem);
+    console.log('[IndexedDB] Đã lưu tệp tải lên thành công:', cachedItem.name);
+  } catch (e) {
+    console.error('Lỗi khi lưu bản nhạc tải lên vào IndexedDB:', e);
+  }
+
   songs.value.push(newUploadedSong);
   const newIndex = songs.value.length - 1;
   
@@ -515,11 +592,19 @@ async function handleSongSelect(index: number) {
   selectedSongIndex.value = index;
   const song: SongEntry = songs.value[index];
 
+  // Lưu bài hát được chọn gần nhất vào localStorage
+  try {
+    localStorage.setItem('synthscore_last_song', getSongKey(song));
+  } catch (e) {
+    console.warn('Không thể lưu last_song vào localStorage:', e);
+  }
+
   if (song.isUploaded && song.uploadedData) {
-    fileData.value = song.uploadedData.midiBytes;
+    const midiBytes = ensureUint8Array(song.uploadedData.midiBytes);
+    fileData.value = midiBytes;
     fileType.value = song.uploadedData.type;
     rawText.value = song.uploadedData.rawText;
-    await AudioEngine.loadSong(song.uploadedData.midiBytes, song.name, song.composer);
+    await AudioEngine.loadSong(midiBytes, song.name, song.composer);
   } else {
     await loadFromLibrary(song);
   }

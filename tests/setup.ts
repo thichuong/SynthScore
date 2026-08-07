@@ -148,6 +148,9 @@ vi.mock('../src/services/appCache', () => {
     saveUserSettings: vi.fn().mockImplementation(async (newSettings: any) => {
       mockUserSettings = { ...mockUserSettings, ...newSettings };
     }),
+    saveUploadedSong: vi.fn().mockResolvedValue(undefined),
+    getAllUploadedSongs: vi.fn().mockResolvedValue([]),
+    deleteUploadedSong: vi.fn().mockResolvedValue(undefined),
   };
 });
 
