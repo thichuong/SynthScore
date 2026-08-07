@@ -14,92 +14,26 @@
             </button>
           </div>
 
-          <div class="modal-body" ref="modalBodyRef">
-            <p class="modal-desc">Chọn định dạng và cấu hình để kết xuất bản nhạc <strong>{{ songName }}</strong></p>
+          <div class="modal-body">
+            <p class="modal-desc">Chọn định dạng chất lượng để kết xuất bản nhạc <strong>{{ songName }}</strong> (âm thanh tự động áp dụng thiết lập Mixer hiện tại)</p>
 
             <!-- Chọn định dạng -->
-            <div class="section-title">Định dạng đầu ra</div>
+            <div class="section-title">Định dạng &amp; Chất lượng đầu ra</div>
             <div class="format-cards-grid">
               <div 
-                v-for="fmt in formats" 
-                :key="fmt.id"
+                v-for="preset in exportPresets" 
+                :key="preset.id"
                 class="format-card"
-                :class="{ active: selectedFormat === fmt.id }"
-                @click="selectFormat(fmt.id)"
+                :class="{ active: selectedPresetId === preset.id }"
+                @click="selectPreset(preset.id)"
               >
-                <div class="format-badge" :class="fmt.id">{{ fmt.name }}</div>
+                <div class="format-badge" :class="preset.badgeClass">{{ preset.name }}</div>
                 <div class="format-info">
-                  <span class="format-title">{{ fmt.label }}</span>
-                  <span class="format-desc">{{ fmt.description }}</span>
+                  <span class="format-title">{{ preset.label }}</span>
+                  <span class="format-desc">{{ preset.description }}</span>
                 </div>
-                <div v-if="selectedFormat === fmt.id" class="active-check">
+                <div v-if="selectedPresetId === preset.id" class="active-check">
                   <Check class="check-icon" />
-                </div>
-              </div>
-            </div>
-
-            <!-- Tùy chọn chi tiết -->
-            <div class="settings-section">
-              <div class="section-title">
-                <Sliders class="settings-title-icon" />
-                <span>Cấu hình nâng cao</span>
-              </div>
-              
-              <div class="settings-grid">
-                <!-- Tùy chọn WAV Bit Depth -->
-                <div v-if="selectedFormat === 'wav'" class="setting-item">
-                  <label for="wav-bit-depth">Độ sâu bit (Bit Depth):</label>
-                  <select id="wav-bit-depth" v-model="wavBitDepth" class="settings-select">
-                    <option :value="24">24-bit PCM (Mặc định High-Res Studio)</option>
-                    <option :value="16">16-bit PCM (CD Standard)</option>
-                    <option :value="32">32-bit Float (IEEE Studio Master)</option>
-                  </select>
-                </div>
-
-                <!-- Chất lượng MP3 -->
-                <div v-if="selectedFormat === 'mp3'" class="setting-item">
-                  <label for="mp3-bitrate">Tốc độ bit (Bitrate):</label>
-                  <select id="mp3-bitrate" v-model="mp3Bitrate" class="settings-select">
-                    <option :value="128">128 kbps (Tiêu chuẩn)</option>
-                    <option :value="192">192 kbps (Chất lượng cao)</option>
-                    <option :value="320">320 kbps (Cực đỉnh - HQ)</option>
-                  </select>
-                </div>
-
-                <!-- Áp dụng Mixer -->
-                <div class="setting-item checkbox-item">
-                  <label class="checkbox-label">
-                    <input type="checkbox" v-model="applyMixer" />
-                    <span class="checkbox-custom"></span>
-                    <span class="label-text">Áp dụng thiết lập âm lượng &amp; panning của Mixer</span>
-                  </label>
-                </div>
-
-                <!-- Áp dụng Master Reverb không gian -->
-                <div class="setting-item checkbox-item">
-                  <label class="checkbox-label">
-                    <input type="checkbox" v-model="enableReverb" />
-                    <span class="checkbox-custom"></span>
-                    <span class="label-text">Bật hiệu ứng không gian Reverb 3D (Concert Hall)</span>
-                  </label>
-                </div>
-
-                <!-- Đuôi âm vang tự nhiên ở cuối bài -->
-                <div class="setting-item checkbox-item">
-                  <label class="checkbox-label">
-                    <input type="checkbox" v-model="includeTail" />
-                    <span class="checkbox-custom"></span>
-                    <span class="label-text">Giữ đuôi âm vang tự nhiên cuối bài (+3.5s)</span>
-                  </label>
-                </div>
-
-                <!-- Chuẩn hóa đỉnh âm thanh Peak Normalization -->
-                <div class="setting-item checkbox-item">
-                  <label class="checkbox-label">
-                    <input type="checkbox" v-model="normalizePeak" />
-                    <span class="checkbox-custom"></span>
-                    <span class="label-text">Chuẩn hóa đỉnh âm thanh Peak Normalization (-0.5 dBFS)</span>
-                  </label>
                 </div>
               </div>
             </div>
@@ -136,11 +70,11 @@
             </div>
             <div class="step-item" :class="{ active: exportStep === 'rendering', completed: isStepCompleted('rendering') }">
               <span class="step-dot"></span>
-              <span class="step-text">Tổng hợp âm thanh offline với Reverb 3D...</span>
+              <span class="step-text">Tổng hợp âm thanh offline theo Mixer...</span>
             </div>
             <div class="step-item" :class="{ active: exportStep === 'encoding', completed: isStepCompleted('encoding') }">
               <span class="step-dot"></span>
-              <span class="step-text">Chuẩn hóa Peak &amp; mã hóa định dạng {{ selectedFormat.toUpperCase() }}...</span>
+              <span class="step-text">Chuẩn hóa Peak &amp; mã hóa định dạng {{ activePresetName }}...</span>
             </div>
             <div class="step-item" :class="{ active: exportStep === 'done', completed: isStepCompleted('done') }">
               <span class="step-dot"></span>
@@ -154,9 +88,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
-import { X, Check, Sliders, Download } from 'lucide-vue-next';
+import { ref, computed, watch } from 'vue';
+import { X, Check, Download } from 'lucide-vue-next';
 import { AudioEngine } from '../../services/audioEngine';
+
+export type PresetId = 'mp3_320' | 'mp3_192' | 'wav_16' | 'wav_24' | 'wav_32' | 'flac' | 'alac' | 'dsd';
+
+export interface ExportPreset {
+  id: PresetId;
+  format: 'mp3' | 'wav' | 'flac' | 'alac' | 'dsd';
+  name: string;
+  label: string;
+  description: string;
+  badgeClass: string;
+  mp3Bitrate?: number;
+  wavBitDepth?: 16 | 24 | 32;
+}
 
 const props = defineProps<{
   isOpen: boolean;
@@ -168,52 +115,101 @@ const emit = defineEmits<{
 }>();
 
 const isExporting = ref(false);
-const selectedFormat = ref<'wav' | 'mp3' | 'flac' | 'alac' | 'dsd'>('mp3');
-const modalBodyRef = ref<HTMLElement | null>(null);
+const selectedPresetId = ref<PresetId>('mp3_320');
 
-function scrollToBottomIfNeeded() {
-  nextTick(() => {
-    if (modalBodyRef.value) {
-      const { scrollHeight, clientHeight } = modalBodyRef.value;
-      if (scrollHeight > clientHeight) {
-        modalBodyRef.value.scrollTo({
-          top: scrollHeight,
-          behavior: 'smooth'
-        });
-      }
-    }
-  });
-}
+const exportPresets: ExportPreset[] = [
+  {
+    id: 'mp3_192',
+    format: 'mp3',
+    name: 'MP3 192',
+    label: 'MP3 192 kbps (Chất lượng cao)',
+    description: 'Định dạng MP3 tiêu chuẩn nén nhiều, dung lượng tập tin cực kỳ nhỏ gọn',
+    badgeClass: 'mp3',
+    mp3Bitrate: 192
+  },
+  {
+    id: 'mp3_320',
+    format: 'mp3',
+    name: 'MP3 320',
+    label: 'MP3 320 kbps (Cực đỉnh - HQ)',
+    description: 'Định dạng MP3 chất lượng cao nhất, âm thanh sắc nét, tương thích cao',
+    badgeClass: 'mp3',
+    mp3Bitrate: 320
+  },
+  {
+    id: 'flac',
+    format: 'flac',
+    name: 'FLAC',
+    label: 'FLAC Lossless',
+    description: 'Nén không mất dữ liệu, tiết kiệm dung lượng (xuất dạng PCM lossless)',
+    badgeClass: 'flac'
+  },
+  {
+    id: 'alac',
+    format: 'alac',
+    name: 'ALAC',
+    label: 'Apple Lossless',
+    description: 'Nén không mất dữ liệu tối ưu cho hệ sinh thái Apple',
+    badgeClass: 'alac'
+  },
+  {
+    id: 'wav_16',
+    format: 'wav',
+    name: 'Wav 16',
+    label: 'WAV 16-bit PCM (CD Standard)',
+    description: 'Âm thanh PCM không nén tiêu chuẩn đĩa CD (16-bit / 44.1kHz)',
+    badgeClass: 'wav',
+    wavBitDepth: 16
+  },
+  {
+    id: 'wav_24',
+    format: 'wav',
+    name: 'Wav 24',
+    label: 'WAV 24-bit PCM (High-Res Studio)',
+    description: 'Chất lượng phòng thu chuyên nghiệp High-Resolution',
+    badgeClass: 'wav',
+    wavBitDepth: 24
+  },
+  {
+    id: 'wav_32',
+    format: 'wav',
+    name: 'Wav 32',
+    label: 'WAV 32-bit Float (IEEE Studio Master)',
+    description: 'Dải động không giới hạn cho hậu kỳ & dựng âm master phòng thu',
+    badgeClass: 'wav',
+    wavBitDepth: 32
+  },
+  {
+    id: 'dsd',
+    format: 'dsd',
+    name: 'DSD',
+    label: 'DSD64 (DSF)',
+    description: 'Chất lượng Audiophile siêu cao cấp 1-bit / 2.8224 MHz',
+    badgeClass: 'dsd'
+  }
+];
 
-function selectFormat(id: typeof selectedFormat.value) {
-  selectedFormat.value = id;
-  scrollToBottomIfNeeded();
-}
-
-watch(selectedFormat, () => {
-  scrollToBottomIfNeeded();
+const activePreset = computed(() => {
+  return exportPresets.find(p => p.id === selectedPresetId.value) || exportPresets[0];
 });
+
+const activePresetName = computed(() => {
+  return activePreset.value.name;
+});
+
+function selectPreset(id: PresetId) {
+  selectedPresetId.value = id;
+}
 
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
-    scrollToBottomIfNeeded();
+    if (!selectedPresetId.value) {
+      selectedPresetId.value = 'mp3_320';
+    }
   }
 });
-const mp3Bitrate = ref(320);
-const wavBitDepth = ref<16 | 24 | 32>(24);
-const applyMixer = ref(true);
-const enableReverb = ref(true);
-const includeTail = ref(true);
-const normalizePeak = ref(true);
-const exportStep = ref<'preparing' | 'rendering' | 'encoding' | 'done'>('preparing');
 
-const formats = [
-  { id: 'mp3', name: 'MP3', label: 'MP3 Compressed', description: 'Định dạng phổ biến, kích thước nhỏ gọn phù hợp chia sẻ' },
-  { id: 'flac', name: 'FLAC', label: 'FLAC Lossless', description: 'Nén không mất dữ liệu, tương thích cao (xuất dạng PCM lossless)' },
-  { id: 'alac', name: 'ALAC', label: 'Apple Lossless', description: 'Tối ưu hóa cho hệ sinh thái Apple (xuất dạng PCM lossless)' },
-  { id: 'wav', name: 'WAV', label: 'WAV Lossless PCM', description: 'Âm thanh chất lượng phòng thu, không nén (16-bit / 24-bit / 32-bit Float)' },
-  { id: 'dsd', name: 'DSD', label: 'DSD64 (DSF)', description: 'Chất lượng Audiophile siêu cao cấp 1-bit / 2.8224 MHz' }
-] as const;
+const exportStep = ref<'preparing' | 'rendering' | 'encoding' | 'done'>('preparing');
 
 function handleClose() {
   if (isExporting.value) return;
@@ -232,16 +228,18 @@ async function startExport() {
   isExporting.value = true;
   exportStep.value = 'preparing';
   
+  const preset = activePreset.value;
+
   try {
     const { blob, fileName } = await AudioEngine.exportAudio(
-      selectedFormat.value,
+      preset.format,
       {
-        mp3Bitrate: mp3Bitrate.value,
-        applyMixer: applyMixer.value,
-        enableReverb: enableReverb.value,
-        includeTail: includeTail.value,
-        normalizePeak: normalizePeak.value,
-        wavBitDepth: wavBitDepth.value
+        mp3Bitrate: preset.mp3Bitrate ?? 320,
+        wavBitDepth: preset.wavBitDepth ?? 24,
+        applyMixer: true,
+        enableReverb: true,
+        includeTail: true,
+        normalizePeak: true
       },
       (step) => {
         exportStep.value = step;
@@ -398,7 +396,7 @@ async function startExport() {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 8px;
 }
 
 .format-card {
@@ -430,7 +428,7 @@ async function startExport() {
   font-weight: 800;
   padding: 4px 8px;
   border-radius: 6px;
-  width: 54px;
+  min-width: 64px;
   text-align: center;
   flex-shrink: 0;
 }
@@ -478,116 +476,6 @@ async function startExport() {
   height: 12px;
   color: #0b0b12;
   stroke-width: 3px;
-}
-
-.settings-section {
-  background: rgba(255, 255, 255, 0.01);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 12px;
-  padding: 16px;
-}
-
-.settings-title-icon {
-  width: 14px;
-  height: 14px;
-  color: #00f0ff;
-}
-
-.settings-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.setting-item {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  text-align: left;
-}
-
-.setting-item label {
-  font-size: 0.75rem;
-  color: #a0a0b0;
-  font-weight: 500;
-}
-
-.settings-select {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 8px 12px;
-  color: #ffffff;
-  font-size: 0.8rem;
-  outline: none;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.settings-select:focus {
-  border-color: #00f0ff;
-}
-
-.checkbox-item {
-  flex-direction: row !important;
-  align-items: center;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  user-select: none;
-  font-size: 0.78rem !important;
-  color: #ffffff !important;
-}
-
-.checkbox-label input {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-  height: 0;
-  width: 0;
-}
-
-.checkbox-custom {
-  height: 16px;
-  width: 16px;
-  background-color: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  position: relative;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.checkbox-label:hover input ~ .checkbox-custom {
-  background-color: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.checkbox-label input:checked ~ .checkbox-custom {
-  background-color: #00f0ff;
-  border-color: #00f0ff;
-  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
-}
-
-.checkbox-custom:after {
-  content: "";
-  position: absolute;
-  display: none;
-  left: 5px;
-  top: 2px;
-  width: 4px;
-  height: 8px;
-  border: solid #0b0b12;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-
-.checkbox-label input:checked ~ .checkbox-custom:after {
-  display: block;
 }
 
 .modal-footer {
