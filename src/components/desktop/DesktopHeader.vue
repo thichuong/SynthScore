@@ -2,7 +2,7 @@
   <header class="app-header">
     <div class="logo-area">
       <div class="logo-icon-wrapper">
-        <img src="../../assets/logo.svg" alt="SynthScore" class="logo-icon animate-pulse" />
+        <img src="../../assets/logo.svg" alt="SynthScore" class="logo-icon" />
       </div>
       <div class="logo-text">
         <h1>SynthScore</h1>
@@ -97,36 +97,32 @@ const emit = defineEmits<{
 }
 
 .logo-icon-wrapper {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(112, 0, 255, 0.2));
-  border: 1px solid rgba(0, 240, 255, 0.4);
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
 }
 
 .logo-icon {
-  width: 24px;
-  height: 24px;
-  filter: drop-shadow(0 0 4px #00f0ff);
+  width: 22px;
+  height: 22px;
 }
 
 .logo-text h1 {
-  font-size: 1.25rem;
-  font-weight: 800;
+  font-size: 1.2rem;
+  font-weight: 700;
   margin: 0;
-  background: linear-gradient(90deg, #ffffff 0%, #00f0ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #ffffff;
   letter-spacing: 0.5px;
 }
 
 .logo-text p {
-  font-size: 0.72rem;
-  color: #8c8c9e;
+  font-size: 0.75rem;
+  color: #9aa0a6;
   margin: 2px 0 0 0;
 }
 
