@@ -162,6 +162,8 @@ const loading = ref(false);
 const isLoading = computed(() => props.loading || loading.value);
 let osmd: OpenSheetMusicDisplay | null = null;
 
+let activeRenderId = 0;
+
 watch([() => props.rawText, () => props.activeTab], async ([newText, newTab]) => {
   if (!newText) {
     clearSheetMusic();
@@ -172,14 +174,15 @@ watch([() => props.rawText, () => props.activeTab], async ([newText, newTab]) =>
     return;
   }
 
-  // Nếu rawText mới khác với rawText đã vẽ trước đó, reset trạng thái
+  // Nếu rawText mới khác với rawText đã vẽ trước đó, reset trạng thái đã vẽ
   if (newText !== renderedRawText) {
     clearSheetMusic();
     isSheetRendered.value = false;
   }
 
-  // Chỉ thực hiện vẽ khi tab 'sheet' đang ĐƯỢC HIỂN THỊ (clientWidth > 0) và chưa được vẽ
+  // CHỈ THỰC HIỆN VẼ KHI TAB 'sheet' ĐANG ĐƯỢC HIỂN THỊ (activeTab === 'sheet') VÀ CHƯA ĐƯỢC VẼ
   if (newTab === 'sheet' && !isSheetRendered.value) {
+    const currentRenderId = ++activeRenderId;
     isRenderingSheet.value = true;
     emit('update:isRenderingSheet', true);
     renderProgress.value = 25;
@@ -187,20 +190,30 @@ watch([() => props.rawText, () => props.activeTab], async ([newText, newTab]) =>
     // Chờ DOM v-show cập nhật xong container visible
     requestAnimationFrame(() => {
       setTimeout(async () => {
+        if (props.activeTab !== 'sheet' || currentRenderId !== activeRenderId) {
+          isRenderingSheet.value = false;
+          emit('update:isRenderingSheet', false);
+          return;
+        }
+
         try {
           renderProgress.value = 65;
-          await renderSheetMusic();
-          renderProgress.value = 100;
-          isSheetRendered.value = true;
-          renderedRawText = newText;
+          const success = await renderSheetMusic(currentRenderId);
+          if (success && currentRenderId === activeRenderId && props.activeTab === 'sheet') {
+            renderProgress.value = 100;
+            isSheetRendered.value = true;
+            renderedRawText = newText;
+          }
         } catch (e) {
           console.error('Lỗi khi hiển thị bản nhạc:', e);
         } finally {
-          setTimeout(() => {
-            loading.value = false;
-            isRenderingSheet.value = false;
-            emit('update:isRenderingSheet', false);
-          }, 150);
+          if (currentRenderId === activeRenderId) {
+            setTimeout(() => {
+              loading.value = false;
+              isRenderingSheet.value = false;
+              emit('update:isRenderingSheet', false);
+            }, 150);
+          }
         }
       }, 50);
     });
@@ -213,12 +226,14 @@ function clearSheetMusic() {
   if (abcContainer) abcContainer.innerHTML = '';
 }
 
-async function renderSheetMusic() {
+async function renderSheetMusic(renderId: number): Promise<boolean> {
   clearSheetMusic();
   const isMobile = isMobileDevice();
 
   if (props.fileType === 'xml' && props.rawText && osmdContainer.value) {
     const { OpenSheetMusicDisplay } = await import('opensheetmusicdisplay');
+    if (props.activeTab !== 'sheet' || renderId !== activeRenderId) return false;
+
     osmd = new OpenSheetMusicDisplay(osmdContainer.value, {
       autoResize: true,
       backend: 'svg',
@@ -229,6 +244,7 @@ async function renderSheetMusic() {
     });
 
     await osmd.load(props.rawText);
+    if (props.activeTab !== 'sheet' || renderId !== activeRenderId) return false;
     
     if (isMobile) {
       osmd.Zoom = 0.65;
@@ -237,15 +253,21 @@ async function renderSheetMusic() {
     }
 
     osmd.render();
+    return true;
   } 
   else if (props.fileType === 'abc' && props.rawText) {
     const abcjs = await import('abcjs');
+    if (props.activeTab !== 'sheet' || renderId !== activeRenderId) return false;
+
     abcjs.default.renderAbc('abc-container', props.rawText, {
       responsive: 'resize',
       add_classes: true,
       scale: isMobile ? 0.65 : 1.0,
     });
+    return true;
   }
+
+  return false;
 }
 </script>
 
