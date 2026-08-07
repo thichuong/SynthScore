@@ -63,6 +63,7 @@
           :rawText="rawText"
           :currentTime="currentTime"
           :isPlaying="isPlaying"
+          :isReady="isReady"
           :isActive="currentView === 'visualizer' || !hasSheet"
         />
       </div>
@@ -121,7 +122,10 @@ watch(hasSheet, (newHasSheet) => {
   }
 });
 
-watch(() => props.fileData, () => {
+watch([() => props.fileData, () => props.playbackMode], ([_newFileData, newMode], [_oldFileData, oldMode]) => {
+  if (oldMode !== undefined && newMode !== oldMode) {
+    return;
+  }
   currentView.value = 'visualizer';
 });
 </script>

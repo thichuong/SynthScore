@@ -48,6 +48,7 @@
           :rawText="rawText"
           :currentTime="currentTime"
           :isPlaying="isPlaying"
+          :isReady="isReady"
           :isActive="activeTab === 'visualizer' || !hasSheet"
         />
       </div>
@@ -89,8 +90,11 @@ const hasSheet = computed(() => {
   return props.fileType === 'xml' || props.fileType === 'abc';
 });
 
-// Tự động chuyển sang tab Thác nốt (visualizer) khi mở bài hát mới
-watch(() => props.fileData, () => {
+// Tự động chuyển sang tab Thác nốt (visualizer) khi mở bài hát mới (không chuyển khi đổi mode Mixer)
+watch([() => props.fileData, () => props.playbackMode], ([_newFileData, newMode], [_oldFileData, oldMode]) => {
+  if (oldMode !== undefined && newMode !== oldMode) {
+    return;
+  }
   activeTab.value = 'visualizer';
 });
 

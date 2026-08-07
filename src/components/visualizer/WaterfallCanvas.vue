@@ -1,12 +1,24 @@
 <template>
-  <div class="canvas-container">
+  <div class="canvas-container" @click="togglePlay">
     <canvas ref="visualizerCanvas" class="visualizer-canvas"></canvas>
+
+    <!-- Overlay Icon Phát/Tạm Dừng khi click màn hình -->
+    <Transition name="fade-scale">
+      <div v-if="overlayIcon" class="click-feedback-overlay">
+        <div class="feedback-icon-circle">
+          <Play v-if="overlayIcon === 'play'" class="feedback-icon play-icon" />
+          <Pause v-else class="feedback-icon" />
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { Midi } from '@tonejs/midi';
+import { Play, Pause } from 'lucide-vue-next';
+import { AudioEngine } from '../../services/audioEngine';
 
 const props = defineProps<{
   fileData: Uint8Array | string | null;
@@ -15,7 +27,33 @@ const props = defineProps<{
   currentTime: number;
   isPlaying?: boolean;
   isActive: boolean;
+  isReady?: boolean;
 }>();
+
+const overlayIcon = ref<'play' | 'pause' | null>(null);
+let overlayTimeoutId: number | null = null;
+
+function triggerClickFeedback(type: 'play' | 'pause') {
+  overlayIcon.value = type;
+  if (overlayTimeoutId !== null) {
+    clearTimeout(overlayTimeoutId);
+  }
+  overlayTimeoutId = window.setTimeout(() => {
+    overlayIcon.value = null;
+    overlayTimeoutId = null;
+  }, 500);
+}
+
+function togglePlay() {
+  if (props.isReady === false) return;
+  if (props.isPlaying) {
+    AudioEngine.pause();
+    triggerClickFeedback('pause');
+  } else {
+    AudioEngine.play();
+    triggerClickFeedback('play');
+  }
+}
 
 const visualizerCanvas = ref<HTMLCanvasElement | null>(null);
 let animationFrameId: number | null = null;
@@ -459,11 +497,49 @@ onBeforeUnmount(() => {
   position: relative;
   overflow: hidden;
   background: #0f0f15;
+  cursor: pointer;
 }
 
 .visualizer-canvas {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.click-feedback-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 100;
+}
+
+.feedback-icon-circle {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: rgba(0, 240, 255, 0.25);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 240, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+}
+
+.feedback-icon {
+  width: 32px;
+  height: 32px;
+  color: #ffffff;
+}
+
+.fade-scale-enter-active, .fade-scale-leave-active {
+  transition: all 0.3s ease;
+}
+
+.fade-scale-enter-from, .fade-scale-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.5);
 }
 </style>
