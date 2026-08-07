@@ -557,7 +557,7 @@ class AudioEngineService {
           this.onTimeUpdateCallback(this.currentTime);
         }
       }
-    }, 100);
+    }, 33);
   }
 
   private stopTimeLoop(): void {

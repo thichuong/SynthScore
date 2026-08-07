@@ -33,6 +33,7 @@
         :fileType="fileType"
         :rawText="rawText"
         :currentTime="currentTime"
+        :isPlaying="isPlaying"
         :isActive="activeTab === 'visualizer' || !hasSheet"
       />
     </div>

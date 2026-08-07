@@ -13,11 +13,24 @@ const props = defineProps<{
   fileType: 'xml' | 'abc' | 'midi' | null;
   rawText: string | null;
   currentTime: number;
+  isPlaying?: boolean;
   isActive: boolean;
 }>();
 
 const visualizerCanvas = ref<HTMLCanvasElement | null>(null);
 let animationFrameId: number | null = null;
+
+// Nội suy thời gian mượt mà (High-Precision Time Interpolation)
+let smoothTime = 0;
+let lastFrameTimestamp = 0;
+
+watch(() => props.currentTime, (newTime) => {
+  const diff = Math.abs(newTime - smoothTime);
+  // Nếu kéo thanh tua (Seek) hoặc tạm dừng hoặc chênh lệch quá 0.2s, gán trực tiếp
+  if (diff > 0.2 || !props.isPlaying) {
+    smoothTime = newTime;
+  }
+});
 
 interface RenderNote {
   midi: number;
@@ -40,6 +53,25 @@ const NOTE_COLORS = [
   '#f97316', // Cam tươi
   '#6366f1', // Xanh chàm
 ];
+
+// Pre-computed lookup cho phím đen (O(1) access)
+const IS_BLACK_KEY = [false, true, false, true, false, false, true, false, true, false, true, false];
+
+// Offscreen Canvas Caching cho phần tĩnh (Nền, đường lưới, phím nhàn rỗi)
+let offscreenBgCanvas: HTMLCanvasElement | null = null;
+let offscreenBgCtx: CanvasRenderingContext2D | null = null;
+
+// Zero-allocation active keys tracking & batch rects
+const activeKeysArray = new Uint8Array(128);
+
+interface NoteRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  r: number;
+}
+const batchNoteRects: NoteRect[][] = Array.from({ length: NOTE_COLORS.length }, () => []);
 
 async function parseMidiForVisualizer() {
   midiNotes = [];
@@ -96,7 +128,7 @@ async function parseMidiForVisualizer() {
       });
     });
 
-    // Sắp xếp midiNotes theo thời gian tăng dần để binarySearch và vòng lặp vẽ hiển thị đầy đủ tất cả các kênh (channels / tracks)
+    // Sắp xếp midiNotes theo thời gian tăng dần để binarySearch hiển thị mượt mà
     midiNotes.sort((a, b) => a.time - b.time);
 
     minMidi = Math.max(21, tempMin - 5);
@@ -105,9 +137,75 @@ async function parseMidiForVisualizer() {
       minMidi = 36;
       maxMidi = 88;
     }
+
+    // Vẽ lại nền tĩnh sau khi dải phím (minMidi / maxMidi) thay đổi
+    if (visualizerCanvas.value) {
+      renderStaticBackground(visualizerCanvas.value.width, visualizerCanvas.value.height);
+    }
   } catch (e) {
     console.error('Không thể parse dữ liệu nốt nhạc vẽ Canvas:', e);
   }
+}
+
+function renderStaticBackground(w: number, h: number) {
+  if (w <= 0 || h <= 0) return;
+  if (!offscreenBgCanvas) {
+    offscreenBgCanvas = document.createElement('canvas');
+  }
+  if (offscreenBgCanvas.width !== w || offscreenBgCanvas.height !== h) {
+    offscreenBgCanvas.width = w;
+    offscreenBgCanvas.height = h;
+  }
+
+  offscreenBgCtx = offscreenBgCanvas.getContext('2d', { alpha: false });
+  if (!offscreenBgCtx) return;
+
+  const ctx = offscreenBgCtx;
+  const pianoHeight = h * 0.18;
+  const playAreaHeight = h - pianoHeight;
+  const keyCount = maxMidi - minMidi + 1;
+  const keyWidth = w / keyCount;
+
+  // 1. Phông nền tối
+  ctx.fillStyle = '#0f0f15';
+  ctx.fillRect(0, 0, w, h);
+
+  // 2. Đường kẻ đệm khung hình rơi (Gom tất cả đường kẻ vào 1 path duy nhất)
+  ctx.strokeStyle = '#1e1e2d';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i <= keyCount; i++) {
+    const x = Math.round(i * keyWidth);
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, playAreaHeight);
+  }
+  ctx.stroke();
+
+  // 3. Khung bàn phím piano phía dưới
+  ctx.fillStyle = '#161622';
+  ctx.fillRect(0, playAreaHeight, w, pianoHeight);
+
+  // 4. Phím trắng tĩnh (Gom vào 1 fill call)
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  for (let m = minMidi; m <= maxMidi; m++) {
+    if (!IS_BLACK_KEY[m % 12]) {
+      const x = (m - minMidi) * keyWidth;
+      ctx.rect(x, playAreaHeight, keyWidth - 1, pianoHeight);
+    }
+  }
+  ctx.fill();
+
+  // 5. Phím đen tĩnh (Gom vào 1 fill call)
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  for (let m = minMidi; m <= maxMidi; m++) {
+    if (IS_BLACK_KEY[m % 12]) {
+      const x = (m - minMidi) * keyWidth;
+      ctx.rect(x + 1, playAreaHeight, keyWidth - 2, pianoHeight * 0.65);
+    }
+  }
+  ctx.fill();
 }
 
 function initCanvas() {
@@ -119,10 +217,15 @@ function initCanvas() {
   const rawW = rect?.width && rect.width > 0 ? rect.width : 800;
   const rawH = rect?.height && rect.height > 0 ? rect.height : 500;
 
-  canvas.width = Math.min(Math.floor(rawW * dpr), 2048);
-  canvas.height = Math.min(Math.floor(rawH * dpr), 2048);
+  const w = Math.min(Math.floor(rawW * dpr), 2048);
+  const h = Math.min(Math.floor(rawH * dpr), 2048);
+
+  canvas.width = w;
+  canvas.height = h;
   canvas.style.width = '100%';
   canvas.style.height = '100%';
+
+  renderStaticBackground(w, h);
 }
 
 function binarySearchFirstNoteIndex(targetTime: number): number {
@@ -141,35 +244,39 @@ function binarySearchFirstNoteIndex(targetTime: number): number {
 function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
   const w = canvas.width;
   const h = canvas.height;
+
+  // 1. Sao chép nền tĩnh (Offscreen Canvas GPU Texture copy - 1 draw operation)
+  if (offscreenBgCanvas) {
+    ctx.drawImage(offscreenBgCanvas, 0, 0);
+  } else {
+    ctx.fillStyle = '#0f0f15';
+    ctx.fillRect(0, 0, w, h);
+  }
+
   const pianoHeight = h * 0.18;
   const playAreaHeight = h - pianoHeight;
-
-  ctx.fillStyle = '#0f0f15';
-  ctx.fillRect(0, 0, w, h);
-
   const keyCount = maxMidi - minMidi + 1;
   const keyWidth = w / keyCount;
 
-  ctx.strokeStyle = '#1e1e2d';
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= keyCount; i++) {
-    ctx.beginPath();
-    ctx.moveTo(i * keyWidth, 0);
-    ctx.lineTo(i * keyWidth, playAreaHeight);
-    ctx.stroke();
-  }
-
   const VISIBLE_SECONDS = 4.0;
   const speed = h / VISIBLE_SECONDS;
-  const curTime = props.currentTime;
+  
+  // Dùng thời gian nội suy smoothTime để chuyển động nốt rơi mượt mà 60-144 FPS
+  const curTime = smoothTime;
 
-  const activeKeys = new Set<number>();
+  // Clear active keys array & batch rects mà không tạo rác bộ nhớ
+  activeKeysArray.fill(0);
+  for (let c = 0; c < NOTE_COLORS.length; c++) {
+    batchNoteRects[c].length = 0;
+  }
+
   const marginBehind = 1.0;
   const windowStart = curTime - marginBehind;
   const windowEnd = curTime + VISIBLE_SECONDS;
 
   const startIdx = binarySearchFirstNoteIndex(windowStart);
 
+  // 2. Gom nhóm các nốt nhạc theo màu sắc
   for (let i = startIdx; i < midiNotes.length; i++) {
     const note = midiNotes[i];
     if (note.time > windowEnd) break;
@@ -180,7 +287,9 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
     if (yEnd < 0 || yStart > playAreaHeight) continue;
 
     if (curTime >= note.time && curTime <= note.time + note.duration) {
-      activeKeys.add(note.midi);
+      if (note.midi >= 0 && note.midi < 128) {
+        activeKeysArray[note.midi] = 1;
+      }
     }
 
     const noteX = (note.midi - minMidi) * keyWidth;
@@ -188,34 +297,55 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
     const noteW = keyWidth - 2;
     const noteH = yEnd - Math.max(0, yStart);
 
+    const radius = noteW > 8 ? Math.min(noteW / 2, 4) : 0;
     const colorIndex = note.trackIndex % NOTE_COLORS.length;
-    const color = NOTE_COLORS[colorIndex];
+    batchNoteRects[colorIndex].push({ x: noteX, y: noteY, w: noteW, h: noteH, r: radius });
+  }
 
-    ctx.fillStyle = color;
-    const radius = Math.min(noteW / 2, 4);
+  // 3. Vẽ nốt rơi theo từng mảng màu gom nhóm (Tối đa 8 draw calls cho tất cả các nốt)
+  for (let c = 0; c < NOTE_COLORS.length; c++) {
+    const rects = batchNoteRects[c];
+    if (rects.length === 0) continue;
+
+    ctx.fillStyle = NOTE_COLORS[c];
     ctx.beginPath();
-    ctx.roundRect(noteX, noteY, noteW, noteH, radius);
+    for (let r = 0; r < rects.length; r++) {
+      const item = rects[r];
+      if (item.r > 0) {
+        ctx.roundRect(item.x, item.y, item.w, item.h, item.r);
+      } else {
+        ctx.rect(item.x, item.y, item.w, item.h);
+      }
+    }
     ctx.fill();
   }
 
-  ctx.fillStyle = '#161622';
-  ctx.fillRect(0, playAreaHeight, w, pianoHeight);
-
-  const blackKeys = [1, 3, 6, 8, 10];
-
+  // 4. Chỉ vẽ đè lên các phím piano đang kích hoạt (Active Key Highlights Only)
+  // Highlight phím trắng đang nhấn
+  ctx.fillStyle = '#60a5fa';
+  ctx.beginPath();
+  let hasActiveWhite = false;
   for (let m = minMidi; m <= maxMidi; m++) {
-    const isBlack = blackKeys.includes(m % 12);
-    const x = (m - minMidi) * keyWidth;
-    const isActive = activeKeys.has(m);
-
-    if (isBlack) {
-      ctx.fillStyle = isActive ? '#2563eb' : '#000000';
-      ctx.fillRect(x + 1, playAreaHeight, keyWidth - 2, pianoHeight * 0.65);
-    } else {
-      ctx.fillStyle = isActive ? '#60a5fa' : '#ffffff';
-      ctx.fillRect(x, playAreaHeight, keyWidth - 1, pianoHeight);
+    if (activeKeysArray[m] === 1 && !IS_BLACK_KEY[m % 12]) {
+      const x = (m - minMidi) * keyWidth;
+      ctx.rect(x, playAreaHeight, keyWidth - 1, pianoHeight);
+      hasActiveWhite = true;
     }
   }
+  if (hasActiveWhite) ctx.fill();
+
+  // Highlight phím đen đang nhấn
+  ctx.fillStyle = '#2563eb';
+  ctx.beginPath();
+  let hasActiveBlack = false;
+  for (let m = minMidi; m <= maxMidi; m++) {
+    if (activeKeysArray[m] === 1 && IS_BLACK_KEY[m % 12]) {
+      const x = (m - minMidi) * keyWidth;
+      ctx.rect(x + 1, playAreaHeight, keyWidth - 2, pianoHeight * 0.65);
+      hasActiveBlack = true;
+    }
+  }
+  if (hasActiveBlack) ctx.fill();
 }
 
 function startAnimation() {
@@ -225,10 +355,35 @@ function startAnimation() {
   const canvas = visualizerCanvas.value;
   if (!canvas) return;
 
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', {
+    alpha: false,
+    desynchronized: true
+  });
   if (!ctx) return;
 
-  const renderLoop = () => {
+  smoothTime = props.currentTime;
+  lastFrameTimestamp = 0;
+
+  const renderLoop = (timestamp: number) => {
+    if (lastFrameTimestamp > 0) {
+      const dt = Math.min(Math.max((timestamp - lastFrameTimestamp) / 1000, 0), 0.1);
+      if (props.isPlaying) {
+        smoothTime += dt;
+        // Hiệu chỉnh trôi thời gian (drift correction) bám sát props.currentTime
+        const drift = props.currentTime - smoothTime;
+        if (Math.abs(drift) < 0.2) {
+          smoothTime += drift * 0.1;
+        } else {
+          smoothTime = props.currentTime;
+        }
+      } else {
+        smoothTime = props.currentTime;
+      }
+    } else {
+      smoothTime = props.currentTime;
+    }
+    lastFrameTimestamp = timestamp;
+
     drawVisualizer(canvas, ctx);
     animationFrameId = requestAnimationFrame(renderLoop);
   };
