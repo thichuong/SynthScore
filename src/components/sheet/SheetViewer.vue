@@ -26,9 +26,9 @@
       </div>
     </Transition>
 
-    <!-- Overlay Đang Tải Bản Nhạc (Hiển thị to rõ ở ngoài với tiến độ & dung lượng) -->
+    <!-- Overlay Đang Tải / Đang Vẽ Bản Nhạc (Hiển thị tiến độ, thông báo nhạc vẫn đang phát mượt mà) -->
     <Transition name="fade">
-      <div v-if="isLoading" class="sheet-loading-overlay">
+      <div v-if="isLoading || isRenderingSheet" class="sheet-loading-overlay">
         <div class="loading-card glass-panel">
           <div class="spinner-container">
             <div class="spinner-outer"></div>
@@ -37,14 +37,19 @@
           </div>
 
           <div class="loading-content">
-            <span class="loading-title">Đang tải bản nhạc...</span>
+            <span class="loading-title">
+              {{ isRenderingSheet ? 'Đang vẽ bản nhạc...' : 'Đang tải bản nhạc...' }}
+            </span>
+            <span class="loading-subtitle">
+              Nhạc vẫn đang phát bình thường
+            </span>
             <div class="loading-meta" v-if="computedFileSize">
               <HardDrive class="meta-icon" />
               <span class="file-size-badge">Dung lượng: {{ computedFileSize }}</span>
             </div>
           </div>
 
-          <!-- Thanh tiến độ tải -->
+          <!-- Thanh tiến độ tải / vẽ -->
           <div class="progress-section">
             <div class="progress-info">
               <span class="progress-status-text">Tiến độ nạp dữ liệu</span>
@@ -83,6 +88,10 @@ const props = defineProps<{
   fileSize?: number | string;
 }>();
 
+const emit = defineEmits<{
+  (e: 'update:isRenderingSheet', isRendering: boolean): void;
+}>();
+
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return '';
   const k = 1024;
@@ -112,6 +121,9 @@ const computedFileSize = computed<string>(() => {
 });
 
 const renderProgress = ref(0);
+const isRenderingSheet = ref(false);
+const isSheetRendered = ref(false);
+let renderedRawText: string | null = null;
 
 const displayProgress = computed(() => {
   if (props.loadingProgress !== undefined && props.loadingProgress !== null && props.loadingProgress > 0) {
@@ -150,28 +162,50 @@ const loading = ref(false);
 const isLoading = computed(() => props.loading || loading.value);
 let osmd: OpenSheetMusicDisplay | null = null;
 
-watch(() => props.rawText, async (newText) => {
+watch([() => props.rawText, () => props.activeTab], async ([newText, newTab]) => {
   if (!newText) {
     clearSheetMusic();
+    isSheetRendered.value = false;
+    renderedRawText = null;
+    isRenderingSheet.value = false;
+    emit('update:isRenderingSheet', false);
     return;
   }
-  
-  loading.value = true;
-  renderProgress.value = 25;
-  setTimeout(async () => {
-    try {
-      renderProgress.value = 65;
-      await renderSheetMusic();
-      renderProgress.value = 100;
-    } catch (e) {
-      console.error('Lỗi khi hiển thị bản nhạc:', e);
-    } finally {
-      setTimeout(() => {
-        loading.value = false;
-      }, 150);
-    }
-  }, 100);
-});
+
+  // Nếu rawText mới khác với rawText đã vẽ trước đó, reset trạng thái
+  if (newText !== renderedRawText) {
+    clearSheetMusic();
+    isSheetRendered.value = false;
+  }
+
+  // Chỉ thực hiện vẽ khi tab 'sheet' đang ĐƯỢC HIỂN THỊ (clientWidth > 0) và chưa được vẽ
+  if (newTab === 'sheet' && !isSheetRendered.value) {
+    isRenderingSheet.value = true;
+    emit('update:isRenderingSheet', true);
+    renderProgress.value = 25;
+
+    // Chờ DOM v-show cập nhật xong container visible
+    requestAnimationFrame(() => {
+      setTimeout(async () => {
+        try {
+          renderProgress.value = 65;
+          await renderSheetMusic();
+          renderProgress.value = 100;
+          isSheetRendered.value = true;
+          renderedRawText = newText;
+        } catch (e) {
+          console.error('Lỗi khi hiển thị bản nhạc:', e);
+        } finally {
+          setTimeout(() => {
+            loading.value = false;
+            isRenderingSheet.value = false;
+            emit('update:isRenderingSheet', false);
+          }, 150);
+        }
+      }, 50);
+    });
+  }
+}, { immediate: true });
 
 function clearSheetMusic() {
   if (osmdContainer.value) osmdContainer.value.innerHTML = '';
@@ -377,6 +411,12 @@ async function renderSheetMusic() {
   color: #ffffff;
   letter-spacing: 0.5px;
   text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+}
+
+.loading-subtitle {
+  font-size: 0.8rem;
+  color: #a0a0b8;
+  font-weight: 500;
 }
 
 .loading-meta {

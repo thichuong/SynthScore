@@ -120,6 +120,10 @@ watch(hasSheet, (newHasSheet) => {
     currentView.value = 'visualizer';
   }
 });
+
+watch(() => props.fileData, () => {
+  currentView.value = 'visualizer';
+});
 </script>
 
 <style scoped>

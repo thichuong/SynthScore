@@ -17,6 +17,7 @@
         :hasSheet="hasSheet"
         :isPlaying="isPlaying"
         :isReady="isReady"
+        :isRenderingSheet="isRenderingSheet"
         @update:activeTab="activeTab = $event"
         @togglePlay="togglePlay"
       />
@@ -36,6 +37,7 @@
           :loading="loading"
           :loadingProgress="loadingProgress"
           :fileSize="fileSize"
+          @update:isRenderingSheet="isRenderingSheet = $event"
         />
 
         <!-- Tab 2: Thác nốt (Piano Roll Waterfall Visualizer Canvas) -->
@@ -81,18 +83,16 @@ const emit = defineEmits<{
 }>();
 
 const activeTab = ref<'sheet' | 'visualizer'>('visualizer');
+const isRenderingSheet = ref(false);
 
 const hasSheet = computed(() => {
   return props.fileType === 'xml' || props.fileType === 'abc';
 });
 
-watch(hasSheet, (newHasSheet) => {
-  if (newHasSheet) {
-    activeTab.value = 'sheet';
-  } else {
-    activeTab.value = 'visualizer';
-  }
-}, { immediate: true });
+// Tự động chuyển sang tab Thác nốt (visualizer) khi mở bài hát mới
+watch(() => props.fileData, () => {
+  activeTab.value = 'visualizer';
+});
 
 function togglePlay() {
   if (!props.isReady) return;

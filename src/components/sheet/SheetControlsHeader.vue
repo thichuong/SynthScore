@@ -4,11 +4,16 @@
       <button 
         v-if="hasSheet"
         class="tab-btn" 
-        :class="{ active: activeTab === 'sheet' }"
+        :class="{ active: activeTab === 'sheet', rendering: isRenderingSheet }"
         @click="emit('update:activeTab', 'sheet')"
       >
-        <Music class="icon" /> Bản Nhạc (Sheet Music)
+        <Music class="icon" /> 
+        <span>Bản Nhạc (Sheet Music)</span>
+        <span v-if="isRenderingSheet" class="rendering-tag">
+          <Loader2 class="spin-icon" /> Đang vẽ...
+        </span>
       </button>
+
       <button 
         class="tab-btn" 
         :class="{ active: activeTab === 'visualizer' }"
@@ -34,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { Music, Layers, Play, Pause } from 'lucide-vue-next';
+import { Music, Layers, Play, Pause, Loader2 } from 'lucide-vue-next';
 
 defineProps<{
   activeTab: 'sheet' | 'visualizer';
@@ -42,6 +47,7 @@ defineProps<{
   isPlaying: boolean;
   isReady: boolean;
   hideHeader?: boolean;
+  isRenderingSheet?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -90,6 +96,35 @@ const emit = defineEmits<{
   border-color: rgba(0, 240, 255, 0.35);
   color: #00f0ff;
   box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.rendering-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: #00f0ff;
+  background: rgba(0, 240, 255, 0.15);
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  margin-left: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.spin-icon {
+  width: 12px;
+  height: 12px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1.0; }
 }
 
 .icon {
