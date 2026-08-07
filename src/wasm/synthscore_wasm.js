@@ -93,6 +93,38 @@ export function parse_musicxml_to_midi_wasm(xml_text) {
     wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
     return v2;
 }
+
+/**
+ * @param {Uint8Array} mxl_bytes
+ * @returns {Uint8Array}
+ */
+export function parse_mxl_to_midi_wasm(mxl_bytes) {
+    const ptr0 = passArray8ToWasm0(mxl_bytes, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.parse_mxl_to_midi_wasm(ptr0, len0);
+    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v2;
+}
+
+/**
+ * @param {Uint8Array} mxl_bytes
+ * @returns {string}
+ */
+export function parse_mxl_to_xml_wasm(mxl_bytes) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ptr0 = passArray8ToWasm0(mxl_bytes, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.parse_mxl_to_xml_wasm(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,

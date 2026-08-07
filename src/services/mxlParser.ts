@@ -1,18 +1,26 @@
 import JSZip from 'jszip';
+import { getWasmModule, isWasmAvailable } from './wasmLoader';
 
 /**
  * Giải nén file MXL (compressed MusicXML) và trả về nội dung MusicXML dạng chuỗi.
- *
- * File .mxl là một archive ZIP chứa:
- * - META-INF/container.xml — chỉ định rootfile (đường dẫn tới file XML chính)
- * - Một hoặc nhiều file .xml chứa nội dung MusicXML thực tế
- *
- * Hàm này sẽ:
- * 1. Đọc container.xml để tìm rootfile
- * 2. Nếu không có container.xml, tìm file .xml lớn nhất trong archive
- * 3. Trả về nội dung text của file MusicXML chính
+ * Đã tối ưu hóa sử dụng Rust WASM Engine (với JSZip fallback).
  */
 export async function parseMxl(buffer: ArrayBuffer): Promise<string> {
+  if (isWasmAvailable()) {
+    try {
+      const wasm = await getWasmModule();
+      if (wasm && typeof wasm.parse_mxl_to_xml_wasm === 'function') {
+        const u8 = new Uint8Array(buffer);
+        const xmlText = wasm.parse_mxl_to_xml_wasm(u8);
+        if (xmlText && xmlText.trim().length > 0) {
+          return xmlText;
+        }
+      }
+    } catch (e) {
+      console.warn('[MXLParser] Lỗi khi dùng WASM MXL parser, chuyển sang JSZip fallback:', e);
+    }
+  }
+
   const zip = await JSZip.loadAsync(buffer);
 
   // --- Bước 1: Thử đọc META-INF/container.xml ---

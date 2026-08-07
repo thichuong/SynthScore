@@ -23,6 +23,8 @@ export interface SynthScoreWasmModule {
   generate_symphony_midi_wasm: (bytes: Uint8Array) => Uint8Array;
   generate_concerto_midi_wasm: (bytes: Uint8Array) => Uint8Array;
   parse_musicxml_to_midi_wasm: (xml_text: string) => Uint8Array;
+  parse_mxl_to_xml_wasm?: (mxl_bytes: Uint8Array) => string;
+  parse_mxl_to_midi_wasm?: (mxl_bytes: Uint8Array) => Uint8Array;
   encode_wav_wasm: (samples_l: Float32Array, samples_r: Float32Array, sample_rate: number, bit_depth: number) => Uint8Array;
   encode_dsd_dsf_wasm: (samples_l: Float32Array, samples_r: Float32Array, sample_rate: number, oversample_factor: number) => Uint8Array;
 }

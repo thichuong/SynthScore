@@ -97,5 +97,35 @@ describe('Rust WASM Engine Integration', () => {
     // Check DSD header magic bytes
     expect(String.fromCharCode(dsfBytes[0], dsfBytes[1], dsfBytes[2], dsfBytes[3])).toBe('DSD ');
   });
+
+  it('should parse compressed MXL to XML text and MIDI binary via WASM module', async () => {
+    const wasm = await getWasmModule();
+    if (!wasm || typeof wasm.parse_mxl_to_xml_wasm !== 'function' || typeof wasm.parse_mxl_to_midi_wasm !== 'function') return;
+
+    // Build a simple zip buffer in memory
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    const sampleXml = `<?xml version="1.0" encoding="UTF-8"?>
+    <score-partwise version="3.1">
+      <part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+      <part id="P1">
+        <measure number="1">
+          <attributes><divisions>4</divisions></attributes>
+          <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+        </measure>
+      </part>
+    </score-partwise>`;
+    zip.file('META-INF/container.xml', `<?xml version="1.0"?><container version="1.0"><rootfiles><rootfile full-path="score.xml"/></rootfiles></container>`);
+    zip.file('score.xml', sampleXml);
+
+    const mxlBuffer = await zip.generateAsync({ type: 'uint8array' });
+
+    const extractedXml = wasm.parse_mxl_to_xml_wasm(mxlBuffer);
+    expect(extractedXml).toBe(sampleXml);
+
+    const midiBytes = wasm.parse_mxl_to_midi_wasm(mxlBuffer);
+    expect(midiBytes instanceof Uint8Array).toBe(true);
+    expect(midiBytes.length).toBeGreaterThan(0);
+  });
 });
 

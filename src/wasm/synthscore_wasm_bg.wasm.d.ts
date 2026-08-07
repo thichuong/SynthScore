@@ -8,6 +8,8 @@ export const generate_symphony_midi_wasm: (a: number, b: number) => [number, num
 export const init_synthscore_wasm: () => number;
 export const parse_midi_tracks_wasm: (a: number, b: number) => any;
 export const parse_musicxml_to_midi_wasm: (a: number, b: number) => [number, number];
+export const parse_mxl_to_midi_wasm: (a: number, b: number) => [number, number];
+export const parse_mxl_to_xml_wasm: (a: number, b: number) => [number, number];
 export const __wbindgen_externrefs: WebAssembly.Table;
 export const __wbindgen_malloc: (a: number, b: number) => number;
 export const __wbindgen_free: (a: number, b: number, c: number) => void;

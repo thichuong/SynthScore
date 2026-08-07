@@ -15,6 +15,10 @@ export function parse_midi_tracks_wasm(bytes: Uint8Array): any;
 
 export function parse_musicxml_to_midi_wasm(xml_text: string): Uint8Array;
 
+export function parse_mxl_to_midi_wasm(mxl_bytes: Uint8Array): Uint8Array;
+
+export function parse_mxl_to_xml_wasm(mxl_bytes: Uint8Array): string;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -26,6 +30,8 @@ export interface InitOutput {
     readonly init_synthscore_wasm: () => number;
     readonly parse_midi_tracks_wasm: (a: number, b: number) => any;
     readonly parse_musicxml_to_midi_wasm: (a: number, b: number) => [number, number];
+    readonly parse_mxl_to_midi_wasm: (a: number, b: number) => [number, number];
+    readonly parse_mxl_to_xml_wasm: (a: number, b: number) => [number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
