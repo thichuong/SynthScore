@@ -122,8 +122,25 @@ watch(hasSheet, (newHasSheet) => {
   }
 });
 
-watch([() => props.fileData, () => props.playbackMode], ([_newFileData, newMode], [_oldFileData, oldMode]) => {
-  if (oldMode !== undefined && newMode !== oldMode) {
+let isModeChanging = false;
+let modeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+watch(() => props.playbackMode, () => {
+  isModeChanging = true;
+  if (modeTimeoutId) clearTimeout(modeTimeoutId);
+  modeTimeoutId = setTimeout(() => {
+    isModeChanging = false;
+    modeTimeoutId = null;
+  }, 3000);
+});
+
+watch(() => props.fileData, () => {
+  if (isModeChanging) {
+    isModeChanging = false;
+    if (modeTimeoutId) {
+      clearTimeout(modeTimeoutId);
+      modeTimeoutId = null;
+    }
     return;
   }
   currentView.value = 'visualizer';

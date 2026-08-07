@@ -118,9 +118,26 @@ const hasSheet = computed(() => {
   return props.fileType === 'xml' || props.fileType === 'abc';
 });
 
+let isModeChanging = false;
+let modeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+watch(() => props.playbackMode, () => {
+  isModeChanging = true;
+  if (modeTimeoutId) clearTimeout(modeTimeoutId);
+  modeTimeoutId = setTimeout(() => {
+    isModeChanging = false;
+    modeTimeoutId = null;
+  }, 3000);
+});
+
 // Tự động chuyển sang tab Thác nốt (visualizer) khi mở bài hát mới (không chuyển khi đổi mode Mixer)
-watch([() => props.fileData, () => props.playbackMode], ([_newFileData, newMode], [_oldFileData, oldMode]) => {
-  if (oldMode !== undefined && newMode !== oldMode) {
+watch(() => props.fileData, () => {
+  if (isModeChanging) {
+    isModeChanging = false;
+    if (modeTimeoutId) {
+      clearTimeout(modeTimeoutId);
+      modeTimeoutId = null;
+    }
     return;
   }
   activeTab.value = 'visualizer';
