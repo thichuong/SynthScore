@@ -6,7 +6,7 @@
         <div class="export-modal-card glass-modal">
           <div class="modal-header">
             <div class="header-title-group">
-              <Sparkles class="header-icon animate-pulse" />
+              <img src="../../assets/logo.svg" alt="SynthScore Logo" class="header-icon" />
               <h3>Xuất âm thanh chất lượng cao</h3>
             </div>
             <button class="close-btn" @click="handleClose">
@@ -14,7 +14,7 @@
             </button>
           </div>
 
-          <div class="modal-body">
+          <div class="modal-body" ref="modalBodyRef">
             <p class="modal-desc">Chọn định dạng và cấu hình để kết xuất bản nhạc <strong>{{ songName }}</strong></p>
 
             <!-- Chọn định dạng -->
@@ -25,7 +25,7 @@
                 :key="fmt.id"
                 class="format-card"
                 :class="{ active: selectedFormat === fmt.id }"
-                @click="selectedFormat = fmt.id"
+                @click="selectFormat(fmt.id)"
               >
                 <div class="format-badge" :class="fmt.id">{{ fmt.name }}</div>
                 <div class="format-info">
@@ -154,8 +154,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Sparkles, X, Check, Sliders, Download } from 'lucide-vue-next';
+import { ref, watch, nextTick } from 'vue';
+import { X, Check, Sliders, Download } from 'lucide-vue-next';
 import { AudioEngine } from '../../services/audioEngine';
 
 const props = defineProps<{
@@ -169,6 +169,36 @@ const emit = defineEmits<{
 
 const isExporting = ref(false);
 const selectedFormat = ref<'wav' | 'mp3' | 'flac' | 'alac' | 'dsd'>('mp3');
+const modalBodyRef = ref<HTMLElement | null>(null);
+
+function scrollToBottomIfNeeded() {
+  nextTick(() => {
+    if (modalBodyRef.value) {
+      const { scrollHeight, clientHeight } = modalBodyRef.value;
+      if (scrollHeight > clientHeight) {
+        modalBodyRef.value.scrollTo({
+          top: scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }
+  });
+}
+
+function selectFormat(id: typeof selectedFormat.value) {
+  selectedFormat.value = id;
+  scrollToBottomIfNeeded();
+}
+
+watch(selectedFormat, () => {
+  scrollToBottomIfNeeded();
+});
+
+watch(() => props.isOpen, (newVal) => {
+  if (newVal) {
+    scrollToBottomIfNeeded();
+  }
+});
 const mp3Bitrate = ref(320);
 const wavBitDepth = ref<16 | 24 | 32>(24);
 const applyMixer = ref(true);
@@ -297,9 +327,9 @@ async function startExport() {
 }
 
 .header-icon {
-  color: #00f0ff;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 .modal-header h3 {
@@ -336,6 +366,7 @@ async function startExport() {
   padding: 24px;
   overflow-y: auto;
   max-height: 70vh;
+  scroll-behavior: smooth;
 }
 
 .modal-desc {
