@@ -183,8 +183,8 @@ watch(() => props.playingIndex, () => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  min-width: 220px;
-  max-width: 320px;
+  min-width: 260px;
+  max-width: 420px;
 }
 
 .picker-trigger:hover:not(:disabled) {
@@ -251,7 +251,8 @@ watch(() => props.playingIndex, () => {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  width: 340px;
+  width: 440px;
+  max-width: calc(100vw - 32px);
   background: #161622;
   border: 1px solid #2e2e42;
   border-radius: 14px;

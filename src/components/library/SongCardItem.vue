@@ -17,8 +17,8 @@
         <span v-if="isPlaying" class="playing-icon">♪</span>
         {{ song.name }}
       </span>
-      <span class="song-meta">
-        <span class="song-composer" v-if="song.composer">{{ song.composer }}</span>
+      <span class="song-composer" v-if="song.composer">{{ song.composer }}</span>
+      <div class="song-tags-row" v-if="song.difficulty || (song.tags && song.tags.length) || song.isFavorite">
         <span 
           class="song-difficulty" 
           v-if="song.difficulty"
@@ -39,7 +39,7 @@
             ưa thích
           </span>
         </span>
-      </span>
+      </div>
     </div>
 
     <!-- Favorite toggle button -->
@@ -98,7 +98,7 @@ function difficultyLabel(diff?: SongEntry['difficulty']): string {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: 8px;
   background: #1e1e28;
   border: 1px solid #2a2a38;
@@ -132,12 +132,12 @@ function difficultyLabel(diff?: SongEntry['difficulty']): string {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
 .song-name {
-  font-size: 0.82rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: #f1f1f7;
   white-space: nowrap;
@@ -155,24 +155,25 @@ function difficultyLabel(diff?: SongEntry['difficulty']): string {
   animation: pulse 1s infinite alternate;
 }
 
-.song-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.7rem;
-  color: #8c8c9e;
-}
-
 .song-composer {
+  font-size: 0.8rem;
+  color: #8c8c9e;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
+}
+
+.song-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 1px;
 }
 
 .song-difficulty {
-  font-size: 0.65rem;
-  padding: 1px 5px;
+  font-size: 0.75rem;
+  padding: 2px 6px;
   border-radius: 4px;
   font-weight: 600;
 }
@@ -187,9 +188,9 @@ function difficultyLabel(diff?: SongEntry['difficulty']): string {
 }
 
 .song-tag {
-  font-size: 0.6rem;
-  padding: 1px 4px;
-  border-radius: 3px;
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 4px;
   font-weight: 600;
 }
 

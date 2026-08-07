@@ -83,7 +83,7 @@ defineExpose({
   background: #22222e;
   border: none;
   color: #ffffff;
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   outline: none;
 }
 
@@ -98,9 +98,9 @@ defineExpose({
   background: #22222e;
   border: 1px solid #323246;
   color: #a0a0b0;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 6px;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
