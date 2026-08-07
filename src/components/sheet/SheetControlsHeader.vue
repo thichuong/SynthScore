@@ -1,0 +1,159 @@
+<template>
+  <div class="viewer-header" v-if="!hideHeader">
+    <div class="viewer-tabs">
+      <button 
+        v-if="hasSheet"
+        class="tab-btn" 
+        :class="{ active: activeTab === 'sheet' }"
+        @click="emit('update:activeTab', 'sheet')"
+      >
+        <Music class="icon" /> Bản Nhạc (Sheet Music)
+      </button>
+      <button 
+        class="tab-btn" 
+        :class="{ active: activeTab === 'visualizer' }"
+        @click="emit('update:activeTab', 'visualizer')"
+      >
+        <Layers class="icon" /> Thác Nốt Nhạc (Falling Notes)
+      </button>
+    </div>
+
+    <div class="viewer-actions">
+      <div class="viewer-status" v-if="loading">
+        <span class="spinner"></span> Đang tải bản nhạc...
+      </div>
+
+      <button 
+        class="viewer-play-btn" 
+        :class="{ playing: isPlaying }"
+        @click="emit('togglePlay')"
+        :title="isPlaying ? 'Tạm dừng' : 'Phát nhạc'"
+        :disabled="!isReady"
+      >
+        <Pause v-if="isPlaying" class="icon" />
+        <Play v-else class="icon play-icon" />
+      </button>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { Music, Layers, Play, Pause } from 'lucide-vue-next';
+
+defineProps<{
+  activeTab: 'sheet' | 'visualizer';
+  hasSheet: boolean;
+  loading: boolean;
+  isPlaying: boolean;
+  isReady: boolean;
+  hideHeader?: boolean;
+}>();
+
+const emit = defineEmits<{
+  (e: 'update:activeTab', tab: 'sheet' | 'visualizer'): void;
+  (e: 'togglePlay'): void;
+}>();
+</script>
+
+<style scoped>
+.viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(18, 18, 24, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.viewer-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #8c8c9e;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.tab-btn.active {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: rgba(0, 240, 255, 0.35);
+  color: #00f0ff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.icon {
+  width: 14px;
+  height: 14px;
+}
+
+.viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.viewer-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #00f0ff;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0, 240, 255, 0.3);
+  border-top-color: #00f0ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.viewer-play-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #00f0ff 0%, #0072ff 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 240, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.viewer-play-btn:hover:not(:disabled) {
+  transform: scale(1.08);
+}
+
+.viewer-play-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.play-icon {
+  transform: translateX(1px);
+}
+</style>

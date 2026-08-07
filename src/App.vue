@@ -110,32 +110,13 @@
       </div>
 
       <!-- Trạng thái Audio Engine -->
-      <div class="engine-status">
-        <div v-if="isLoadingSoundfont" class="status-badge loading soundfont-progress-badge">
-          <div class="sf-progress-top">
-            <span class="spinner"></span>
-            <span class="sf-name" :title="soundfontProgress?.sf3Name">{{ soundfontProgress?.sf3Name || 'Đang tải nhạc cụ...' }}</span>
-            <span v-if="soundfontProgress" class="sf-percent">{{ soundfontProgress.percent }}%</span>
-          </div>
-          <div v-if="soundfontProgress" class="sf-progress-track">
-            <div class="sf-progress-fill" :style="{ width: soundfontProgress.percent + '%' }"></div>
-          </div>
-          <div v-if="soundfontProgress" class="sf-progress-details">
-            <span class="sf-eta">{{ formatEta(soundfontProgress.etaSeconds) }}</span>
-            <span v-if="soundfontProgress.speed > 0" class="sf-speed">{{ formatBytes(soundfontProgress.speed) }}/s</span>
-            <span v-if="soundfontProgress.isFallback" class="sf-fallback-tag" title="Đang tải từ GitHub Pages CDN">Fallback CDN</span>
-          </div>
-        </div>
-        <span v-else-if="initializationFailed" class="status-badge error clickable" @click="initializeEngine" title="Nhấp để thử khởi tạo lại Audio Engine">
-          <AlertCircle class="status-icon" /> Lỗi âm thanh (Nhấp để thử lại)
-        </span>
-        <span v-else-if="!isInitialized" class="status-badge loading">
-          <span class="spinner"></span> Đang khởi tạo...
-        </span>
-        <span v-else class="status-badge active">
-          <CheckCircle class="status-icon" /> Sẵn sàng (GM Synth)
-        </span>
-      </div>
+      <EngineStatusBadge
+        :isLoadingSoundfont="isLoadingSoundfont"
+        :soundfontProgress="soundfontProgress"
+        :initializationFailed="initializationFailed"
+        :isInitialized="isInitialized"
+        @retryInit="initializeEngine"
+      />
     </header>
 
     <!-- Nội dung chính Dashboard -->
@@ -191,18 +172,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, onBeforeUnmount, computed } from 'vue';
-import { CheckCircle, AlertCircle } from 'lucide-vue-next';
+import { ref, shallowRef, onMounted, computed } from 'vue';
 import FileUploader from './components/FileUploader.vue';
 import OrchestraMixer from './components/OrchestraMixer.vue';
 import SheetViewer from './components/SheetViewer.vue';
 import PlaybackControls from './components/PlaybackControls.vue';
 import SongLibraryPicker from './components/SongLibraryPicker.vue';
+import EngineStatusBadge from './components/header/EngineStatusBadge.vue';
 
 import MobileHeader from './components/mobile/MobileHeader.vue';
 import MobilePresentation from './components/mobile/MobilePresentation.vue';
 import MobileControls from './components/mobile/MobileControls.vue';
 import { useResponsive } from './composables/useResponsive';
+import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts';
 
 import { AudioEngine, type SoundfontProgress } from './services/audioEngine';
 import type { TrackInfo } from './services/midiGenerator';
@@ -226,22 +208,6 @@ const isPlaying = ref(false);
 const isLoadingLibrarySong = ref(false);
 const initializationFailed = ref(false);
 
-function formatBytes(bytes: number): string {
-  if (!bytes || bytes <= 0) return '0 B';
-  if (bytes >= 1024 * 1024) {
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-  return `${(bytes / 1024).toFixed(0)} KB`;
-}
-
-function formatEta(seconds: number): string {
-  if (!seconds || seconds <= 0 || !isFinite(seconds)) return 'Đang tải...';
-  if (seconds < 60) return `Còn ~${seconds}s`;
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `Còn ~${m}m ${s}s`;
-}
-
 const currentTime = ref(0);
 const duration = ref(0);
 const bpm = ref(120);
@@ -260,19 +226,16 @@ const rawText = ref<string | null>(null);
 
 const selectedSongIndex = ref(-1);
 
-// Hiển thị Toast phản hồi phím tắt
-const toastText = ref('');
-const isToastVisible = ref(false);
-let toastTimeout: any = null;
-
-function showShortcutToast(msg: string) {
-  toastText.value = msg;
-  isToastVisible.value = true;
-  if (toastTimeout) clearTimeout(toastTimeout);
-  toastTimeout = setTimeout(() => {
-    isToastVisible.value = false;
-  }, 1500);
-}
+const { toastText, isToastVisible, showShortcutToast } = useKeyboardShortcuts({
+  isReady,
+  isPlaying,
+  duration,
+  currentTime,
+  onNextSong: handleNextSong,
+  onPrevSong: handlePrevSong,
+  onToggleRepeat: toggleRepeatMode,
+  onToggleShortcutsModal: () => playbackControlsRef.value?.toggleShortcutsModal()
+});
 
 function toggleRepeatMode() {
   const newMode = AudioEngine.toggleRepeatMode();
@@ -285,123 +248,6 @@ function toggleRepeatMode() {
   showShortcutToast(labels[newMode]);
 }
 
-// Bắt phím tắt bàn phím toàn cục (Global Keyboard Shortcuts)
-function handleGlobalKeydown(e: KeyboardEvent) {
-  // Bỏ qua nếu đang gõ văn bản trong các ô input / textarea / select
-  const activeEl = document.activeElement;
-  const isInputActive = activeEl && (
-    activeEl.tagName === 'INPUT' ||
-    activeEl.tagName === 'TEXTAREA' ||
-    activeEl.tagName === 'SELECT' ||
-    (activeEl as HTMLElement).isContentEditable
-  );
-
-  if (isInputActive) {
-    return;
-  }
-
-  const key = e.key;
-  const code = e.code;
-  const isShift = e.shiftKey;
-
-  // 1. Play / Pause: Space or K or MediaPlayPause
-  if ((code === 'Space' && !isShift) || key.toLowerCase() === 'k' || code === 'MediaPlayPause') {
-    e.preventDefault();
-    if (!isReady.value) return;
-    if (isPlaying.value) {
-      AudioEngine.pause();
-      showShortcutToast('Tạm dừng phát');
-    } else {
-      AudioEngine.play();
-      showShortcutToast('Đang phát nhạc');
-    }
-  }
-  // 2. Stop: Shift + Space or S or MediaStop
-  else if ((code === 'Space' && isShift) || key.toLowerCase() === 's' || code === 'MediaStop') {
-    e.preventDefault();
-    if (!isReady.value) return;
-    AudioEngine.stop();
-    showShortcutToast('Dừng phát nhạc');
-  }
-  // 3. Next song: N or Shift + ArrowRight or MediaTrackNext
-  else if (key.toLowerCase() === 'n' || (code === 'ArrowRight' && isShift) || code === 'MediaTrackNext') {
-    e.preventDefault();
-    handleNextSong();
-    showShortcutToast('Bài tiếp theo');
-  }
-  // 4. Previous song: P or Shift + ArrowLeft or MediaTrackPrevious
-  else if (key.toLowerCase() === 'p' || (code === 'ArrowLeft' && isShift) || code === 'MediaTrackPrevious') {
-    e.preventDefault();
-    handlePrevSong();
-    showShortcutToast('Bài trước đó');
-  }
-  // 5. Seek Forward (5s): ArrowRight or L or .
-  else if ((code === 'ArrowRight' && !isShift) || key.toLowerCase() === 'l' || key === '.') {
-    e.preventDefault();
-    if (!isReady.value) return;
-    const newTime = Math.min(duration.value, currentTime.value + 5);
-    AudioEngine.seek(newTime);
-    showShortcutToast('Tua +5s');
-  }
-  // 6. Seek Backward (5s): ArrowLeft or J or ,
-  else if ((code === 'ArrowLeft' && !isShift) || key.toLowerCase() === 'j' || key === ',') {
-    e.preventDefault();
-    if (!isReady.value) return;
-    const newTime = Math.max(0, currentTime.value - 5);
-    AudioEngine.seek(newTime);
-    showShortcutToast('Tua -5s');
-  }
-  // 7. Volume Up: ArrowUp
-  else if (code === 'ArrowUp') {
-    e.preventDefault();
-    const newVol = Math.min(150, AudioEngine.masterVolume + 10);
-    AudioEngine.setMasterVolume(newVol);
-    showShortcutToast(`Âm lượng: ${newVol}%`);
-  }
-  // 8. Volume Down: ArrowDown
-  else if (code === 'ArrowDown') {
-    e.preventDefault();
-    const newVol = Math.max(0, AudioEngine.masterVolume - 10);
-    AudioEngine.setMasterVolume(newVol);
-    showShortcutToast(`Âm lượng: ${newVol}%`);
-  }
-  // 9. Mute toggle: M
-  else if (key.toLowerCase() === 'm') {
-    e.preventDefault();
-    const newVol = AudioEngine.toggleMute();
-    if (newVol === 0) {
-      showShortcutToast('Đã tắt tiếng (Mute)');
-    } else {
-      showShortcutToast(`Bật tiếng: ${newVol}%`);
-    }
-  }
-  // 10. Speed Down: [
-  else if (key === '[') {
-    e.preventDefault();
-    const newRate = Math.max(0.5, Math.round((AudioEngine.playbackRate - 0.1) * 10) / 10);
-    AudioEngine.setPlaybackRate(newRate);
-    showShortcutToast(`Tốc độ: ${newRate.toFixed(1)}x`);
-  }
-  // 11. Speed Up: ]
-  else if (key === ']') {
-    e.preventDefault();
-    const newRate = Math.min(2.0, Math.round((AudioEngine.playbackRate + 0.1) * 10) / 10);
-    AudioEngine.setPlaybackRate(newRate);
-    showShortcutToast(`Tốc độ: ${newRate.toFixed(1)}x`);
-  }
-  // 12. Toggle Repeat mode: R
-  else if (key.toLowerCase() === 'r') {
-    e.preventDefault();
-    toggleRepeatMode();
-  }
-  // 13. Toggle Shortcuts guide modal: ? or H
-  else if (key === '?' || key.toLowerCase() === 'h') {
-    e.preventDefault();
-    playbackControlsRef.value?.toggleShortcutsModal();
-  }
-}
-
-// Định danh bài hát duy nhất bằng khóa
 function getSongKey(song: SongEntry): string {
   if (song.url) return song.url;
   return `uploaded_${song.composer || ''}_${song.name}`;
@@ -414,7 +260,6 @@ interface FilteredSong extends SongEntry {
   originalIndex: number;
 }
 
-// Danh sách bài hát (reactive) khởi tạo bằng các bài hát mặc định từ songLibrary
 const songs = ref<SongEntry[]>(songLibrary.map(song => ({
   ...song,
   isFavorite: false
@@ -425,7 +270,6 @@ const filteredSongs = computed<FilteredSong[]>(() => {
   const results: FilteredSong[] = [];
 
   songs.value.forEach((song, idx) => {
-    // 1. Lọc theo bộ lọc tab
     if (activeFilter.value === 'có sẵn') {
       if (!song.tags?.includes('có sẵn')) return;
     } else if (activeFilter.value === 'tải lên') {
@@ -434,7 +278,6 @@ const filteredSongs = computed<FilteredSong[]>(() => {
       if (!song.isFavorite) return;
     }
 
-    // 2. Lọc theo tìm kiếm
     if (query) {
       const haystack = `${song.name} ${song.composer || ''}`.toLowerCase();
       if (!haystack.includes(query)) return;
@@ -446,9 +289,7 @@ const filteredSongs = computed<FilteredSong[]>(() => {
   return results;
 });
 
-// Lắng nghe trạng thái thay đổi từ AudioEngine
 onMounted(() => {
-  // Tải danh sách ưa thích từ localStorage
   try {
     const saved = localStorage.getItem('synthscore_favorites');
     if (saved) {
@@ -485,11 +326,9 @@ onMounted(() => {
     currentTime.value = time;
   });
 
-  // Đăng ký nhận sự kiện chuyển bài từ Media Session API hoặc phím tắt
   AudioEngine.onPreviousTrack(() => handlePrevSong());
   AudioEngine.onNextTrack(() => handleNextSong());
 
-  // Tự động chuyển bài khi kết thúc bài hát (xử lý theo repeatMode: 'one' | 'all' | 'off')
   AudioEngine.onSongEnded(async () => {
     if (repeatMode.value === 'one') {
       AudioEngine.seek(0);
@@ -502,7 +341,6 @@ onMounted(() => {
         s => s.originalIndex === selectedSongIndex.value
       );
 
-      // Nếu không bật lặp lại ('off') và đã đến bài cuối cùng trong danh sách -> Dừng phát
       if (repeatMode.value === 'off' && currentFilteredIdx === filteredSongs.value.length - 1) {
         AudioEngine.stop();
         return;
@@ -518,20 +356,11 @@ onMounted(() => {
     }
   });
 
-  // Đăng ký sự kiện bàn phím toàn cục
-  window.addEventListener('keydown', handleGlobalKeydown);
-
-  // Chủ động khởi tạo Audio Engine khi mount
   initializeEngine();
 
-  // Tiền tải tất cả 4 bộ âm thanh nhạc cụ Soundfont khi mount để đảm bảo bộ nhớ đệm đầy đủ
   AudioEngine.preloadAllSoundfonts().catch(e => {
     console.warn('Không thể tiền tải đầy đủ các soundfont:', e);
   });
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleGlobalKeydown);
 });
 
 async function initializeEngine() {
@@ -544,12 +373,10 @@ async function initializeEngine() {
   }
 }
 
-
 async function handleModeChange(mode: 'default' | 'symphony' | 'concerto') {
   await AudioEngine.setPlaybackMode(mode);
 }
 
-// Hàm trích xuất metadata (tên bài hát, tác giả) từ định dạng .xml hoặc .abc
 function extractMetadata(data: string, type: 'xml' | 'abc'): { name?: string; composer?: string } {
   const result: { name?: string; composer?: string } = {};
   
@@ -598,9 +425,7 @@ function extractMetadata(data: string, type: 'xml' | 'abc'): { name?: string; co
   return result;
 }
 
-// Xử lý nạp nhạc từ người dùng tải lên
 async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xml' | 'abc' | 'midi'; name: string }) {
-  // Đảm bảo AudioEngine đã được khởi tạo
   if (!isInitialized.value) {
     await initializeEngine();
   }
@@ -616,7 +441,7 @@ async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xm
     midiBytes = parseMusicXmlToMidiBytes(xmlText);
     rawTextValue = xmlText;
   } 
-  else { // abc
+  else {
     const abcText = payload.data as string;
     const abcjs = await import('abcjs');
     const midiBin = abcjs.default.synth.getMidiFile(abcText, { midiOutputType: 'binary' }) as any;
@@ -624,7 +449,6 @@ async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xm
     rawTextValue = abcText;
   }
 
-  // Trích xuất thông tin bài hát nếu có thể
   let extractedName = payload.name.replace(/\.[^/.]+$/, "");
   let extractedComposer = 'Tải lên bởi bạn';
 
@@ -638,7 +462,6 @@ async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xm
     }
   }
 
-  // Tạo một SongEntry mới có gắn thẻ "tải lên" và lưu dữ liệu tệp đã nạp
   const uploadedSongKey = `uploaded_${extractedComposer}_${extractedName}`;
   let isFav = false;
   try {
@@ -662,32 +485,27 @@ async function handleMusicLoaded(payload: { data: Uint8Array | string; type: 'xm
     }
   };
 
-  // Thêm vào danh sách bài hát và tự động kích hoạt
   songs.value.push(newUploadedSong);
   const newIndex = songs.value.length - 1;
   
   await handleSongSelect(newIndex);
 }
 
-// Xử lý chọn bản nhạc từ SongLibraryPicker
 async function handleSongSelect(index: number) {
   if (index < 0 || index >= songs.value.length) return;
   selectedSongIndex.value = index;
   const song: SongEntry = songs.value[index];
 
   if (song.isUploaded && song.uploadedData) {
-    // Nếu là bài hát người dùng tải lên, dùng luôn dữ liệu đã lưu trong bộ nhớ
     fileData.value = song.uploadedData.midiBytes;
     fileType.value = song.uploadedData.type;
     rawText.value = song.uploadedData.rawText;
     await AudioEngine.loadSong(song.uploadedData.midiBytes, song.name, song.composer);
   } else {
-    // Bài hát thư viện chuẩn thì tải từ mạng
     await loadFromLibrary(song);
   }
 }
 
-// Xử lý chuyển sang bài hát phía trước trong danh sách đã lọc
 async function handlePrevSong() {
   if (filteredSongs.value.length === 0) return;
   
@@ -708,7 +526,6 @@ async function handlePrevSong() {
   }
 }
 
-// Xử lý chuyển sang bài hát kế tiếp trong danh sách đã lọc
 async function handleNextSong() {
   if (filteredSongs.value.length === 0) return;
   
@@ -729,13 +546,11 @@ async function handleNextSong() {
   }
 }
 
-// Xử lý đánh dấu ưa thích
 function toggleFavorite(originalIndex: number) {
   if (originalIndex < 0 || originalIndex >= songs.value.length) return;
   const song = songs.value[originalIndex];
   song.isFavorite = !song.isFavorite;
 
-  // Cập nhật localStorage
   const favoriteKeys = songs.value
     .filter(s => s.isFavorite)
     .map(s => getSongKey(s));
@@ -762,25 +577,19 @@ async function loadFromLibrary(song: SongEntry) {
   try {
     let buffer: ArrayBuffer;
 
-    // Kiểm tra cache trước
     const cached = await getCachedSong(url);
     if (cached) {
       buffer = cached;
     } else {
-      // Tải từ mạng và lưu cache
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       buffer = await response.arrayBuffer();
-      // Lưu vào IndexedDB để lần sau không cần tải lại
       await cacheSong(url, buffer);
     }
     
-    // Giải nén MXL → MusicXML text
     const xmlText = await parseMxl(buffer);
-
-    // Chuyển đổi MusicXML → MIDI bytes
     const midiBytes = parseMusicXmlToMidiBytes(xmlText);
 
     fileData.value = midiBytes;
@@ -809,7 +618,6 @@ async function loadFromLibrary(song: SongEntry) {
   font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* Header */
 .app-header {
   display: flex;
   justify-content: space-between;
@@ -829,7 +637,6 @@ async function loadFromLibrary(song: SongEntry) {
   align-items: center;
   gap: 12px;
 }
-
 
 .logo-area {
   display: flex;
@@ -873,148 +680,6 @@ async function loadFromLibrary(song: SongEntry) {
   font-weight: 500;
 }
 
-
-/* Engine Status */
-.status-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 6px 12px;
-  border-radius: 8px;
-}
-
-.status-badge.clickable {
-  cursor: pointer;
-  transition: all 0.2s ease;
-  user-select: none;
-}
-
-.status-badge.clickable:hover {
-  filter: brightness(1.2);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 59, 48, 0.2);
-}
-
-.status-badge.clickable:active {
-  transform: translateY(0);
-}
-
-.status-badge.error {
-  background: rgba(255, 59, 48, 0.1);
-  border: 1px solid rgba(255, 59, 48, 0.2);
-  color: #ff3b30;
-}
-
-.status-badge.loading {
-  background: rgba(0, 240, 255, 0.1);
-  border: 1px solid rgba(0, 240, 255, 0.2);
-  color: #00f0ff;
-}
-
-/* Soundfont Progress Badge */
-.status-badge.soundfont-progress-badge {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 5px;
-  min-width: 190px;
-  padding: 8px 12px;
-  background: rgba(0, 240, 255, 0.08);
-  border: 1px solid rgba(0, 240, 255, 0.25);
-  border-radius: 10px;
-  box-shadow: 0 4px 14px rgba(0, 240, 255, 0.12);
-  transition: all 0.2s ease;
-}
-
-.sf-progress-top {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.73rem;
-  font-weight: 700;
-  color: #00f0ff;
-}
-
-.sf-name {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 120px;
-}
-
-.sf-percent {
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: #00f0ff;
-}
-
-.sf-progress-track {
-  width: 100%;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.sf-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #00f0ff 0%, #7000ff 100%);
-  border-radius: 2px;
-  transition: width 0.2s ease;
-}
-
-.sf-progress-details {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.sf-eta {
-  color: #ffaa00;
-  font-weight: 600;
-}
-
-.sf-speed {
-  color: #8c8c9e;
-}
-
-.sf-fallback-tag {
-  background: rgba(255, 170, 0, 0.15);
-  color: #ffaa00;
-  border: 1px solid rgba(255, 170, 0, 0.3);
-  padding: 1px 4px;
-  border-radius: 4px;
-  font-size: 0.6rem;
-  font-weight: 700;
-}
-
-.status-badge.active {
-  background: rgba(57, 255, 20, 0.1);
-  border: 1px solid rgba(57, 255, 20, 0.2);
-  color: #39ff14;
-}
-
-.status-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.spinner {
-  width: 10px;
-  height: 10px;
-  border: 2px solid rgba(0, 240, 255, 0.3);
-  border-top-color: #00f0ff;
-  border-radius: 50%;
-  animation: spin 1s infinite linear;
-}
-
-/* Dashboard Grid */
 .dashboard-grid {
   flex: 1;
   display: flex;
@@ -1040,16 +705,10 @@ async function loadFromLibrary(song: SongEntry) {
   overflow: hidden;
 }
 
-/* Footer Control */
 .app-footer {
   flex-shrink: 0;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Custom Scrollbars */
 .dashboard-sidebar::-webkit-scrollbar {
   width: 4px;
 }
@@ -1067,7 +726,6 @@ async function loadFromLibrary(song: SongEntry) {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Floating Shortcut Toast Notification */
 .shortcut-toast-floating {
   position: fixed;
   bottom: 95px;
@@ -1098,7 +756,6 @@ async function loadFromLibrary(song: SongEntry) {
   transform: translateY(12px) scale(0.95);
 }
 
-/* Mobile App Shell Layout (100dvh Single Screen) */
 .mobile-app-shell {
   display: flex;
   flex-direction: column;

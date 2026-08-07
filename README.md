@@ -118,49 +118,11 @@ SynthScore tích hợp sẵn hệ thống kiểm thử tự động toàn diện
 *   Tiến hành phân tích ngược note-by-note (đối chiếu cao độ nốt, thời điểm bắt đầu, thời lượng giây) giữa file XML gốc và file MIDI xuất ra để phát hiện lỗi mất nốt hoặc lệch nhịp.
 *   Xuất báo cáo Markdown chi tiết tại file [tests-report.md](file:///home/exblackhole/Desktop/SynthScore/tests-report.md) hiển thị độ khớp nốt tuyệt đối của từng bản nhạc.
 
----
+## 🏗️ Kiến trúc & Cấu trúc Thư mục Dự án
 
-## 📂 Cấu trúc Thư mục Dự án
+Toàn bộ tài liệu chi tiết về sơ đồ kiến trúc hệ thống và cây cấu trúc thư mục dự án SynthScore đã được chuyển sang tệp riêng:
 
-```text
-SynthScore/
-├── crates/
-│   └── synthscore-wasm/        # Crate Rust WASM backend (midi, xml parser, dsp exporter)
-│       ├── Cargo.toml
-│       └── src/
-│           ├── lib.rs
-│           ├── midi_processor.rs
-│           ├── xml_parser.rs
-│           └── audio_dsp.rs
-├── public/                     # Tài nguyên tĩnh
-│   ├── spessasynth_processor.min.js # File xử lý AudioWorklet của SpessaSynth
-│   ├── manifest.json           # Cấu hình PWA Web Manifest
-│   └── sw.js                   # Service Worker hỗ trợ chạy offline
-├── src/
-│   ├── assets/                 # Hình ảnh, font chữ, css chung
-│   ├── components/             # Các thành phần giao diện Vue
-│   │   ├── FileUploader.vue     # Bộ tải file kéo thả (.midi, .mxl, .abc)
-│   │   ├── OrchestraMixer.vue   # Bàn trộn nhạc cụ đa kênh, tùy chỉnh âm lượng, solo, mute
-│   │   ├── PlaybackControls.vue # Thanh điều khiển tiến trình phát, bpm, âm lượng tổng
-│   │   ├── SheetViewer.vue      # Trình hiển thị bản nhạc (OSMD/Abcjs) & Thác nốt Canvas
-│   │   └── SongLibraryPicker.vue# Bộ chọn bài hát từ thư viện mẫu tích hợp
-│   ├── data/                   # Dữ liệu tĩnh cấu hình
-│   │   ├── instruments.ts      # Danh sách nhạc cụ General MIDI chia nhóm
-│   │   └── songLibrary.ts      # Thư viện danh sách bài hát mẫu (.mxl)
-│   ├── services/               # Các dịch vụ xử lý logic nền
-│   │   ├── audioEngine.ts      # Lớp Singleton quản lý synthesizer, sequencer và âm thanh
-│   │   ├── wasmLoader.ts       # Dịch vụ nạp & quản lý đệm module Rust WASM
-│   │   ├── midiWorker.ts       # Web Worker offload xử lý MIDI bằng Rust WASM
-│   │   ├── musicXmlParser.ts   # Chuyển đổi tệp tin xml thô sang dữ liệu nhị phân MIDI
-│   │   ├── mxlParser.ts        # Giải nén tệp tin mxl để lấy xml thô
-│   │   └── appCache.ts         # Quản lý lưu trữ đệm bài hát và SoundFonts ngoại tuyến (IndexedDB)
-│   ├── wasm/                   # File WASM và JS binding do wasm-bindgen sinh ra
-│   ├── App.vue                 # Giao diện chính ráp nối các bộ phận (Dashboard)
-│   ├── main.ts                 # Điểm khởi tạo ứng dụng Vue
-│   └── style.css               # Định nghĩa các biến CSS màu sắc, giao diện Glassmorphism
-├── package.json                # Khai báo thư viện và script
-└── vite.config.ts              # Cấu hình dự án Vite
-```
+👉 **[ARCHITECTURE.md](file:///home/exblackhole/Desktop/SynthScore/ARCHITECTURE.md)**
 
 ---
 
