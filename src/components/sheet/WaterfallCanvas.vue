@@ -103,7 +103,7 @@ async function parseMidiForVisualizer() {
         arrayBuffer = uint8.buffer.slice(
           uint8.byteOffset,
           uint8.byteOffset + uint8.byteLength
-        );
+        ) as ArrayBuffer;
       } else {
         return; 
       }
