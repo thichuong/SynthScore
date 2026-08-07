@@ -22,7 +22,7 @@
       @retryInit="initializeEngine"
     />
 
-    <!-- Phần 2: Trình bài (Mixer, Thác nốt nhạc, Bản nhạc) -->
+    <!-- Phần 2: Trình bày (Mixer, Thác nốt nhạc, Bản nhạc) -->
     <MobilePresentation
       :fileData="fileData"
       :fileType="fileType"
@@ -40,6 +40,7 @@
 
     <!-- Phần 3: Controls (Play/Pause, Seekbar, Drawer mở rộng) -->
     <MobileControls
+      ref="mobileControlsRef"
       :isPlaying="isPlaying"
       :isReady="isReady"
       :currentTime="currentTime"
@@ -54,25 +55,6 @@
       @toggleRepeat="toggleRepeatMode"
     />
 
-    <!-- PlaybackControls ẩn dùng để cung cấp Modal Export audio trên mobile -->
-    <div style="display: none;">
-      <PlaybackControls 
-        ref="playbackControlsRef"
-        :isPlaying="isPlaying"
-        :isReady="isReady"
-        :currentTime="currentTime"
-        :duration="duration"
-        :bpm="bpm"
-        :songName="songName"
-        :repeatMode="repeatMode"
-        :volume="masterVolume"
-        :playbackRate="playbackRate"
-        @prev="handlePrevSong"
-        @next="handleNextSong"
-        @toggleRepeat="toggleRepeatMode"
-      />
-    </div>
-
     <!-- Floating Toast Notification khi bấm phím tắt -->
     <Transition name="toast-fade">
       <div v-if="isToastVisible" class="shortcut-toast-floating">
@@ -83,90 +65,57 @@
 
   <!-- Giao diện Desktop -->
   <div v-else class="app-container">
-    <!-- Header -->
-    <header class="app-header">
-      <div class="logo-area">
-        <div class="logo-icon-wrapper">
-          <img src="./assets/logo.svg" alt="SynthScore" class="logo-icon animate-pulse" />
-        </div>
-        <div class="logo-text">
-          <h1>SynthScore</h1>
-          <p>Trình chơi nhạc tự động &amp; Xem bản nhạc tương tác cao cấp</p>
-        </div>
-      </div>
+    <!-- Phần 1: Header (Logo, Chọn bài hát, Nạp file, Engine Status) -->
+    <DesktopHeader
+      :songs="songs"
+      :filteredSongs="filteredSongs"
+      :playingIndex="selectedSongIndex"
+      :isLoading="isLoadingLibrarySong"
+      :disabled="isLoadingSoundfont"
+      v-model:searchQuery="searchQuery"
+      v-model:activeFilter="activeFilter"
+      :isInitialized="isInitialized"
+      :isLoadingSoundfont="isLoadingSoundfont"
+      :soundfontProgress="soundfontProgress"
+      :initializationFailed="initializationFailed"
+      @selectSong="handleSongSelect"
+      @toggleFavorite="toggleFavorite"
+      @musicLoaded="handleMusicLoaded"
+      @retryInit="initializeEngine"
+    />
 
-      <div class="header-controls">
-        <!-- Thư viện bản nhạc -->
-        <SongLibraryPicker 
-          :songs="songs"
-          :filteredSongs="filteredSongs"
-          :playingIndex="selectedSongIndex" 
-          :isLoading="isLoadingLibrarySong"
-          :disabled="isLoadingSoundfont"
-          v-model:searchQuery="searchQuery"
-          v-model:activeFilter="activeFilter"
-          @select="handleSongSelect"
-          @toggle-favorite="toggleFavorite"
-        />
+    <!-- Phần 2: Nội dung chính Trình bày (Mixer ở bên trái, Sheet/Waterfall ở bên phải với Header ở giữa) -->
+    <DesktopPresentation
+      :fileData="fileData"
+      :fileType="fileType"
+      :rawText="rawText"
+      :isPlaying="isPlaying"
+      :currentTime="currentTime"
+      :isReady="isReady"
+      :tracks="tracks"
+      :playbackMode="playbackMode"
+      :loading="isLoadingLibrarySong"
+      :loadingProgress="songDownloadProgress"
+      :fileSize="songFileSize"
+      @changeMode="handleModeChange"
+    />
 
-        <FileUploader @musicLoaded="handleMusicLoaded" />
-      </div>
-
-      <!-- Trạng thái Audio Engine -->
-      <EngineStatusBadge
-        :isLoadingSoundfont="isLoadingSoundfont"
-        :soundfontProgress="soundfontProgress"
-        :initializationFailed="initializationFailed"
-        :isInitialized="isInitialized"
-        @retryInit="initializeEngine"
-      />
-    </header>
-
-    <!-- Nội dung chính Dashboard -->
-    <main class="dashboard-grid">
-      <!-- Cột trái: Bàn trộn Mixer -->
-      <div class="dashboard-sidebar">
-        <OrchestraMixer 
-          :tracks="tracks" 
-          :currentMode="playbackMode"
-          @changeMode="handleModeChange"
-        />
-      </div>
-
-      <!-- Cột phải: Khung hiển thị bản nhạc (Sheet Viewer / Piano Roll) -->
-      <div class="dashboard-content">
-        <SheetViewer 
-          :fileData="fileData"
-          :fileType="fileType"
-          :rawText="rawText"
-          :isPlaying="isPlaying"
-          :currentTime="currentTime"
-          :isReady="isReady"
-          :loading="isLoadingLibrarySong"
-          :loadingProgress="songDownloadProgress"
-          :fileSize="songFileSize"
-        />
-      </div>
-    </main>
-
-    <!-- Khung điều khiển phát nhạc ở đáy màn hình -->
-    <footer class="app-footer">
-      <PlaybackControls 
-        ref="playbackControlsRef"
-        :isPlaying="isPlaying"
-        :isReady="isReady"
-        :currentTime="currentTime"
-        :duration="duration"
-        :bpm="bpm"
-        :songName="songName"
-        :repeatMode="repeatMode"
-        :volume="masterVolume"
-        :playbackRate="playbackRate"
-        @prev="handlePrevSong"
-        @next="handleNextSong"
-        @toggleRepeat="toggleRepeatMode"
-      />
-    </footer>
+    <!-- Phần 3: Bộ điều khiển phát nhạc ở đáy màn hình (Footer Controls) -->
+    <DesktopControls
+      ref="desktopControlsRef"
+      :isPlaying="isPlaying"
+      :isReady="isReady"
+      :currentTime="currentTime"
+      :duration="duration"
+      :bpm="bpm"
+      :songName="songName"
+      :repeatMode="repeatMode"
+      :volume="masterVolume"
+      :playbackRate="playbackRate"
+      @prev="handlePrevSong"
+      @next="handleNextSong"
+      @toggleRepeat="toggleRepeatMode"
+    />
 
     <!-- Floating Toast Notification khi bấm phím tắt -->
     <Transition name="toast-fade">
@@ -179,12 +128,9 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, computed } from 'vue';
-import FileUploader from './components/FileUploader.vue';
-import OrchestraMixer from './components/OrchestraMixer.vue';
-import SheetViewer from './components/SheetViewer.vue';
-import PlaybackControls from './components/PlaybackControls.vue';
-import SongLibraryPicker from './components/SongLibraryPicker.vue';
-import EngineStatusBadge from './components/header/EngineStatusBadge.vue';
+import DesktopHeader from './components/desktop/DesktopHeader.vue';
+import DesktopPresentation from './components/desktop/DesktopPresentation.vue';
+import DesktopControls from './components/desktop/DesktopControls.vue';
 
 import MobileHeader from './components/mobile/MobileHeader.vue';
 import MobilePresentation from './components/mobile/MobilePresentation.vue';
@@ -202,8 +148,15 @@ import type { SongEntry } from './data/songLibrary';
 
 const { isMobile } = useResponsive();
 
+const mobileControlsRef = ref<InstanceType<typeof MobileControls> | null>(null);
+const desktopControlsRef = ref<InstanceType<typeof DesktopControls> | null>(null);
+
 function handleTriggerExport() {
-  playbackControlsRef.value?.openExportModal();
+  if (isMobile.value) {
+    mobileControlsRef.value?.openExportModal();
+  } else {
+    desktopControlsRef.value?.openExportModal();
+  }
 }
 
 const isInitialized = ref(false);
@@ -226,8 +179,6 @@ const repeatMode = ref<'off' | 'all' | 'one'>(AudioEngine.repeatMode);
 const masterVolume = ref(AudioEngine.masterVolume);
 const playbackRate = ref(AudioEngine.playbackRate);
 
-const playbackControlsRef = ref<InstanceType<typeof PlaybackControls> | null>(null);
-
 const fileData = shallowRef<Uint8Array | string | null>(null);
 const fileType = ref<'xml' | 'abc' | 'midi' | null>(null);
 const rawText = ref<string | null>(null);
@@ -242,7 +193,13 @@ const { toastText, isToastVisible, showShortcutToast } = useKeyboardShortcuts({
   onNextSong: handleNextSong,
   onPrevSong: handlePrevSong,
   onToggleRepeat: toggleRepeatMode,
-  onToggleShortcutsModal: () => playbackControlsRef.value?.toggleShortcutsModal()
+  onToggleShortcutsModal: () => {
+    if (isMobile.value) {
+      mobileControlsRef.value?.toggleShortcutsModal();
+    } else {
+      desktopControlsRef.value?.toggleShortcutsModal();
+    }
+  }
 });
 
 function toggleRepeatMode() {
@@ -787,152 +744,41 @@ async function loadFromLibrary(song: SongEntry) {
   font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  background: rgba(18, 18, 24, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 12px 24px;
-  border-radius: 16px;
-  backdrop-filter: blur(10px);
-  position: relative;
-  z-index: 100;
-}
-
-.header-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo-area {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo-icon-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  overflow: hidden;
-}
-
-.logo-icon {
-  width: 38px;
-  height: 38px;
-  object-fit: contain;
-}
-
-.logo-text h1 {
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 800;
-  background: linear-gradient(90deg, #ffffff 30%, #a0a0ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: 0.5px;
-}
-
-.logo-text p {
-  margin: 2px 0 0 0;
-  font-size: 0.7rem;
-  color: #8c8c9e;
-  font-weight: 500;
-}
-
-.dashboard-grid {
-  flex: 1;
-  display: flex;
-  gap: 12px;
-  overflow: hidden;
-  margin-bottom: 16px;
-}
-
-.dashboard-sidebar {
-  width: 420px;
+.mobile-app-shell {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  flex-shrink: 0;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.dashboard-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  height: 100dvh;
+  width: 100vw;
+  background: #09090e;
+  color: #f1f1f7;
   overflow: hidden;
-}
-
-.app-footer {
-  flex-shrink: 0;
-}
-
-.dashboard-sidebar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.dashboard-sidebar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.dashboard-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-}
-
-.dashboard-sidebar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 .shortcut-toast-floating {
   position: fixed;
-  bottom: 95px;
-  right: 28px;
-  background: rgba(15, 23, 42, 0.92);
-  color: #00f0ff;
-  border: 1px solid rgba(0, 240, 255, 0.35);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(0, 240, 255, 0.25);
-  padding: 10px 20px;
-  border-radius: 12px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  z-index: 1200;
+  bottom: 85px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 240, 255, 0.2);
   backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: #ffffff;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 4px 20px rgba(0, 240, 255, 0.3);
+  z-index: 999;
   pointer-events: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  letter-spacing: 0.3px;
 }
 
 .toast-fade-enter-active, .toast-fade-leave-active {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .toast-fade-enter-from, .toast-fade-leave-to {
   opacity: 0;
-  transform: translateY(12px) scale(0.95);
-}
-
-.mobile-app-shell {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
-  width: 100vw;
-  overflow: hidden;
-  background-color: #09090e;
-  box-sizing: border-box;
+  transform: translate(-50%, 10px);
 }
 </style>

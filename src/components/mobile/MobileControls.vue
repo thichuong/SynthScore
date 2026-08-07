@@ -112,6 +112,26 @@
               />
             </div>
 
+            <!-- Action Buttons: Export & Shortcuts -->
+            <div class="drawer-row-btns">
+              <button 
+                class="drawer-action-btn export-btn-m"
+                @click="openExportModal"
+                :disabled="!isReady || !songName"
+              >
+                <Download class="btn-icon" />
+                <span>Xuất âm thanh</span>
+              </button>
+
+              <button 
+                class="drawer-action-btn"
+                @click="openShortcutsModal"
+              >
+                <Keyboard class="btn-icon" />
+                <span>Phím tắt</span>
+              </button>
+            </div>
+
             <!-- Repeat Mode & Stop -->
             <div class="drawer-row-btns">
               <button 
@@ -133,6 +153,18 @@
         </div>
       </div>
     </Transition>
+
+    <!-- Modals -->
+    <ExportAudioModal 
+      :isOpen="isExportModalOpen" 
+      :songName="songName" 
+      @close="closeExportModal" 
+    />
+
+    <ShortcutsModal 
+      :isOpen="isShortcutsModalOpen" 
+      @close="closeShortcutsModal" 
+    />
   </div>
 </template>
 
@@ -141,9 +173,11 @@ import { ref, computed, watch } from 'vue';
 import { 
   Play, Pause, SkipBack, SkipForward, Square, 
   Repeat, Repeat1, Volume2, VolumeX, Gauge, 
-  SlidersHorizontal, Music, X
+  SlidersHorizontal, Music, X, Download, Keyboard
 } from 'lucide-vue-next';
 import { AudioEngine } from '../../services/audioEngine';
+import ExportAudioModal from '../controls/ExportAudioModal.vue';
+import ShortcutsModal from '../controls/ShortcutsModal.vue';
 
 const props = defineProps<{
   isPlaying: boolean;
@@ -166,6 +200,8 @@ const emit = defineEmits<{
 const isDrawerOpen = ref(false);
 const localVolume = ref(props.volume);
 const localPlaybackRate = ref(props.playbackRate);
+const isExportModalOpen = ref(false);
+const isShortcutsModalOpen = ref(false);
 
 watch(() => props.volume, (val) => localVolume.value = val);
 watch(() => props.playbackRate, (val) => localPlaybackRate.value = val);
@@ -215,6 +251,30 @@ function toggleMute() {
 function updatePlaybackRate() {
   AudioEngine.setPlaybackRate(localPlaybackRate.value);
 }
+
+function openExportModal() {
+  isExportModalOpen.value = true;
+}
+
+function closeExportModal() {
+  isExportModalOpen.value = false;
+}
+
+function openShortcutsModal() {
+  isShortcutsModalOpen.value = true;
+}
+
+function closeShortcutsModal() {
+  isShortcutsModalOpen.value = false;
+}
+
+defineExpose({
+  openExportModal,
+  closeExportModal,
+  openShortcutsModal,
+  closeShortcutsModal,
+  toggleShortcutsModal: () => { isShortcutsModalOpen.value = !isShortcutsModalOpen.value; }
+});
 </script>
 
 <style scoped>
@@ -261,7 +321,7 @@ function updatePlaybackRate() {
 .mobile-main-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: space-around;
   gap: 8px;
 }
 
@@ -479,6 +539,12 @@ function updatePlaybackRate() {
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+.drawer-action-btn.export-btn-m {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.2) 0%, rgba(0, 114, 255, 0.2) 100%);
+  border-color: rgba(0, 240, 255, 0.4);
+  color: #00f0ff;
 }
 
 .drawer-action-btn.active {

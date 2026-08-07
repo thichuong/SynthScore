@@ -37,31 +37,36 @@ SynthScore/
 ├── src/
 │   ├── assets/                 # SVGs, hình ảnh, font chữ, CSS dùng chung
 │   ├── components/             # Các thành phần giao diện Vue 3
-│   │   ├── controls/           # Sub-components cho bộ điều khiển phát nhạc (Playback Controls)
+│   │   ├── controls/           # Bộ điều khiển phát nhạc & modal tiện ích dùng chung
+│   │   │   ├── PlaybackControls.vue    # Khung điều khiển phát nhạc chính (Play/Pause/Volume/Speed/Export)
 │   │   │   ├── AudioSpectrumCanvas.vue # Trực quan hóa phổ âm thanh Canvas
 │   │   │   ├── ExportAudioModal.vue    # Modal xuất file audio đa định dạng (WAV, MP3, FLAC, DSD)
 │   │   │   ├── ProgressBar.vue         # Thanh seekbar tiến độ & thời gian phát bài hát
 │   │   │   └── ShortcutsModal.vue      # Modal bảng hướng dẫn phím tắt bàn phím
+│   │   ├── desktop/            # Giao diện dành riêng cho Desktop (Đối xứng 3 phần)
+│   │   │   ├── DesktopControls.vue     # Footer chứa bộ điều khiển phát nhạc Desktop
+│   │   │   ├── DesktopHeader.vue       # Header chứa logo, thư viện bài hát, nạp file, status badge
+│   │   │   └── DesktopPresentation.vue # Khung trung tâm (Mixer bên trái & SheetControlsHeader/Sheet/Waterfall bên phải)
 │   │   ├── header/             # Sub-components cho header
 │   │   │   └── EngineStatusBadge.vue   # Đèn trạng thái & tiến độ tải Soundfont ngoại tuyến
 │   │   ├── library/            # Sub-components cho thư viện bài hát
 │   │   │   ├── SongCardItem.vue        # Card hiển thị bài hát với nút thả tim, tag, độ khó
 │   │   │   └── SongSearchFilter.vue    # Ô tìm kiếm và chip lọc thể loại
-│   │   ├── mixer/              # Sub-components cho bàn trộn âm thanh
+│   │   ├── mixer/              # Quản lý bàn trộn âm thanh đa kênh
+│   │   │   ├── OrchestraMixer.vue      # Bàn trộn nhạc cụ chính
 │   │   │   ├── MixerHeaderPresets.vue  # Preset Giao hưởng/Concerto & Reverb Master
 │   │   │   └── MixerTrackRow.vue       # Dòng điều khiển Solo/Mute/Volume/Pan/Instrument cho mỗi kênh
 │   │   ├── mobile/             # Giao diện dành riêng cho thiết bị di động (Responsive Single-Screen)
-│   │   │   ├── MobileControls.vue
-│   │   │   ├── MobileHeader.vue
-│   │   │   └── MobilePresentation.vue
-│   │   ├── sheet/              # Sub-components cho hiển thị bản nhạc & nốt rơi
-│   │   │   ├── SheetControlsHeader.vue # Toolbar đổi tab Bản nhạc / Thác nốt & Zoom
+│   │   │   ├── MobileControls.vue      # Footer chứa bộ điều khiển phát nhạc & drawer nâng cao
+│   │   │   ├── MobileHeader.vue        # Header di động
+│   │   │   └── MobilePresentation.vue  # Khung trình bày trung tâm di động
+│   │   ├── sheet/              # Hiển thị bản nhạc Sheet Music (OSMD / Abcjs)
+│   │   │   ├── SheetViewer.vue         # Trình hiển thị bản nhạc (OSMD/Abcjs)
+│   │   │   └── SheetControlsHeader.vue # Toolbar đổi tab Bản nhạc / Thác nốt & Zoom
+│   │   ├── visualizer/         # Trực quan hóa âm thanh & đồ họa thác nốt
 │   │   │   └── WaterfallCanvas.vue     # Canvas render thác nốt rơi (Piano Roll)
 │   │   ├── FileUploader.vue     # Bộ tải file kéo thả (.midi, .mxl, .abc)
 │   │   ├── InstrumentSelector.vue # Bộ chọn nhạc cụ General MIDI 128 chương trình
-│   │   ├── OrchestraMixer.vue   # Bàn trộn nhạc cụ đa kênh
-│   │   ├── PlaybackControls.vue # Khung điều khiển phát nhạc chính ở footer
-│   │   ├── SheetViewer.vue      # Trình hiển thị bản nhạc (OSMD/Abcjs) & Thác nốt Canvas
 │   │   └── SongLibraryPicker.vue# Bộ chọn bài hát từ thư viện mẫu
 │   ├── composables/            # Vue Composables tái sử dụng logic
 │   │   ├── useKeyboardShortcuts.ts # Quản lý phím tắt bàn phím toàn cục & Toast notification

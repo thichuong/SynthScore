@@ -61,11 +61,11 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { Music, Plus } from 'lucide-vue-next';
-import { AudioEngine } from '../services/audioEngine';
-import type { TrackInfo } from '../services/midiGenerator';
-import { getDefaultTrackSettings } from '../services/midiGenerator';
-import MixerHeaderPresets from './mixer/MixerHeaderPresets.vue';
-import MixerTrackRow from './mixer/MixerTrackRow.vue';
+import { AudioEngine } from '../../services/audioEngine';
+import type { TrackInfo } from '../../services/midiGenerator';
+import { getDefaultTrackSettings } from '../../services/midiGenerator';
+import MixerHeaderPresets from './MixerHeaderPresets.vue';
+import MixerTrackRow from './MixerTrackRow.vue';
 
 defineProps<{
   tracks: TrackInfo[];

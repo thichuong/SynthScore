@@ -1,40 +1,19 @@
 <template>
-  <div class="sheet-viewer glass-card" :class="{ 'no-header': hideHeader }">
-    <SheetControlsHeader
-      :activeTab="activeTab"
-      :hasSheet="hasSheet"
-      :isPlaying="isPlaying"
-      :isReady="isReady"
-      :hideHeader="hideHeader"
-      @update:activeTab="activeTab = $event"
-      @togglePlay="togglePlay"
-    />
-
+  <div class="sheet-viewer glass-card">
     <div class="viewer-body" @click="togglePlay">
       <!-- Container hiển thị Sheet Music (MusicXML) -->
       <div 
-        v-show="activeTab === 'sheet' && fileType === 'xml'" 
+        v-show="fileType === 'xml'" 
         ref="osmdContainer" 
         class="osmd-container"
       ></div>
 
       <!-- Container hiển thị ABC Notation -->
       <div 
-        v-show="activeTab === 'sheet' && fileType === 'abc'" 
+        v-show="fileType === 'abc'" 
         id="abc-container" 
         class="abc-container"
       ></div>
-
-      <!-- Container hiển thị Falling Notes Visualizer -->
-      <WaterfallCanvas
-        v-show="activeTab === 'visualizer' || !hasSheet"
-        :fileData="fileData"
-        :fileType="fileType"
-        :rawText="rawText"
-        :currentTime="currentTime"
-        :isPlaying="isPlaying"
-        :isActive="activeTab === 'visualizer' || !hasSheet"
-      />
     </div>
 
     <!-- Overlay Icon Phát/Tạm Dừng khi click màn hình -->
@@ -88,10 +67,8 @@
 import { ref, watch, computed } from 'vue';
 import type { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
 import { Play, Pause, Music, HardDrive } from 'lucide-vue-next';
-import { isMobileDevice } from '../composables/useResponsive';
-import { AudioEngine } from '../services/audioEngine';
-import SheetControlsHeader from './sheet/SheetControlsHeader.vue';
-import WaterfallCanvas from './sheet/WaterfallCanvas.vue';
+import { isMobileDevice } from '../../composables/useResponsive';
+import { AudioEngine } from '../../services/audioEngine';
 
 const props = defineProps<{
   fileData: Uint8Array | string | null;
@@ -101,14 +78,9 @@ const props = defineProps<{
   currentTime: number;
   isReady: boolean;
   activeTab?: 'sheet' | 'visualizer';
-  hideHeader?: boolean;
   loading?: boolean;
   loadingProgress?: number;
   fileSize?: number | string;
-}>();
-
-const emit = defineEmits<{
-  (e: 'update:activeTab', tab: 'sheet' | 'visualizer'): void;
 }>();
 
 function formatBytes(bytes: number): string {
@@ -174,25 +146,9 @@ function togglePlay() {
 }
 
 const osmdContainer = ref<HTMLDivElement | null>(null);
-const activeTab = ref<'sheet' | 'visualizer'>(props.activeTab || 'visualizer');
-
-watch(() => props.activeTab, (newTab) => {
-  if (newTab && newTab !== activeTab.value) {
-    activeTab.value = newTab;
-  }
-});
-
-watch(activeTab, (newTab) => {
-  emit('update:activeTab', newTab);
-}, { immediate: true });
-
 const loading = ref(false);
 const isLoading = computed(() => props.loading || loading.value);
 let osmd: OpenSheetMusicDisplay | null = null;
-
-const hasSheet = computed(() => {
-  return props.fileType === 'xml' || props.fileType === 'abc';
-});
 
 watch(() => props.rawText, async (newText) => {
   if (!newText) {
@@ -215,16 +171,6 @@ watch(() => props.rawText, async (newText) => {
       }, 150);
     }
   }, 100);
-});
-
-watch(() => props.fileData, (newData) => {
-  if (!newData) return;
-  
-  if (hasSheet.value) {
-    activeTab.value = 'sheet';
-  } else {
-    activeTab.value = 'visualizer';
-  }
 });
 
 function clearSheetMusic() {

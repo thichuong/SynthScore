@@ -140,11 +140,11 @@ import {
   Play, Pause, Square, Volume2, Volume1, VolumeX, Gauge, Music, 
   Download, Repeat, Repeat1, Keyboard 
 } from 'lucide-vue-next';
-import { AudioEngine } from '../services/audioEngine';
-import ProgressBar from './controls/ProgressBar.vue';
-import AudioSpectrumCanvas from './controls/AudioSpectrumCanvas.vue';
-import ExportAudioModal from './controls/ExportAudioModal.vue';
-import ShortcutsModal from './controls/ShortcutsModal.vue';
+import { AudioEngine } from '../../services/audioEngine';
+import ProgressBar from './ProgressBar.vue';
+import AudioSpectrumCanvas from './AudioSpectrumCanvas.vue';
+import ExportAudioModal from './ExportAudioModal.vue';
+import ShortcutsModal from './ShortcutsModal.vue';
 
 const props = withDefaults(defineProps<{
   isPlaying: boolean;

@@ -33,9 +33,9 @@
 
     <!-- Nội dung hiển thị chính -->
     <div class="mobile-view-container">
-      <!-- Khung hiển thị Bản nhạc / Thác nốt -->
+      <!-- Khung hiển thị Bản nhạc -->
       <div 
-        v-show="currentView === 'sheet' || currentView === 'visualizer'" 
+        v-show="currentView === 'sheet' && hasSheet" 
         class="full-view-pane"
       >
         <SheetViewer 
@@ -46,11 +46,24 @@
           :currentTime="currentTime"
           :isReady="isReady"
           :activeTab="currentView === 'sheet' ? 'sheet' : 'visualizer'"
-          @update:activeTab="handleTabUpdate"
-          :hideHeader="true"
           :loading="loading"
           :loadingProgress="loadingProgress"
           :fileSize="fileSize"
+        />
+      </div>
+
+      <!-- Khung hiển thị Thác nốt -->
+      <div 
+        v-show="currentView === 'visualizer' || (currentView === 'sheet' && !hasSheet)" 
+        class="full-view-pane"
+      >
+        <WaterfallCanvas
+          :fileData="fileData"
+          :fileType="fileType"
+          :rawText="rawText"
+          :currentTime="currentTime"
+          :isPlaying="isPlaying"
+          :isActive="currentView === 'visualizer' || !hasSheet"
         />
       </div>
 
@@ -72,8 +85,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { Music, Layers, Sliders } from 'lucide-vue-next';
-import SheetViewer from '../SheetViewer.vue';
-import OrchestraMixer from '../OrchestraMixer.vue';
+import SheetViewer from '../sheet/SheetViewer.vue';
+import WaterfallCanvas from '../visualizer/WaterfallCanvas.vue';
+import OrchestraMixer from '../mixer/OrchestraMixer.vue';
 import type { TrackInfo } from '../../services/midiGenerator';
 
 const props = defineProps<{
@@ -106,12 +120,6 @@ watch(hasSheet, (newHasSheet) => {
     currentView.value = 'visualizer';
   }
 });
-
-function handleTabUpdate(tab: 'sheet' | 'visualizer') {
-  if (currentView.value !== 'mixer') {
-    currentView.value = tab;
-  }
-}
 </script>
 
 <style scoped>
@@ -192,7 +200,8 @@ function handleTabUpdate(tab: 'sheet' | 'visualizer') {
 }
 
 .full-view-pane :deep(.sheet-viewer),
-.full-view-pane :deep(.orchestra-mixer) {
+.full-view-pane :deep(.orchestra-mixer),
+.full-view-pane :deep(.canvas-container) {
   height: 100% !important;
   max-height: 100% !important;
   margin: 0 !important;
