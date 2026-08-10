@@ -41,9 +41,9 @@
 </template>
 
 <script setup lang="ts">
-import SongLibraryPicker from '../controls/SongLibraryPicker.vue';
-import FileUploader from '../controls/FileUploader.vue';
-import EngineStatusBadge from '../header/EngineStatusBadge.vue';
+import SongLibraryPicker from '../../components/controls/SongLibraryPicker.vue';
+import FileUploader from '../../components/controls/FileUploader.vue';
+import EngineStatusBadge from '../../components/header/EngineStatusBadge.vue';
 import type { SongEntry } from '../../data/songLibrary';
 import type { SoundfontProgress } from '../../services/audioEngine';
 

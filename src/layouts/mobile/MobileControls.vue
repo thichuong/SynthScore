@@ -176,8 +176,8 @@ import {
   SlidersHorizontal, Music, X, Download, Keyboard
 } from 'lucide-vue-next';
 import { AudioEngine } from '../../services/audioEngine';
-import ExportAudioModal from '../controls/ExportAudioModal.vue';
-import ShortcutsModal from '../controls/ShortcutsModal.vue';
+import ExportAudioModal from '../../components/controls/ExportAudioModal.vue';
+import ShortcutsModal from '../../components/controls/ShortcutsModal.vue';
 
 const props = defineProps<{
   isPlaying: boolean;

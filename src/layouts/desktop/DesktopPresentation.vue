@@ -87,9 +87,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { Music, Layers, Play, Pause, Loader2 } from 'lucide-vue-next';
-import OrchestraMixer from '../mixer/OrchestraMixer.vue';
-import SheetViewer from '../sheet/SheetViewer.vue';
-import WaterfallCanvas from '../visualizer/WaterfallCanvas.vue';
+import OrchestraMixer from '../../components/mixer/OrchestraMixer.vue';
+import SheetViewer from '../../components/sheet/SheetViewer.vue';
+import WaterfallCanvas from '../../components/visualizer/WaterfallCanvas.vue';
 import type { TrackInfo } from '../../services/midiGenerator';
 import { AudioEngine } from '../../services/audioEngine';
 

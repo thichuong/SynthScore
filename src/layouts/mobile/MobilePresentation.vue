@@ -86,9 +86,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { Music, Layers, Sliders } from 'lucide-vue-next';
-import SheetViewer from '../sheet/SheetViewer.vue';
-import WaterfallCanvas from '../visualizer/WaterfallCanvas.vue';
-import OrchestraMixer from '../mixer/OrchestraMixer.vue';
+import SheetViewer from '../../components/sheet/SheetViewer.vue';
+import WaterfallCanvas from '../../components/visualizer/WaterfallCanvas.vue';
+import OrchestraMixer from '../../components/mixer/OrchestraMixer.vue';
 import type { TrackInfo } from '../../services/midiGenerator';
 
 const props = defineProps<{

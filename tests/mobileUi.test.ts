@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { useResponsive } from '../src/composables/useResponsive';
-import MobileHeader from '../src/components/mobile/MobileHeader.vue';
-import MobilePresentation from '../src/components/mobile/MobilePresentation.vue';
-import MobileControls from '../src/components/mobile/MobileControls.vue';
-import DesktopHeader from '../src/components/desktop/DesktopHeader.vue';
-import DesktopPresentation from '../src/components/desktop/DesktopPresentation.vue';
-import DesktopControls from '../src/components/desktop/DesktopControls.vue';
+import MobileHeader from '../src/layouts/mobile/MobileHeader.vue';
+import MobilePresentation from '../src/layouts/mobile/MobilePresentation.vue';
+import MobileControls from '../src/layouts/mobile/MobileControls.vue';
+import DesktopHeader from '../src/layouts/desktop/DesktopHeader.vue';
+import DesktopPresentation from '../src/layouts/desktop/DesktopPresentation.vue';
+import DesktopControls from '../src/layouts/desktop/DesktopControls.vue';
 import PlaybackControls from '../src/components/controls/PlaybackControls.vue';
 
 describe('UI Architecture & Responsiveness', () => {

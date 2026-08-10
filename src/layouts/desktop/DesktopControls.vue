@@ -20,7 +20,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import PlaybackControls from '../controls/PlaybackControls.vue';
+import PlaybackControls from '../../components/controls/PlaybackControls.vue';
 
 defineProps<{
   isPlaying: boolean;

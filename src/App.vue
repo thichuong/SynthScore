@@ -128,13 +128,13 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, computed } from 'vue';
-import DesktopHeader from './components/desktop/DesktopHeader.vue';
-import DesktopPresentation from './components/desktop/DesktopPresentation.vue';
-import DesktopControls from './components/desktop/DesktopControls.vue';
+import DesktopHeader from './layouts/desktop/DesktopHeader.vue';
+import DesktopPresentation from './layouts/desktop/DesktopPresentation.vue';
+import DesktopControls from './layouts/desktop/DesktopControls.vue';
 
-import MobileHeader from './components/mobile/MobileHeader.vue';
-import MobilePresentation from './components/mobile/MobilePresentation.vue';
-import MobileControls from './components/mobile/MobileControls.vue';
+import MobileHeader from './layouts/mobile/MobileHeader.vue';
+import MobilePresentation from './layouts/mobile/MobilePresentation.vue';
+import MobileControls from './layouts/mobile/MobileControls.vue';
 import { useResponsive } from './composables/useResponsive';
 import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts';
 
