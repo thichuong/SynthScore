@@ -80,6 +80,7 @@ interface RenderNote {
 let midiNotes: RenderNote[] = [];
 let maxMidi = 88;
 let minMidi = 36;
+let maxNoteDuration = 10.0;
 
 const NOTE_COLORS = [
   '#3b82f6', // Kênh 0: Violin I / Grand Piano (Xanh dương)
@@ -121,6 +122,7 @@ const batchNoteRects: NoteRect[][] = Array.from({ length: NOTE_COLORS.length }, 
 
 async function parseMidiForVisualizer() {
   midiNotes = [];
+  maxNoteDuration = 10.0;
   if (!props.fileData) return;
 
   try {
@@ -169,12 +171,15 @@ async function parseMidiForVisualizer() {
           trackIndex: channel
         });
 
+        if (note.duration > maxNoteDuration) {
+          maxNoteDuration = note.duration;
+        }
         if (note.midi < tempMin) tempMin = note.midi;
         if (note.midi > tempMax) tempMax = note.midi;
       });
     });
 
-    // Sắp xếp midiNotes theo thời gian tăng dần để binarySearch hiển thị mượt mà
+    // Sắp xếp midiNotes theo thời gian bắt đầu tăng dần để tìm kiếm nhị phân chính xác
     midiNotes.sort((a, b) => a.time - b.time);
 
     minMidi = Math.max(21, tempMin - 5);
@@ -274,11 +279,12 @@ function initCanvas() {
   renderStaticBackground(w, h);
 }
 
-function binarySearchFirstNoteIndex(targetTime: number): number {
+// Tìm kiếm nhị phân theo thời gian bắt đầu (mảng midiNotes được sắp xếp tăng dần theo note.time)
+function binarySearchByStartTime(targetStartTime: number): number {
   let lo = 0, hi = midiNotes.length;
   while (lo < hi) {
     const mid = (lo + hi) >>> 1;
-    if (midiNotes[mid].time + midiNotes[mid].duration < targetTime) {
+    if (midiNotes[mid].time < targetStartTime) {
       lo = mid + 1;
     } else {
       hi = mid;
@@ -316,37 +322,52 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
     batchNoteRects[c].length = 0;
   }
 
-  const marginBehind = 1.0;
+  const marginBehind = 2.0;
   const windowStart = curTime - marginBehind;
   const windowEnd = curTime + VISIBLE_SECONDS;
 
-  const startIdx = binarySearchFirstNoteIndex(windowStart);
+  // Bắt đầu tìm nốt có note.time >= windowStart - maxNoteDuration
+  const startSearchTime = windowStart - maxNoteDuration;
+  const startIdx = binarySearchByStartTime(startSearchTime);
 
   // 2. Gom nhóm các nốt nhạc theo màu sắc
   for (let i = startIdx; i < midiNotes.length; i++) {
     const note = midiNotes[i];
     if (note.time > windowEnd) break;
 
-    const yStart = playAreaHeight - (note.time - curTime) * speed - note.duration * speed;
-    const yEnd = playAreaHeight - (note.time - curTime) * speed;
+    const noteEndTime = note.time + note.duration;
+    if (noteEndTime < windowStart) continue;
 
+    // yEnd: đáy thanh nốt (thời điểm bắt đầu nốt)
+    // yStart: đỉnh thanh nốt (thời điểm kết thúc nốt)
+    const yEnd = playAreaHeight - (note.time - curTime) * speed;
+    const yStart = playAreaHeight - (noteEndTime - curTime) * speed;
+
+    // Bỏ qua nốt nằm hoàn toàn ngoài vùng hiển thị [0, playAreaHeight]
     if (yEnd < 0 || yStart > playAreaHeight) continue;
 
-    if (curTime >= note.time && curTime <= note.time + note.duration) {
+    // Đánh dấu phím piano đang kích hoạt
+    if (curTime >= note.time && curTime <= noteEndTime) {
       if (note.midi >= 0 && note.midi < 128) {
         const colorIdx = (note.trackIndex % NOTE_COLORS.length) + 1;
         activeKeysArray[note.midi] = colorIdx;
       }
     }
 
-    const noteX = (note.midi - minMidi) * keyWidth;
-    const noteY = Math.max(0, yStart);
-    const noteW = keyWidth - 2;
-    const noteH = yEnd - Math.max(0, yStart);
+    if (note.midi < minMidi || note.midi > maxMidi) continue;
 
-    const radius = noteW > 8 ? Math.min(noteW / 2, 4) : 0;
-    const colorIndex = note.trackIndex % NOTE_COLORS.length;
-    batchNoteRects[colorIndex].push({ x: noteX, y: noteY, w: noteW, h: noteH, r: radius });
+    // Cắt góc (Clamping) dải hiển thị trong phạm vi [0, playAreaHeight]
+    const clampedYStart = Math.max(0, yStart);
+    const clampedYEnd = Math.min(playAreaHeight, yEnd);
+    const noteH = clampedYEnd - clampedYStart;
+
+    if (noteH > 0) {
+      const noteX = (note.midi - minMidi) * keyWidth;
+      const noteW = Math.max(1, keyWidth - 2);
+      const radius = noteW > 8 ? Math.min(noteW / 2, 4) : 0;
+      const colorIndex = note.trackIndex % NOTE_COLORS.length;
+      batchNoteRects[colorIndex].push({ x: noteX, y: clampedYStart, w: noteW, h: noteH, r: radius });
+    }
   }
 
   // 3. Vẽ nốt rơi theo từng mảng màu gom nhóm (Tối đa 16 draw calls cho tất cả các nốt)
