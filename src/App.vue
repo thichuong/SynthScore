@@ -761,6 +761,7 @@ async function loadFromLibrary(song: SongEntry) {
   left: 50%;
   transform: translateX(-50%);
   background: rgba(0, 240, 255, 0.2);
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(0, 240, 255, 0.4);
   color: #ffffff;

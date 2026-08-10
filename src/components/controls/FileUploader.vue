@@ -155,6 +155,7 @@ async function processFile(file: File) {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-backdrop-filter: blur(5px);
   backdrop-filter: blur(5px);
 }
 
@@ -184,6 +185,7 @@ async function processFile(file: File) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  -webkit-backdrop-filter: blur(5px);
   backdrop-filter: blur(5px);
 }
 

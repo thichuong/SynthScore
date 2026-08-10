@@ -316,6 +316,7 @@ async function renderSheetMusic(renderId: number): Promise<boolean> {
   height: 70px;
   border-radius: 50%;
   background: rgba(0, 240, 255, 0.25);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(0, 240, 255, 0.5);
   display: flex;

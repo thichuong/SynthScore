@@ -418,6 +418,7 @@ const emit = defineEmits<{
   width: 100%;
   height: 4px;
   -webkit-appearance: none;
+  appearance: none;
   background: rgba(255, 255, 255, 0.08);
   border-radius: 2px;
   outline: none;
@@ -425,6 +426,7 @@ const emit = defineEmits<{
 
 .fx-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
+  appearance: none;
   width: 10px;
   height: 10px;
   border-radius: 50%;

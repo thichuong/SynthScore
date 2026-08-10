@@ -165,6 +165,7 @@ watch(() => props.fileData, () => {
   padding: 6px;
   margin: 6px 10px 4px 10px;
   background: rgba(22, 22, 32, 0.7);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;

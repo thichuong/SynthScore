@@ -341,6 +341,7 @@ function formatPanValue(pan: number): string {
   flex: 1;
   height: 4px;
   -webkit-appearance: none;
+  appearance: none;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
   outline: none;
@@ -348,6 +349,7 @@ function formatPanValue(pan: number): string {
 
 .vol-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
+  appearance: none;
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -463,14 +465,15 @@ function formatPanValue(pan: number): string {
   flex: 1;
   height: 4px;
   -webkit-appearance: none;
+  appearance: none;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
   outline: none;
 }
 
-.pan-input::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #00f0ff; cursor: pointer; }
-.reverb-input::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #c084fc; cursor: pointer; }
-.chorus-input::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #38bdf8; cursor: pointer; }
+.pan-input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #00f0ff; cursor: pointer; }
+.reverb-input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #c084fc; cursor: pointer; }
+.chorus-input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #38bdf8; cursor: pointer; }
 
 .btn-reset-mini {
   background: transparent;

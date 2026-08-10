@@ -291,6 +291,7 @@ defineExpose({
   gap: 6px;
   padding: 8px 12px 10px 12px;
   background: rgba(18, 18, 26, 0.95);
+  -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
@@ -426,6 +427,7 @@ defineExpose({
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   z-index: 100;
   display: flex;

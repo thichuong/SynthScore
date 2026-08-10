@@ -278,6 +278,7 @@ async function startExport() {
   width: 100vw;
   height: 100vh;
   background: rgba(5, 5, 8, 0.7);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   z-index: 1000;
   display: flex;
@@ -546,6 +547,7 @@ async function startExport() {
   width: 100vw;
   height: 100vh;
   background: rgba(5, 5, 8, 0.85);
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   z-index: 1100;
   display: flex;

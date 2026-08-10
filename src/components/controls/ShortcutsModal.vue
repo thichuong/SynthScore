@@ -126,6 +126,7 @@ const emit = defineEmits<{
   width: 100vw;
   height: 100vh;
   background: rgba(5, 5, 8, 0.75);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   z-index: 1050;
   display: flex;

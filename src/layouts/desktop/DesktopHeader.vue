@@ -85,6 +85,7 @@ const emit = defineEmits<{
   border: 1px solid rgba(255, 255, 255, 0.05);
   padding: 12px 24px;
   border-radius: 16px;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   position: relative;
   z-index: 10;

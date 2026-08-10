@@ -129,6 +129,7 @@ const activeFilter = computed({
   gap: 8px;
   padding: 8px 12px;
   background: rgba(18, 18, 26, 0.9);
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
@@ -159,6 +160,7 @@ const activeFilter = computed({
   font-size: 1.05rem;
   background: linear-gradient(135deg, #00f0ff 0%, #7000ff 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
