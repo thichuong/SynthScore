@@ -648,51 +648,13 @@ pub fn generate_symphony_midi_wasm(bytes: &[u8]) -> Vec<u8> {
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    // Note Thinning
-    let max_voices_per_window = 8;
-    let quantize_window = 0.03;
-
-    let mut thinned_notes = Vec::new();
-    let mut window_start = -f64::INFINITY;
-    let mut window_notes: Vec<RawNote> = Vec::new();
-
-    let flush_win = |w_notes: &mut Vec<RawNote>, t_notes: &mut Vec<RawNote>| {
-        if w_notes.len() <= max_voices_per_window {
-            t_notes.append(w_notes);
-        } else {
-            w_notes.sort_by(|a, b| {
-                b.velocity
-                    .partial_cmp(&a.velocity)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-            t_notes.extend(w_notes.drain(0..max_voices_per_window));
-            w_notes.clear();
-        }
-    };
-
-    for note in all_notes {
-        if note.time - window_start > quantize_window {
-            flush_win(&mut window_notes, &mut thinned_notes);
-            window_start = note.time;
-        }
-        window_notes.push(note);
-    }
-    flush_win(&mut window_notes, &mut thinned_notes);
-
-    thinned_notes.sort_by(|a, b| {
-        a.time
-            .partial_cmp(&b.time)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-
     let ppq = 480.0;
     let sec_per_tick = 60.0 / (f64::from(bpm) * ppq);
 
     let mut prepared_events = Vec::new();
-    let mut violin_alternator = 0u32;
     let mut last_timpani_time = -5.0f64;
 
-    for note in thinned_notes {
+    for note in all_notes {
         let m = note.midi;
         let t = note.time;
         let d = note.duration;
@@ -713,36 +675,19 @@ pub fn generate_symphony_midi_wasm(bytes: &[u8]) -> Vec<u8> {
         };
 
         if m >= 64 {
-            if violin_alternator.is_multiple_of(2) {
-                add_note(&mut prepared_events, 0, m, 1.0);
-
-                add_note(&mut prepared_events, 1, m, 0.35);
-            } else {
-                add_note(&mut prepared_events, 1, m, 0.85);
-                add_note(&mut prepared_events, 0, m, 0.4);
-            }
-            violin_alternator += 1;
+            add_note(&mut prepared_events, 0, m, 1.0);
+            add_note(&mut prepared_events, 1, m, 0.7);
 
             if m >= 72 {
                 add_note(&mut prepared_events, 5, m, 0.65);
             }
-            if v >= 0.5 {
-                add_note(&mut prepared_events, 7, m, 0.4);
-            }
-            if v >= 0.7 {
-                add_note(&mut prepared_events, 8, m, 0.35);
-            }
-            if d >= 0.3 && v >= 0.5 {
-                add_note(&mut prepared_events, 10, m, 0.3);
-            }
+            add_note(&mut prepared_events, 7, m, 0.4);
+            add_note(&mut prepared_events, 8, m, 0.35);
+            add_note(&mut prepared_events, 10, m, 0.3);
         } else if (48..64).contains(&m) {
             add_note(&mut prepared_events, 2, m, 0.8);
-            if v >= 0.55 {
-                add_note(&mut prepared_events, 6, m, 0.55);
-            }
-            if d >= 0.25 && v >= 0.5 {
-                add_note(&mut prepared_events, 8, m, 0.4);
-            }
+            add_note(&mut prepared_events, 6, m, 0.55);
+            add_note(&mut prepared_events, 8, m, 0.4);
         } else {
             add_note(&mut prepared_events, 3, m, 0.9);
             let cb_midi = if m >= 36 { m - 12 } else { m };

@@ -191,94 +191,44 @@ export function generateSymphonyMidi(originalMidiBytes: Uint8Array): Uint8Array 
 
     allNotes.sort((a, b) => a.time - b.time);
 
-    // === TỐI ƯU: Note Thinning — Giới hạn polyphony tối đa ===
-    // Gom nốt theo cửa sổ thời gian 30ms, giữ tối đa MAX_VOICES_PER_WINDOW nốt/cửa sổ
-    const MAX_VOICES_PER_WINDOW = 8;
-    const QUANTIZE_WINDOW = 0.03; // 30ms
-
-    const thinnedNotes: typeof allNotes = [];
-    let windowStart = -Infinity;
-    let windowNotes: typeof allNotes = [];
-
-    const flushWindow = () => {
-      if (windowNotes.length <= MAX_VOICES_PER_WINDOW) {
-        thinnedNotes.push(...windowNotes);
-      } else {
-        // Ưu tiên giữ nốt có velocity cao nhất
-        windowNotes.sort((a, b) => b.velocity - a.velocity);
-        thinnedNotes.push(...windowNotes.slice(0, MAX_VOICES_PER_WINDOW));
-      }
-      windowNotes = [];
-    };
-
-    for (const note of allNotes) {
-      if (note.time - windowStart > QUANTIZE_WINDOW) {
-        flushWindow();
-        windowStart = note.time;
-      }
-      windowNotes.push(note);
-    }
-    flushWindow();
-
-    // Sắp xếp lại theo thời gian sau khi thinning
-    thinnedNotes.sort((a, b) => a.time - b.time);
-
-    // === PHỐI KHÍ THÔNG MINH ===
+    // === PHỐI KHÍ ĐẦY ĐỦ TRỌN VẸN (Full Quality Orchestration) ===
     let lastTimpaniTime = -5;
-    let violinAlternator = 0; // Xen kẽ Violin I/II
 
-    thinnedNotes.forEach(note => {
+    allNotes.forEach(note => {
       const m = note.midi;
       const t = note.time;
       const d = note.duration;
       const v = note.velocity;
 
       if (m >= 64) {
-        // === Giai điệu âm cao ===
-        // Xen kẽ Violin I/II thay vì ghi cả hai đồng thời → giảm 1 voice
-        if (violinAlternator % 2 === 0) {
-          symTracks[0].addNote({ midi: m, time: t, duration: d, velocity: v });
-          symTracks[1].addNote({ midi: m, time: t, duration: d, velocity: v * 0.35 });
-        } else {
-          symTracks[1].addNote({ midi: m, time: t, duration: d, velocity: v * 0.85 });
-          symTracks[0].addNote({ midi: m, time: t, duration: d, velocity: v * 0.4 });
-        }
-        violinAlternator++;
+        // === Giai điệu âm cao (Treble) ===
+        symTracks[0].addNote({ midi: m, time: t, duration: d, velocity: v });
+        symTracks[1].addNote({ midi: m, time: t, duration: d, velocity: v * 0.7 });
 
-        // Flute chỉ chơi nốt rất cao (giai điệu chính)
+        // Flute đệm nốt cao
         if (m >= 72) {
           symTracks[5].addNote({ midi: m, time: t, duration: d, velocity: v * 0.65 });
         }
 
-        // Clarinet đệm nhẹ — chỉ khi velocity gốc đủ mạnh
-        if (v >= 0.5) {
-          symTracks[7].addNote({ midi: m, time: t, duration: d, velocity: v * 0.4 });
-        }
+        // Clarinet đệm hòa âm
+        symTracks[7].addNote({ midi: m, time: t, duration: d, velocity: v * 0.4 });
 
-        // French Horn chỉ nhấn vào các nốt mạnh (accent)
-        if (v >= 0.7) {
-          symTracks[8].addNote({ midi: m, time: t, duration: d, velocity: v * 0.35 });
-        }
+        // French Horn accent
+        symTracks[8].addNote({ midi: m, time: t, duration: d, velocity: v * 0.35 });
 
-        // Harp arpeggio nhẹ — chỉ trên nốt có duration dài (sustain)
-        if (d >= 0.3 && v >= 0.5) {
-          symTracks[9].addNote({ midi: m, time: t, duration: d, velocity: v * 0.3 });
-        }
+        // Harp đệm nhẹ (Track index 10 = Orchestral Harp)
+        symTracks[10].addNote({ midi: m, time: t, duration: d, velocity: v * 0.3 });
       } 
       else if (m >= 48 && m < 64) {
-        // === Hòa âm âm trung ===
+        // === Hòa âm âm trung (Mid) ===
         // Viola chơi chính
         symTracks[2].addNote({ midi: m, time: t, duration: d, velocity: v * 0.8 });
 
-        // Oboe chỉ đệm nốt mạnh
-        if (v >= 0.55) {
-          symTracks[6].addNote({ midi: m, time: t, duration: d, velocity: v * 0.55 });
-        }
+        // Oboe đệm
+        symTracks[6].addNote({ midi: m, time: t, duration: d, velocity: v * 0.55 });
 
-        // French Horn hòa âm trung — chỉ sustain dài
-        if (d >= 0.25 && v >= 0.5) {
-          symTracks[8].addNote({ midi: m, time: t, duration: d, velocity: v * 0.4 });
-        }
+        // French Horn đệm trung
+        symTracks[8].addNote({ midi: m, time: t, duration: d, velocity: v * 0.4 });
       } 
       else {
         // === Bè trầm (Bass) ===
@@ -289,9 +239,9 @@ export function generateSymphonyMidi(originalMidiBytes: Uint8Array): Uint8Array 
         const cbMidi = m >= 36 ? m - 12 : m;
         symTracks[4].addNote({ midi: cbMidi, time: t, duration: d, velocity: v * 0.65 });
 
-        // Timpani chỉ đánh nốt trầm sâu, cách nhau >= 1.5s
+        // Timpani (Track index 9 = Timpani)
         if (m < 40 && (t - lastTimpaniTime) >= 1.5) {
-          symTracks[10].addNote({ midi: m, time: t, duration: Math.min(d, 0.4), velocity: v * 0.45 });
+          symTracks[9].addNote({ midi: m, time: t, duration: Math.min(d, 0.4), velocity: v * 0.45 });
           lastTimpaniTime = t;
         }
       }

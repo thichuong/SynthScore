@@ -151,9 +151,31 @@ describe('TS/JS Fallback Engine (WASM Disabled/Unavailable)', () => {
     const wasmSym = new Midi(wasmSymBytes.buffer);
 
     expect(jsSym.tracks.length).toBe(wasmSym.tracks.length);
+    let jsTotalSymNotes = 0;
+    let wasmTotalSymNotes = 0;
     for (let i = 0; i < jsSym.tracks.length; i++) {
       expect(jsSym.tracks[i].name).toBe(wasmSym.tracks[i].name);
+      jsTotalSymNotes += jsSym.tracks[i].notes.length;
+      wasmTotalSymNotes += wasmSym.tracks[i].notes.length;
     }
+    expect(jsTotalSymNotes).toBe(wasmTotalSymNotes);
+
+    // Compare Concerto generation parity
+    const jsConcBytes = generateConcertoMidi(sampleMidiBytes);
+    const wasmConcBytes = wasm.generate_concerto_midi_wasm(sampleMidiBytes);
+
+    const jsConc = new Midi(jsConcBytes.buffer);
+    const wasmConc = new Midi(wasmConcBytes.buffer);
+
+    expect(jsConc.tracks.length).toBe(wasmConc.tracks.length);
+    let jsTotalConcNotes = 0;
+    let wasmTotalConcNotes = 0;
+    for (let i = 0; i < jsConc.tracks.length; i++) {
+      expect(jsConc.tracks[i].name).toBe(wasmConc.tracks[i].name);
+      jsTotalConcNotes += jsConc.tracks[i].notes.length;
+      wasmTotalConcNotes += wasmConc.tracks[i].notes.length;
+    }
+    expect(jsTotalConcNotes).toBe(wasmTotalConcNotes);
   });
 
   afterAll(async () => {

@@ -82,14 +82,22 @@ let maxMidi = 88;
 let minMidi = 36;
 
 const NOTE_COLORS = [
-  '#3b82f6', // Xanh dương
-  '#10b981', // Xanh lá
-  '#f59e0b', // Cam hổ phách
-  '#8b5cf6', // Tím nhạt
-  '#ec4899', // Hồng dịu
-  '#06b6d4', // Xanh ngọc
-  '#f97316', // Cam tươi
-  '#6366f1', // Xanh chàm
+  '#3b82f6', // Kênh 0: Violin I / Grand Piano (Xanh dương)
+  '#60a5fa', // Kênh 1: Violin II (Xanh da trời)
+  '#8b5cf6', // Kênh 2: Viola (Tím)
+  '#a855f7', // Kênh 3: Cello (Tím thẫm)
+  '#d946ef', // Kênh 4: Contrabass (Hồng cánh sen)
+  '#06b6d4', // Kênh 5: Flute (Xanh ngọc)
+  '#14b8a6', // Kênh 6: Oboe (Xanh ngọc lục bảo)
+  '#10b981', // Kênh 7: Clarinet (Xanh lá)
+  '#f59e0b', // Kênh 8: French Horn (Vàng cam)
+  '#ef4444', // Kênh 9: Timpani / Bộ gõ (Đỏ tươi)
+  '#ec4899', // Kênh 10: Orchestral Harp (Hồng phớt)
+  '#f97316', // Kênh 11: Trumpet (Cam tươi)
+  '#eab308', // Kênh 12: Trombone (Vàng chanh)
+  '#84cc16', // Kênh 13: Synth Lead (Xanh lá chuối)
+  '#2dd4bf', // Kênh 14: Synth Pad (Xanh lơ)
+  '#c084fc', // Kênh 15: FX / Khác (Tím hoa oải hương)
 ];
 
 // Pre-computed lookup cho phím đen (O(1) access)
@@ -326,7 +334,8 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
 
     if (curTime >= note.time && curTime <= note.time + note.duration) {
       if (note.midi >= 0 && note.midi < 128) {
-        activeKeysArray[note.midi] = 1;
+        const colorIdx = (note.trackIndex % NOTE_COLORS.length) + 1;
+        activeKeysArray[note.midi] = colorIdx;
       }
     }
 
@@ -340,7 +349,7 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
     batchNoteRects[colorIndex].push({ x: noteX, y: noteY, w: noteW, h: noteH, r: radius });
   }
 
-  // 3. Vẽ nốt rơi theo từng mảng màu gom nhóm (Tối đa 8 draw calls cho tất cả các nốt)
+  // 3. Vẽ nốt rơi theo từng mảng màu gom nhóm (Tối đa 16 draw calls cho tất cả các nốt)
   for (let c = 0; c < NOTE_COLORS.length; c++) {
     const rects = batchNoteRects[c];
     if (rects.length === 0) continue;
@@ -358,32 +367,26 @@ function drawVisualizer(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D
     ctx.fill();
   }
 
-  // 4. Chỉ vẽ đè lên các phím piano đang kích hoạt (Active Key Highlights Only)
-  // Highlight phím trắng đang nhấn
-  ctx.fillStyle = '#60a5fa';
-  ctx.beginPath();
-  let hasActiveWhite = false;
+  // 4. Vẽ phát sáng phím piano đang kích hoạt theo màu sắc nhạc cụ tương ứng
   for (let m = minMidi; m <= maxMidi; m++) {
-    if (activeKeysArray[m] === 1 && !IS_BLACK_KEY[m % 12]) {
+    const colorIdx = activeKeysArray[m];
+    if (colorIdx > 0) {
+      const trackColor = NOTE_COLORS[colorIdx - 1];
       const x = (m - minMidi) * keyWidth;
-      ctx.rect(x, playAreaHeight, keyWidth - 1, pianoHeight);
-      hasActiveWhite = true;
-    }
-  }
-  if (hasActiveWhite) ctx.fill();
+      const isBlack = IS_BLACK_KEY[m % 12];
 
-  // Highlight phím đen đang nhấn
-  ctx.fillStyle = '#2563eb';
-  ctx.beginPath();
-  let hasActiveBlack = false;
-  for (let m = minMidi; m <= maxMidi; m++) {
-    if (activeKeysArray[m] === 1 && IS_BLACK_KEY[m % 12]) {
-      const x = (m - minMidi) * keyWidth;
-      ctx.rect(x + 1, playAreaHeight, keyWidth - 2, pianoHeight * 0.65);
-      hasActiveBlack = true;
+      ctx.fillStyle = trackColor;
+      if (isBlack) {
+        ctx.fillRect(x + 1, playAreaHeight, keyWidth - 2, pianoHeight * 0.65);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.fillRect(x + 1, playAreaHeight, keyWidth - 2, 4);
+      } else {
+        ctx.fillRect(x, playAreaHeight, keyWidth - 1, pianoHeight);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.fillRect(x, playAreaHeight, keyWidth - 1, 5);
+      }
     }
   }
-  if (hasActiveBlack) ctx.fill();
 }
 
 function startAnimation() {
