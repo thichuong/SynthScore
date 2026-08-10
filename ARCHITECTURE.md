@@ -38,11 +38,13 @@ SynthScore/
 │   ├── assets/                 # SVGs, hình ảnh, font chữ, CSS dùng chung
 │   ├── components/             # Các thành phần giao diện Vue 3
 │   │   ├── controls/           # Bộ điều khiển phát nhạc & modal tiện ích dùng chung
-│   │   │   ├── PlaybackControls.vue    # Khung điều khiển phát nhạc chính (Play/Pause/Volume/Speed/Export)
 │   │   │   ├── AudioSpectrumCanvas.vue # Trực quan hóa phổ âm thanh Canvas
 │   │   │   ├── ExportAudioModal.vue    # Modal xuất file audio đa định dạng (WAV, MP3, FLAC, DSD)
+│   │   │   ├── FileUploader.vue        # Bộ tải file kéo thả (.midi, .mxl, .abc)
+│   │   │   ├── PlaybackControls.vue    # Khung điều khiển phát nhạc chính (Play/Pause/Volume/Speed/Export)
 │   │   │   ├── ProgressBar.vue         # Thanh seekbar tiến độ & thời gian phát bài hát
-│   │   │   └── ShortcutsModal.vue      # Modal bảng hướng dẫn phím tắt bàn phím
+│   │   │   ├── ShortcutsModal.vue      # Modal bảng hướng dẫn phím tắt bàn phím
+│   │   │   └── SongLibraryPicker.vue   # Bộ chọn bài hát từ thư viện mẫu
 │   │   ├── desktop/            # Giao diện dành riêng cho Desktop (Đối xứng 3 phần)
 │   │   │   ├── DesktopControls.vue     # Footer chứa bộ điều khiển phát nhạc Desktop
 │   │   │   ├── DesktopHeader.vue       # Header chứa logo, thư viện bài hát, nạp file, status badge
@@ -53,9 +55,10 @@ SynthScore/
 │   │   │   ├── SongCardItem.vue        # Card hiển thị bài hát với nút thả tim, tag, độ khó
 │   │   │   └── SongSearchFilter.vue    # Ô tìm kiếm và chip lọc thể loại
 │   │   ├── mixer/              # Quản lý bàn trộn âm thanh đa kênh
-│   │   │   ├── OrchestraMixer.vue      # Bàn trộn nhạc cụ chính
+│   │   │   ├── InstrumentSelector.vue  # Bộ chọn nhạc cụ General MIDI 128 chương trình
 │   │   │   ├── MixerHeaderPresets.vue  # Preset Giao hưởng/Concerto & Reverb Master
 │   │   │   ├── MixerTrackRow.vue       # Dòng điều khiển Solo/Mute/Volume/Pan/Instrument cho mỗi kênh
+│   │   │   ├── OrchestraMixer.vue      # Bàn trộn nhạc cụ chính
 │   │   │   └── ReverbSelector.vue      # Bộ chọn kiểu phòng Reverb Master custom dropdown với hiệu ứng Teleport & mượt mà
 │   │   ├── mobile/             # Giao diện dành riêng cho thiết bị di động (Responsive Single-Screen)
 │   │   │   ├── MobileControls.vue      # Footer chứa bộ điều khiển phát nhạc & drawer nâng cao
@@ -63,11 +66,8 @@ SynthScore/
 │   │   │   └── MobilePresentation.vue  # Khung trình bày trung tâm di động
 │   │   ├── sheet/              # Hiển thị bản nhạc Sheet Music (OSMD / Abcjs)
 │   │   │   └── SheetViewer.vue         # Trình hiển thị bản nhạc (OSMD/Abcjs)
-│   │   ├── visualizer/         # Trực quan hóa âm thanh & đồ họa thác nốt
-│   │   │   └── WaterfallCanvas.vue     # Canvas render thác nốt rơi (Piano Roll)
-│   │   ├── FileUploader.vue     # Bộ tải file kéo thả (.midi, .mxl, .abc)
-│   │   ├── InstrumentSelector.vue # Bộ chọn nhạc cụ General MIDI 128 chương trình
-│   │   └── SongLibraryPicker.vue# Bộ chọn bài hát từ thư viện mẫu
+│   │   └── visualizer/         # Trực quan hóa âm thanh & đồ họa thác nốt
+│   │       └── WaterfallCanvas.vue     # Canvas render thác nốt rơi (Piano Roll)
 │   ├── composables/            # Vue Composables tái sử dụng logic
 │   │   ├── useKeyboardShortcuts.ts # Quản lý phím tắt bàn phím toàn cục & Toast notification
 │   │   └── useResponsive.ts    # Nhận diện thiết bị Mobile / Desktop

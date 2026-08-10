@@ -69,8 +69,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { Download, CheckCircle, AlertCircle } from 'lucide-vue-next';
-import SongLibraryPicker from '../SongLibraryPicker.vue';
-import FileUploader from '../FileUploader.vue';
+import SongLibraryPicker from '../controls/SongLibraryPicker.vue';
+import FileUploader from '../controls/FileUploader.vue';
 import type { SongEntry } from '../../data/songLibrary';
 import type { SoundfontProgress } from '../../services/audio/soundfontService';
 

@@ -30,7 +30,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { UploadCloud } from 'lucide-vue-next';
-import { parseMxl } from '../services/mxlParser';
+import { parseMxl } from '../../services/mxlParser';
 
 const emit = defineEmits<{
   (e: 'musicLoaded', payload: { data: Uint8Array | string; type: 'xml' | 'abc' | 'midi'; name: string }): void;

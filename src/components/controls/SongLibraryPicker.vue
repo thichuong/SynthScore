@@ -62,9 +62,9 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { Music, ChevronDown } from 'lucide-vue-next';
-import type { SongEntry } from '../data/songLibrary';
-import SongSearchFilter from './library/SongSearchFilter.vue';
-import SongCardItem from './library/SongCardItem.vue';
+import type { SongEntry } from '../../data/songLibrary';
+import SongSearchFilter from '../library/SongSearchFilter.vue';
+import SongCardItem from '../library/SongCardItem.vue';
 
 interface FilteredSong extends SongEntry {
   originalIndex: number;

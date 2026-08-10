@@ -84,8 +84,8 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { ChevronDown, Search, X } from 'lucide-vue-next';
-import { instrumentGroups } from '../data/instruments';
-import type { InstrumentInfo } from '../data/instruments';
+import { instrumentGroups } from '../../data/instruments';
+import type { InstrumentInfo } from '../../data/instruments';
 
 const props = defineProps<{
   modelValue: number;

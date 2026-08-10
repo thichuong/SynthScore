@@ -167,7 +167,7 @@
 
 <script setup lang="ts">
 import { Volume2, VolumeX, Trash2, Play, Sliders, RotateCcw } from 'lucide-vue-next';
-import InstrumentSelector from '../InstrumentSelector.vue';
+import InstrumentSelector from './InstrumentSelector.vue';
 import { getInstrumentEmoji } from '../../data/instruments';
 import type { TrackInfo } from '../../services/midiGenerator';
 
