@@ -40,7 +40,10 @@
       <div class="master-fx-header" @click="emit('toggleMasterFX')" title="Nhấp để hiển thị/ẩn bộ điều khiển vang phòng">
         <div class="fx-header-title">
           <Sparkles class="fx-icon" />
-          <span>Vang Không Gian (Master Reverb)</span>
+          <div class="fx-title-text">
+            <span class="fx-title-main">Vang Không Gian</span>
+            <span class="fx-title-sub">(Master Reverb)</span>
+          </div>
         </div>
         <div class="fx-header-right">
           <span class="fx-status-badge" :class="{ active: effectsEnabled }">
@@ -71,19 +74,10 @@
           <div class="fx-slider-meta">
             <span>Kiểu phòng (Room Type):</span>
           </div>
-          <select 
-            :value="reverbCharacter" 
-            @change="emit('updateReverb', { character: Number(($event.target as HTMLSelectElement).value), gain: masterReverbGain, time: reverbTime, preDelay: reverbPreDelay })" 
-            class="fx-select"
-          >
-            <option :value="0">Phòng Nhỏ 1 (Room 1)</option>
-            <option :value="1">Phòng Nhỏ 2 (Room 2)</option>
-            <option :value="2">Phòng Trung Bình (Chamber)</option>
-            <option :value="3">Khán Phòng Lớn (Concert Hall)</option>
-            <option :value="4">Phòng Vang Sắt (Plate Reverb)</option>
-            <option :value="6">Vang Lặp (Delay)</option>
-            <option :value="7">Vang Đảo Kênh (Panning Delay)</option>
-          </select>
+          <ReverbSelector 
+            :modelValue="reverbCharacter" 
+            @update:modelValue="emit('updateReverb', { character: $event, gain: masterReverbGain, time: reverbTime, preDelay: reverbPreDelay })" 
+          />
         </div>
 
         <div class="fx-control-row-stack">
@@ -137,6 +131,7 @@
 
 <script setup lang="ts">
 import { Sliders, Sparkles, ChevronUp, ChevronDown, RotateCcw } from 'lucide-vue-next';
+import ReverbSelector from './ReverbSelector.vue';
 
 defineProps<{
   currentMode: 'default' | 'symphony' | 'concerto';
@@ -241,6 +236,10 @@ const emit = defineEmits<{
   transition: all 0.3s ease;
 }
 
+.master-fx-panel.expanded {
+  overflow: visible;
+}
+
 .master-fx-header {
   display: flex;
   align-items: center;
@@ -259,41 +258,61 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.8rem;
+}
+
+.fx-title-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.fx-title-main {
+  font-size: 0.82rem;
   font-weight: 600;
   color: #e2e8f0;
 }
 
+.fx-title-sub {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
 .fx-icon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   color: #a855f7;
+  flex-shrink: 0;
 }
 
 .fx-header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .fx-status-badge {
-  font-size: 0.65rem;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
   color: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
 }
 
 .fx-status-badge.active {
-  background: rgba(168, 85, 247, 0.15);
+  background: rgba(168, 85, 247, 0.2);
   color: #c084fc;
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  border: 1px solid rgba(168, 85, 247, 0.4);
 }
 
 .chevron-icon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   color: #94a3b8;
+  flex-shrink: 0;
 }
 
 .master-fx-body {
@@ -311,7 +330,8 @@ const emit = defineEmits<{
 }
 
 .fx-label {
-  font-size: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
   color: #a0a0b0;
 }
 
@@ -325,9 +345,9 @@ const emit = defineEmits<{
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #94a3b8;
-  font-size: 0.7rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -343,8 +363,9 @@ const emit = defineEmits<{
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #a0a0b0;
-  font-size: 0.7rem;
-  padding: 4px 8px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
@@ -358,20 +379,21 @@ const emit = defineEmits<{
 }
 
 .reset-icon-mini {
-  width: 12px;
-  height: 12px;
+  width: 15px;
+  height: 15px;
 }
 
 .fx-control-row-stack {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .fx-slider-meta {
   display: flex;
   justify-content: space-between;
-  font-size: 0.72rem;
+  font-size: 0.88rem;
+  font-weight: 500;
   color: #a0a0b0;
 }
 
@@ -379,6 +401,7 @@ const emit = defineEmits<{
   color: #c084fc;
   font-weight: 600;
   font-family: monospace;
+  font-size: 0.9rem;
 }
 
 .fx-select {
@@ -386,8 +409,8 @@ const emit = defineEmits<{
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   color: #ffffff;
-  padding: 4px 8px;
-  font-size: 0.75rem;
+  padding: 7px 10px;
+  font-size: 0.9rem;
   outline: none;
 }
 

@@ -229,13 +229,13 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 5px 8px;
+  padding: 7px 12px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
   color: #e2e2e9;
-  font-size: 0.72rem;
-  font-weight: 500;
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
   outline: none;
   transition: all 0.2s ease;
@@ -256,7 +256,7 @@ onBeforeUnmount(() => {
 
 .trigger-icon {
   flex-shrink: 0;
-  font-size: 0.8rem;
+  font-size: 1rem;
 }
 
 .trigger-text {
@@ -267,8 +267,8 @@ onBeforeUnmount(() => {
 }
 
 .trigger-chevron {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   color: #8c8c9e;
   flex-shrink: 0;
   transition: transform 0.2s ease;
@@ -284,7 +284,7 @@ onBeforeUnmount(() => {
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  min-width: 210px;
+  min-width: 240px;
   background: rgba(16, 16, 22, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
@@ -317,15 +317,15 @@ onBeforeUnmount(() => {
 .search-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px;
+  gap: 8px;
+  padding: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(0, 0, 0, 0.15);
 }
 
 .search-icon {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   color: #8c8c9e;
   flex-shrink: 0;
 }
@@ -335,7 +335,7 @@ onBeforeUnmount(() => {
   background: none;
   border: none;
   color: #ffffff;
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-family: inherit;
   outline: none;
 }
@@ -360,13 +360,13 @@ onBeforeUnmount(() => {
 }
 
 .clear-icon {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
 }
 
 /* === Options List === */
 .options-list {
-  max-height: 240px;
+  max-height: 260px;
   overflow-y: auto;
   padding: 4px;
 }
@@ -404,8 +404,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 6px;
-  font-size: 0.65rem;
+  padding: 6px 10px;
+  font-size: 0.8rem;
   font-weight: 700;
   color: #00f0ff;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
@@ -413,7 +413,7 @@ onBeforeUnmount(() => {
 }
 
 .group-header-emoji {
-  font-size: 0.7rem;
+  font-size: 0.9rem;
 }
 
 /* Option Item */
@@ -421,11 +421,11 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 8px;
+  padding: 7px 12px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.1s ease;
-  font-size: 0.7rem;
+  font-size: 0.88rem;
   color: #b5b5c0;
 }
 
@@ -442,7 +442,7 @@ onBeforeUnmount(() => {
 }
 
 .option-icon {
-  font-size: 0.72rem;
+  font-size: 0.95rem;
   flex-shrink: 0;
 }
 
@@ -460,14 +460,14 @@ onBeforeUnmount(() => {
 }
 
 .option-group-name {
-  font-size: 0.58rem;
+  font-size: 0.72rem;
   color: #7c7c8e;
 }
 
 .empty-state {
   padding: 16px 8px;
   text-align: center;
-  font-size: 0.68rem;
+  font-size: 0.85rem;
   color: #5c5c6e;
 }
 </style>

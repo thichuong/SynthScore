@@ -55,7 +55,8 @@ SynthScore/
 │   │   ├── mixer/              # Quản lý bàn trộn âm thanh đa kênh
 │   │   │   ├── OrchestraMixer.vue      # Bàn trộn nhạc cụ chính
 │   │   │   ├── MixerHeaderPresets.vue  # Preset Giao hưởng/Concerto & Reverb Master
-│   │   │   └── MixerTrackRow.vue       # Dòng điều khiển Solo/Mute/Volume/Pan/Instrument cho mỗi kênh
+│   │   │   ├── MixerTrackRow.vue       # Dòng điều khiển Solo/Mute/Volume/Pan/Instrument cho mỗi kênh
+│   │   │   └── ReverbSelector.vue      # Bộ chọn kiểu phòng Reverb Master custom dropdown với hiệu ứng Teleport & mượt mà
 │   │   ├── mobile/             # Giao diện dành riêng cho thiết bị di động (Responsive Single-Screen)
 │   │   │   ├── MobileControls.vue      # Footer chứa bộ điều khiển phát nhạc & drawer nâng cao
 │   │   │   ├── MobileHeader.vue        # Header di động

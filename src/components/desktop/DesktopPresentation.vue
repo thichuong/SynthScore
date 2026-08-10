@@ -156,7 +156,7 @@ function togglePlay() {
 <style scoped>
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 380px 1fr;
   gap: 16px;
   flex: 1;
   min-height: 0;
