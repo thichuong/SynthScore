@@ -427,113 +427,113 @@ pub fn parse_midi_tracks_wasm(bytes: &[u8]) -> JsValue {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct TrackDefinition {
-    pub(crate) name: &'static str,
+pub(crate) struct TrackDefinition<'a> {
+    pub(crate) name: std::borrow::Cow<'a, str>,
     pub(crate) program: u8,
     pub(crate) channel: u8,
 }
 
-const SYMPHONIC_TRACKS: [TrackDefinition; 11] = [
+const SYMPHONIC_TRACKS: [TrackDefinition<'static>; 11] = [
     TrackDefinition {
-        name: "Violin I (Treble Strings)",
+        name: std::borrow::Cow::Borrowed("Violin I (Treble Strings)"),
         program: 40,
         channel: 0,
     },
     TrackDefinition {
-        name: "Violin II (Treble Strings)",
+        name: std::borrow::Cow::Borrowed("Violin II (Treble Strings)"),
         program: 40,
         channel: 1,
     },
     TrackDefinition {
-        name: "Viola (Alto Strings)",
+        name: std::borrow::Cow::Borrowed("Viola (Alto Strings)"),
         program: 41,
         channel: 2,
     },
     TrackDefinition {
-        name: "Cello (Bass Strings)",
+        name: std::borrow::Cow::Borrowed("Cello (Bass Strings)"),
         program: 42,
         channel: 3,
     },
     TrackDefinition {
-        name: "Contrabass (Deep Strings)",
+        name: std::borrow::Cow::Borrowed("Contrabass (Deep Strings)"),
         program: 43,
         channel: 4,
     },
     TrackDefinition {
-        name: "Flute (Woodwind)",
+        name: std::borrow::Cow::Borrowed("Flute (Woodwind)"),
         program: 73,
         channel: 5,
     },
     TrackDefinition {
-        name: "Oboe (Woodwind)",
+        name: std::borrow::Cow::Borrowed("Oboe (Woodwind)"),
         program: 68,
         channel: 6,
     },
     TrackDefinition {
-        name: "Clarinet (Woodwind)",
+        name: std::borrow::Cow::Borrowed("Clarinet (Woodwind)"),
         program: 71,
         channel: 7,
     },
     TrackDefinition {
-        name: "French Horn (Brass)",
+        name: std::borrow::Cow::Borrowed("French Horn (Brass)"),
         program: 60,
         channel: 8,
     },
     TrackDefinition {
-        name: "Timpani (Percussion)",
+        name: std::borrow::Cow::Borrowed("Timpani (Percussion)"),
         program: 47,
         channel: 9,
     },
     TrackDefinition {
-        name: "Orchestral Harp (Plucked)",
+        name: std::borrow::Cow::Borrowed("Orchestral Harp (Plucked)"),
         program: 46,
         channel: 10,
     },
 ];
 
-const CONCERTO_TRACKS: [TrackDefinition; 9] = [
+const CONCERTO_TRACKS: [TrackDefinition<'static>; 9] = [
     TrackDefinition {
-        name: "Solo Grand Piano",
+        name: std::borrow::Cow::Borrowed("Solo Grand Piano"),
         program: 0,
         channel: 0,
     },
     TrackDefinition {
-        name: "Violin I (Orchestra)",
+        name: std::borrow::Cow::Borrowed("Violin I (Orchestra)"),
         program: 40,
         channel: 1,
     },
     TrackDefinition {
-        name: "Violin II (Orchestra)",
+        name: std::borrow::Cow::Borrowed("Violin II (Orchestra)"),
         program: 40,
         channel: 2,
     },
     TrackDefinition {
-        name: "Viola (Orchestra)",
+        name: std::borrow::Cow::Borrowed("Viola (Orchestra)"),
         program: 41,
         channel: 3,
     },
     TrackDefinition {
-        name: "Cello (Orchestra)",
+        name: std::borrow::Cow::Borrowed("Cello (Orchestra)"),
         program: 42,
         channel: 4,
     },
     TrackDefinition {
-        name: "Contrabass (Orchestra)",
+        name: std::borrow::Cow::Borrowed("Contrabass (Orchestra)"),
         program: 43,
         channel: 5,
     },
     TrackDefinition {
-        name: "Flute (Orchestra)",
+        name: std::borrow::Cow::Borrowed("Flute (Orchestra)"),
         program: 73,
         channel: 6,
     },
     TrackDefinition {
-        name: "French Horn (Orchestra)",
+        name: std::borrow::Cow::Borrowed("French Horn (Orchestra)"),
         program: 60,
         channel: 7,
     },
     TrackDefinition {
-        name: "Timpani (Orchestra)",
+        name: std::borrow::Cow::Borrowed("Timpani (Orchestra)"),
         program: 47,
         channel: 8,
     },

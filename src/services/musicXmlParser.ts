@@ -26,6 +26,91 @@ export function getNoteName(step: string, alter: number, octave: number): string
   return `${steps[finalIndex]}${finalOctave}`;
 }
 
+export interface ScorePartMeta {
+  id: string;
+  name: string;
+  instrumentName: string;
+  instrumentSound: string;
+  midiChannel?: number;
+  midiProgram?: number;
+  volume?: number;
+  pan?: number;
+}
+
+export function resolveInstrumentAndChannel(
+  meta: ScorePartMeta,
+  autoChannelRef: { val: number }
+): { program: number; channel: number } {
+  const text = `${meta.name} ${meta.instrumentName} ${meta.instrumentSound}`.toLowerCase();
+  const isDrumSound = meta.instrumentSound.toLowerCase().startsWith('drum') || meta.instrumentSound.toLowerCase().startsWith('percussion');
+  const isDrumText = text.includes('drum') || text.includes('percussion') || text.includes('kit');
+  const isDrumChannel = meta.midiChannel === 10;
+  const isDrum = isDrumSound || isDrumText || isDrumChannel;
+
+  let channel: number;
+  if (isDrum) {
+    channel = 9;
+  } else if (meta.midiChannel !== undefined && meta.midiChannel >= 1 && meta.midiChannel <= 16) {
+    const c = (meta.midiChannel - 1) % 16;
+    if (c === 9) {
+      if (autoChannelRef.val === 9) autoChannelRef.val++;
+      channel = autoChannelRef.val % 16;
+      autoChannelRef.val++;
+    } else {
+      channel = c;
+    }
+  } else {
+    if (autoChannelRef.val === 9) autoChannelRef.val++;
+    channel = autoChannelRef.val % 16;
+    autoChannelRef.val++;
+  }
+
+  let program = 0;
+  if (isDrum) {
+    program = 0;
+  } else if (meta.midiProgram !== undefined && meta.midiProgram >= 1 && meta.midiProgram <= 128) {
+    program = Math.max(0, Math.min(127, meta.midiProgram - 1));
+  } else if (meta.instrumentSound) {
+    const sound = meta.instrumentSound.toLowerCase();
+    if (sound.includes('distortion')) program = 30;
+    else if (sound.includes('clean')) program = 27;
+    else if (sound.includes('jazz')) program = 26;
+    else if (sound.includes('guitar')) program = 25;
+    else if (sound.includes('bass.electric') || sound.includes('bass')) program = 33;
+    else if (sound.includes('synth.lead')) program = 80;
+    else if (sound.includes('synth.pad')) program = 88;
+    else if (sound.includes('brass.synth')) program = 62;
+    else if (sound.includes('brass')) program = 61;
+    else if (sound.includes('violin')) program = 40;
+    else if (sound.includes('viola')) program = 41;
+    else if (sound.includes('cello')) program = 42;
+    else if (sound.includes('contrabass')) program = 43;
+    else if (sound.includes('flute')) program = 73;
+    else if (sound.includes('oboe')) program = 68;
+    else if (sound.includes('clarinet')) program = 71;
+    else program = 0;
+  } else {
+    if (text.includes('distortion guitar') || text.includes('distortion')) program = 30;
+    else if (text.includes('electric guitar')) program = 27;
+    else if (text.includes('acoustic guitar') || text.includes('guitar') || text.includes('gtr')) program = 25;
+    else if (text.includes('synth lead') || text.includes('lead synth') || text.includes('square') || text.includes('sawtooth') || text.includes('lead')) program = 80;
+    else if (text.includes('synth brass')) program = 62;
+    else if (text.includes('synth')) program = 80;
+    else if (text.includes('brass')) program = 61;
+    else if (text.includes('electric bass') || text.includes('pick bass') || text.includes('bass')) program = 33;
+    else if (text.includes('violin') || text.includes('string')) program = 40;
+    else if (text.includes('cello')) program = 42;
+    else if (text.includes('flute')) program = 73;
+    else if (text.includes('horn') || text.includes('cor')) program = 60;
+    else if (text.includes('trumpet')) program = 56;
+    else if (text.includes('sax')) program = 65;
+    else if (text.includes('organ')) program = 16;
+    else program = 0;
+  }
+
+  return { program, channel };
+}
+
 /**
  * Trình phân tích cú pháp MusicXML cơ bản sang MIDI Binary.
  * Hỗ trợ các khái niệm chính: pitch, alter, octave, duration, chord, rest, backup, forward, tempo, voice, ties.
@@ -52,13 +137,49 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
   midi.name = titleNode?.textContent?.trim() || 'MusicXML Song';
 
   const parts = xmlDoc.getElementsByTagNameNS('*', 'score-part');
-  const partMap = new Map<string, string>();
+  const partMap = new Map<string, ScorePartMeta>();
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
-    const id = part.getAttribute('id');
+    const id = part.getAttribute('id') || `P${i + 1}`;
     const nameNode = part.getElementsByTagNameNS('*', 'part-name')[0];
-    const name = nameNode?.textContent || 'Instrument';
-    if (id) partMap.set(id, name);
+    const name = nameNode?.textContent?.trim() || 'Instrument';
+
+    const instrNameNode = part.getElementsByTagNameNS('*', 'instrument-name')[0];
+    const instrumentName = instrNameNode?.textContent?.trim() || '';
+
+    const soundNode = part.getElementsByTagNameNS('*', 'instrument-sound')[0];
+    const instrumentSound = soundNode?.textContent?.trim() || '';
+
+    let midiChannel: number | undefined = undefined;
+    let midiProgram: number | undefined = undefined;
+    let volume: number | undefined = undefined;
+    let pan: number | undefined = undefined;
+
+    const midiInst = part.getElementsByTagNameNS('*', 'midi-instrument')[0];
+    if (midiInst) {
+      const chNode = midiInst.getElementsByTagNameNS('*', 'midi-channel')[0];
+      if (chNode?.textContent) midiChannel = parseInt(chNode.textContent.trim(), 10);
+
+      const progNode = midiInst.getElementsByTagNameNS('*', 'midi-program')[0];
+      if (progNode?.textContent) midiProgram = parseInt(progNode.textContent.trim(), 10);
+
+      const volNode = midiInst.getElementsByTagNameNS('*', 'volume')[0];
+      if (volNode?.textContent) volume = parseFloat(volNode.textContent.trim());
+
+      const panNode = midiInst.getElementsByTagNameNS('*', 'pan')[0];
+      if (panNode?.textContent) pan = parseFloat(panNode.textContent.trim());
+    }
+
+    partMap.set(id, {
+      id,
+      name,
+      instrumentName,
+      instrumentSound,
+      midiChannel,
+      midiProgram,
+      volume,
+      pan
+    });
   }
 
   const partElements = xmlDoc.getElementsByTagNameNS('*', 'part');
@@ -255,36 +376,23 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
   }));
   midi.header.update();
 
-  let channelCounter = 0;
+  const autoChannelRef = { val: 0 };
 
   for (let p = 0; p < partElements.length; p++) {
     const partEl = partElements[p];
     const partId = partEl.getAttribute('id') || '';
-    const trackName = partMap.get(partId) || 'Track';
-    
-    const track = midi.addTrack();
-    track.name = trackName;
+    const meta = partMap.get(partId) || {
+      id: partId,
+      name: 'Track',
+      instrumentName: '',
+      instrumentSound: ''
+    };
+    const { program, channel } = resolveInstrumentAndChannel(meta, autoChannelRef);
 
-    // Gán channel MIDI riêng cho từng track (bỏ qua kênh 9 dành cho trống)
-    if (channelCounter === 9) {
-      channelCounter++;
-    }
-    track.channel = channelCounter % 16;
-    channelCounter++;
-    
-    // Tự động gán loại nhạc cụ cơ bản dựa trên tên
-    const nameLower = trackName.toLowerCase();
-    if (nameLower.includes('violin') || nameLower.includes('string')) {
-      track.instrument.number = 40; // Violin
-    } else if (nameLower.includes('cello')) {
-      track.instrument.number = 42; // Cello
-    } else if (nameLower.includes('flute')) {
-      track.instrument.number = 73; // Flute
-    } else if (nameLower.includes('horn') || nameLower.includes('cor')) {
-      track.instrument.number = 60; // French Horn
-    } else {
-      track.instrument.number = 0; // Acoustic Grand Piano
-    }
+    const track = midi.addTrack();
+    track.name = meta.name || 'Track';
+    track.channel = channel;
+    track.instrument.number = program;
 
     let divisions = 1;
     let beatOffset = 0;

@@ -189,4 +189,81 @@ describe('parseMusicXmlToMidiBytes', () => {
     expect(g4?.time).toBeCloseTo(1.0, 2); // starts at 1.0s
     expect(g4?.duration).toBeCloseTo(1.0, 2);
   });
+
+  it('should correctly parse complex multi-part MusicXML scores with instruments and channels', () => {
+    const xmlText = `<?xml version="1.0" encoding="UTF-8"?>
+    <score-partwise version="4.0">
+      <work><work-title>Complex Instrument Test</work-title></work>
+      <part-list>
+        <score-part id="P1">
+          <part-name>Anime Lead Vocal / Synth Lead</part-name>
+          <score-instrument id="P1-I1">
+            <instrument-name>Lead 1 (square)</instrument-name>
+            <instrument-sound>synth.lead.square</instrument-sound>
+          </score-instrument>
+          <midi-instrument id="P1-I1">
+            <midi-channel>1</midi-channel>
+            <midi-program>81</midi-program>
+          </midi-instrument>
+        </score-part>
+        <score-part id="P2">
+          <part-name>Distortion Electric Guitar</part-name>
+          <score-instrument id="P2-I1">
+            <instrument-name>Distortion Guitar</instrument-name>
+            <instrument-sound>guitar.electric.distortion</instrument-sound>
+          </score-instrument>
+          <midi-instrument id="P2-I1">
+            <midi-channel>2</midi-channel>
+            <midi-program>31</midi-program>
+          </midi-instrument>
+        </score-part>
+        <score-part id="P3">
+          <part-name>J-Rock Drum Kit</part-name>
+          <score-instrument id="P3-I1">
+            <instrument-name>Drum Set</instrument-name>
+            <instrument-sound>drum.set</instrument-sound>
+          </score-instrument>
+          <midi-instrument id="P3-I1">
+            <midi-channel>10</midi-channel>
+            <midi-program>1</midi-program>
+          </midi-instrument>
+        </score-part>
+      </part-list>
+      <part id="P1">
+        <measure number="1">
+          <attributes><divisions>1</divisions></attributes>
+          <note><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration></note>
+        </measure>
+      </part>
+      <part id="P2">
+        <measure number="1">
+          <attributes><divisions>1</divisions></attributes>
+          <note><pitch><step>E</step><octave>3</octave></pitch><duration>4</duration></note>
+        </measure>
+      </part>
+      <part id="P3">
+        <measure number="1">
+          <attributes><divisions>1</divisions></attributes>
+          <note><pitch><step>C</step><octave>2</octave></pitch><duration>4</duration></note>
+        </measure>
+      </part>
+    </score-partwise>`;
+
+    const midiBytes = parseMusicXmlToMidiBytes(xmlText);
+    const midi = new Midi(midiBytes.buffer);
+
+    expect(midi.tracks.length).toBe(3);
+
+    const leadTrack = midi.tracks.find(t => t.name.includes('Lead'));
+    expect(leadTrack).toBeDefined();
+    expect(leadTrack?.instrument.number).toBe(80); // 81 - 1 = 80 (Lead 1 square)
+
+    const guitarTrack = midi.tracks.find(t => t.name.includes('Guitar'));
+    expect(guitarTrack).toBeDefined();
+    expect(guitarTrack?.instrument.number).toBe(30); // 31 - 1 = 30 (Distortion Guitar)
+
+    const drumTrack = midi.tracks.find(t => t.name.includes('Drum'));
+    expect(drumTrack).toBeDefined();
+    expect(drumTrack?.channel).toBe(9); // Channel 10 (1-indexed) = 9 (0-indexed)
+  });
 });
