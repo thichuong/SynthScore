@@ -17,17 +17,21 @@ import { AudioExporter, type ExportOptions } from './audio/audioExporter';
 import { MediaSessionManager } from './audio/mediaSessionManager';
 import { loadUserSettings, saveUserSettings } from './appCache';
 
-export type { TrackInfo, SoundfontProgress, ExportOptions };
+export type { SoundfontProgress } from './audio/soundfontService';
+export type { TrackInfo, ExportOptions };
 
-/**
- * WARNING / CHÚ Ý QUAN TRỌNG:
- * Tuyệt đối KHÔNG đưa instance của AudioEngineService hoặc export AudioEngine của nó
- * vào ref() hoặc reactive() trong Vue component. Việc bọc reactive/ref sẽ tạo ra proxy
- * cho các đối tượng gốc của Web Audio API (như AudioContext, AudioNode, AnalyserNode)
- * và WebAssembly, làm suy giảm hiệu năng nghiêm trọng hoặc gây crash ứng dụng.
- * Thay vào đó, hãy sử dụng các callback onStateChange/onTimeUpdate để cập nhật các ref
- * dạng nguyên bản (primitives) trong component Vue.
- */
+function extractInitialBpmFromMidi(midiBytes: Uint8Array): number {
+  for (let i = 0; i < midiBytes.length - 5; i++) {
+    if (midiBytes[i] === 0xFF && midiBytes[i + 1] === 0x51 && midiBytes[i + 2] === 0x03) {
+      const tempoUs = (midiBytes[i + 3] << 16) | (midiBytes[i + 4] << 8) | midiBytes[i + 5];
+      if (tempoUs > 0) {
+        return Math.round(60_000_000 / tempoUs);
+      }
+    }
+  }
+  return 120;
+}
+
 class AudioEngineService {
   // Các Dịch Vụ Con được Tách Biệt
   private ctxManager = new AudioContextManager();
@@ -215,7 +219,11 @@ class AudioEngineService {
         this.sequencer.eventHandler.addEvent('songChange', 'audio_engine_song', () => {
           if (this.sequencer) {
             this.duration = this.sequencer.duration || 0;
-            this.bpm = this.sequencer.currentTempo || 120;
+            if (this.activeMidiBytes) {
+              this.bpm = extractInitialBpmFromMidi(this.activeMidiBytes);
+            } else {
+              this.bpm = Math.round(this.sequencer.currentTempo || 120);
+            }
           }
           this.triggerStateChange();
         });
@@ -411,7 +419,7 @@ class AudioEngineService {
     this.sequencer.loadNewSongList([{ binary: arrayBuffer, fileName: songName }]);
 
     this.duration = this.sequencer.duration || 0;
-    this.bpm = this.sequencer.currentTempo || 120;
+    this.bpm = extractInitialBpmFromMidi(midiBytes);
 
     // Phân tích các bè nhạc cụ từ tệp MIDI mới nạp qua Web Worker
     let parsedTracks: TrackInfo[] = [];

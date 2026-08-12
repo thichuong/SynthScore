@@ -190,6 +190,33 @@ fn resolve_instrument_and_channel(part: &ScorePartInfo, next_auto_channel: &mut 
     (program, channel)
 }
 
+fn parse_bpm_from_text(s: &str) -> Option<f64> {
+    let mut num_str = String::new();
+    let mut found_digit = false;
+    for ch in s.chars() {
+        if ch.is_ascii_digit() || (ch == '.' && found_digit && !num_str.contains('.')) {
+            num_str.push(ch);
+            found_digit = true;
+        } else if found_digit {
+            if let Ok(v) = num_str.parse::<f64>() {
+                if (1.0..=500.0).contains(&v) {
+                    return Some(v);
+                }
+            }
+            num_str.clear();
+            found_digit = false;
+        }
+    }
+    if !num_str.is_empty() {
+        if let Ok(v) = num_str.parse::<f64>() {
+            if (1.0..=500.0).contains(&v) {
+                return Some(v);
+            }
+        }
+    }
+    None
+}
+
 #[wasm_bindgen]
 #[must_use]
 pub fn parse_musicxml_to_midi_wasm(xml_text: &str) -> Vec<u8> {
@@ -200,7 +227,15 @@ pub fn parse_musicxml_to_midi_wasm(xml_text: &str) -> Vec<u8> {
     let mut current_tag = String::new();
 
     let mut divisions: u32 = 1;
-    let mut bpm: f64 = 120.0;
+    let mut raw_tempo_events: Vec<crate::midi_processor::TempoEvent> = Vec::new();
+
+    let mut in_metronome = false;
+    let mut metronome_beat_unit = String::from("quarter");
+    let mut metronome_has_dot = false;
+    let mut metronome_per_minute: Option<f64> = None;
+    let mut in_direction = false;
+    let mut direction_sound_tempo: Option<f64> = None;
+    let mut direction_words = String::new();
 
     let mut score_parts: Vec<ScorePartInfo> = Vec::new();
     let mut part_id_map: HashMap<String, usize> = HashMap::new();
@@ -265,6 +300,22 @@ pub fn parse_musicxml_to_midi_wasm(xml_text: &str) -> Vec<u8> {
                         last_note_starts.clear();
                         current_voice = "1".to_string();
                     }
+                    "direction" => {
+                        in_direction = true;
+                        direction_sound_tempo = None;
+                        direction_words.clear();
+                    }
+                    "metronome" => {
+                        in_metronome = true;
+                        metronome_beat_unit = "quarter".to_string();
+                        metronome_has_dot = false;
+                        metronome_per_minute = None;
+                    }
+                    "beat-unit-dot" => {
+                        if in_metronome {
+                            metronome_has_dot = true;
+                        }
+                    }
                     "note" => {
                         in_note = true;
                         step.clear();
@@ -284,7 +335,14 @@ pub fn parse_musicxml_to_midi_wasm(xml_text: &str) -> Vec<u8> {
                                 if let Ok(val) = std::str::from_utf8(&attr.value) {
                                     if let Ok(b) = val.parse::<f64>() {
                                         if b > 0.0 {
-                                            bpm = b;
+                                            direction_sound_tempo = Some(b);
+                                            raw_tempo_events.push(
+                                                crate::midi_processor::TempoEvent {
+                                                    tick: (current_beat_offset * 480.0).round()
+                                                        as u32,
+                                                    bpm: b,
+                                                },
+                                            );
                                         }
                                     }
                                 }
@@ -302,13 +360,20 @@ pub fn parse_musicxml_to_midi_wasm(xml_text: &str) -> Vec<u8> {
                 if tag == "chord" {
                     is_chord = true;
                 }
+                if tag == "beat-unit-dot" && in_metronome {
+                    metronome_has_dot = true;
+                }
                 if tag == "sound" {
                     for attr in e.attributes().flatten() {
                         if attr.key.as_ref() == b"tempo" {
                             if let Ok(val) = std::str::from_utf8(&attr.value) {
                                 if let Ok(b) = val.parse::<f64>() {
                                     if b > 0.0 {
-                                        bpm = b;
+                                        direction_sound_tempo = Some(b);
+                                        raw_tempo_events.push(crate::midi_processor::TempoEvent {
+                                            tick: (current_beat_offset * 480.0).round() as u32,
+                                            bpm: b,
+                                        });
                                     }
                                 }
                             }
@@ -322,7 +387,15 @@ pub fn parse_musicxml_to_midi_wasm(xml_text: &str) -> Vec<u8> {
                     continue;
                 }
 
-                if in_part_list {
+                if in_metronome {
+                    match current_tag.as_str() {
+                        "beat-unit" => metronome_beat_unit = text.to_lowercase(),
+                        "per-minute" => metronome_per_minute = parse_bpm_from_text(&text),
+                        _ => {}
+                    }
+                } else if in_direction && current_tag == "words" {
+                    direction_words.push_str(&text);
+                } else if in_part_list {
                     if let Some(ref mut sp) = current_score_part {
                         match current_tag.as_str() {
                             "part-name" => sp.part_name.clone_from(&text),
@@ -373,6 +446,42 @@ pub fn parse_musicxml_to_midi_wasm(xml_text: &str) -> Vec<u8> {
             Ok(Event::End(ref e)) => {
                 let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
                 match tag.as_str() {
+                    "metronome" => {
+                        in_metronome = false;
+                        if let Some(pm) = metronome_per_minute {
+                            let mut unit_mult = match metronome_beat_unit.as_str() {
+                                "eighth" => 0.5,
+                                "half" => 2.0,
+                                "whole" => 4.0,
+                                "16th" | "sixteenth" => 0.25,
+                                "32nd" | "thirty-second" => 0.125,
+                                "64th" | "sixty-fourth" => 0.0625,
+                                _ => 1.0,
+                            };
+                            if metronome_has_dot {
+                                unit_mult *= 1.5;
+                            }
+                            let quarter_bpm = pm * unit_mult;
+                            raw_tempo_events.push(crate::midi_processor::TempoEvent {
+                                tick: (current_beat_offset * 480.0).round() as u32,
+                                bpm: quarter_bpm,
+                            });
+                        }
+                    }
+                    "direction" => {
+                        in_direction = false;
+                        if direction_sound_tempo.is_none()
+                            && metronome_per_minute.is_none()
+                            && !direction_words.is_empty()
+                        {
+                            if let Some(bpm_val) = parse_bpm_from_text(&direction_words) {
+                                raw_tempo_events.push(crate::midi_processor::TempoEvent {
+                                    tick: (current_beat_offset * 480.0).round() as u32,
+                                    bpm: bpm_val,
+                                });
+                            }
+                        }
+                    }
                     "part-list" => {
                         in_part_list = false;
                     }
@@ -454,8 +563,35 @@ pub fn parse_musicxml_to_midi_wasm(xml_text: &str) -> Vec<u8> {
         });
     }
 
+    raw_tempo_events.sort_by_key(|te| te.tick);
+    let mut tempo_events: Vec<crate::midi_processor::TempoEvent> = Vec::new();
+    for te in raw_tempo_events {
+        if let Some(last) = tempo_events.last_mut() {
+            if last.tick == te.tick {
+                *last = te;
+                continue;
+            }
+        }
+        tempo_events.push(te);
+    }
+    if tempo_events.is_empty() {
+        tempo_events.push(crate::midi_processor::TempoEvent {
+            tick: 0,
+            bpm: 120.0,
+        });
+    } else if tempo_events[0].tick > 0 {
+        let first_bpm = tempo_events[0].bpm;
+        tempo_events.insert(
+            0,
+            crate::midi_processor::TempoEvent {
+                tick: 0,
+                bpm: first_bpm,
+            },
+        );
+    }
+
     if parsed_notes.is_empty() {
-        return crate::midi_processor::build_midi_file(&track_defs, Vec::new(), bpm as u32);
+        return crate::midi_processor::build_midi_file(&track_defs, Vec::new(), &tempo_events);
     }
 
     let ppq = 480u16;
@@ -475,5 +611,5 @@ pub fn parse_musicxml_to_midi_wasm(xml_text: &str) -> Vec<u8> {
         });
     }
 
-    crate::midi_processor::build_midi_file(&track_defs, prepared_events, bpm as u32)
+    crate::midi_processor::build_midi_file(&track_defs, prepared_events, &tempo_events)
 }

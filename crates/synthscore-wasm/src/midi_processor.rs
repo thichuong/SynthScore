@@ -547,10 +547,16 @@ pub(crate) struct PreparedNoteEvent {
     pub(crate) velocity: u8,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TempoEvent {
+    pub tick: u32,
+    pub bpm: f64,
+}
+
 pub(crate) fn build_midi_file(
     tracks_def: &[TrackDefinition],
     events: Vec<PreparedNoteEvent>,
-    bpm: u32,
+    tempo_events: &[TempoEvent],
 ) -> Vec<u8> {
     let ppq: u16 = 480;
     let mut out = Vec::new();
@@ -562,7 +568,24 @@ pub(crate) fn build_midi_file(
     out.extend_from_slice(&(tracks_def.len() as u16).to_be_bytes());
     out.extend_from_slice(&ppq.to_be_bytes());
 
-    let tempo_us = 60_000_000u32 / bpm.max(1);
+    // Prepare tempo events
+    let mut sorted_tempos: Vec<TempoEvent> = tempo_events.to_vec();
+    sorted_tempos.sort_by_key(|t| t.tick);
+    if sorted_tempos.is_empty() {
+        sorted_tempos.push(TempoEvent {
+            tick: 0,
+            bpm: 120.0,
+        });
+    } else if sorted_tempos[0].tick > 0 {
+        let first_bpm = sorted_tempos[0].bpm;
+        sorted_tempos.insert(
+            0,
+            TempoEvent {
+                tick: 0,
+                bpm: first_bpm,
+            },
+        );
+    }
 
     // Group events by channel
     let mut track_events: Vec<Vec<(u32, u8, u8, u8)>> = vec![Vec::new(); tracks_def.len()]; // (tick, is_on, key, velocity)
@@ -588,47 +611,86 @@ pub(crate) fn build_midi_file(
         write_vlq(&mut trk_data, def.name.len() as u32);
         trk_data.extend_from_slice(def.name.as_bytes());
 
-        // Delta 0: Set Tempo meta (first track)
-        if i == 0 {
-            write_vlq(&mut trk_data, 0);
-            trk_data.push(0xFF);
-            trk_data.push(0x51);
-            trk_data.push(0x03);
-            trk_data.push(((tempo_us >> 16) & 0xFF) as u8);
-            trk_data.push(((tempo_us >> 8) & 0xFF) as u8);
-            trk_data.push((tempo_us & 0xFF) as u8);
-        }
-
         // Delta 0: Program Change
         write_vlq(&mut trk_data, 0);
         trk_data.push(0xC0 | (def.channel & 0x0F));
         trk_data.push(def.program);
 
-        let mut last_tick = 0u32;
-        for (tick, is_on, key, vel) in trk {
-            let delta = tick.saturating_sub(last_tick);
-            last_tick = tick;
+        if i == 0 {
+            enum Trk0Item {
+                Tempo(u32, f64),
+                Note(u32, u8, u8, u8),
+            }
+            let mut items: Vec<Trk0Item> = Vec::new();
+            for te in &sorted_tempos {
+                items.push(Trk0Item::Tempo(te.tick, te.bpm));
+            }
+            for (tick, is_on, key, vel) in trk {
+                items.push(Trk0Item::Note(tick, is_on, key, vel));
+            }
+            items.sort_by_key(|item| match item {
+                Trk0Item::Tempo(t, _) | Trk0Item::Note(t, _, _, _) => *t,
+            });
 
-            write_vlq(&mut trk_data, delta);
-            if is_on == 1 {
-                trk_data.push(0x90 | (def.channel & 0x0F));
-                trk_data.push(key);
-                trk_data.push(vel);
-            } else {
-                trk_data.push(0x80 | (def.channel & 0x0F));
-                trk_data.push(key);
-                trk_data.push(0);
+            let mut last_tick = 0u32;
+            for item in items {
+                match item {
+                    Trk0Item::Tempo(tick, bpm_val) => {
+                        let delta = tick.saturating_sub(last_tick);
+                        last_tick = tick;
+                        write_vlq(&mut trk_data, delta);
+                        let tempo_us = (60_000_000.0 / bpm_val.max(1.0)).round() as u32;
+                        trk_data.push(0xFF);
+                        trk_data.push(0x51);
+                        trk_data.push(0x03);
+                        trk_data.push(((tempo_us >> 16) & 0xFF) as u8);
+                        trk_data.push(((tempo_us >> 8) & 0xFF) as u8);
+                        trk_data.push((tempo_us & 0xFF) as u8);
+                    }
+                    Trk0Item::Note(tick, is_on, key, vel) => {
+                        let delta = tick.saturating_sub(last_tick);
+                        last_tick = tick;
+                        write_vlq(&mut trk_data, delta);
+                        if is_on == 1 {
+                            trk_data.push(0x90 | (def.channel & 0x0F));
+                            trk_data.push(key);
+                            trk_data.push(vel);
+                        } else {
+                            trk_data.push(0x80 | (def.channel & 0x0F));
+                            trk_data.push(key);
+                            trk_data.push(0);
+                        }
+                    }
+                }
+            }
+        } else {
+            let mut last_tick = 0u32;
+            for (tick, is_on, key, vel) in trk {
+                let delta = tick.saturating_sub(last_tick);
+                last_tick = tick;
+
+                write_vlq(&mut trk_data, delta);
+                if is_on == 1 {
+                    trk_data.push(0x90 | (def.channel & 0x0F));
+                    trk_data.push(key);
+                    trk_data.push(vel);
+                } else {
+                    trk_data.push(0x80 | (def.channel & 0x0F));
+                    trk_data.push(key);
+                    trk_data.push(0);
+                }
             }
         }
 
-        // End of Track Meta
+        // End of Track meta
         write_vlq(&mut trk_data, 0);
-        trk_data.extend_from_slice(&[0xFF, 0x2F, 0x00]);
+        trk_data.push(0xFF);
+        trk_data.push(0x2F);
+        trk_data.push(0x00);
 
-        // Write MTrk Header
         out.extend_from_slice(b"MTrk");
         out.extend_from_slice(&(trk_data.len() as u32).to_be_bytes());
-        out.extend(trk_data);
+        out.extend_from_slice(&trk_data);
     }
 
     out
@@ -707,7 +769,14 @@ pub fn generate_symphony_midi_wasm(bytes: &[u8]) -> Vec<u8> {
         }
     }
 
-    build_midi_file(&SYMPHONIC_TRACKS, prepared_events, bpm)
+    build_midi_file(
+        &SYMPHONIC_TRACKS,
+        prepared_events,
+        &[TempoEvent {
+            tick: 0,
+            bpm: f64::from(bpm),
+        }],
+    )
 }
 
 #[wasm_bindgen]
@@ -783,5 +852,12 @@ pub fn generate_concerto_midi_wasm(bytes: &[u8]) -> Vec<u8> {
         }
     }
 
-    build_midi_file(&CONCERTO_TRACKS, prepared_events, bpm)
+    build_midi_file(
+        &CONCERTO_TRACKS,
+        prepared_events,
+        &[TempoEvent {
+            tick: 0,
+            bpm: f64::from(bpm),
+        }],
+    )
 }

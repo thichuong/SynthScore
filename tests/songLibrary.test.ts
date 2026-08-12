@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { Midi } from '@tonejs/midi';
 import { songLibrary } from '../src/data/songLibrary';
 import { parseMxl } from '../src/services/mxlParser';
-import { parseMusicXmlToMidiBytes } from '../src/services/musicXmlParser';
+import { parseMusicXmlToMidiBytes, parseMetronomeBpm, extractBpmFromText } from '../src/services/musicXmlParser';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -163,6 +163,13 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
           if (divNode) {
             divisions = parseInt(divNode.textContent || '1', 10);
           }
+        } else if (tagName === 'sound') {
+          if (el.hasAttribute('tempo')) {
+            const bpm = parseFloat(el.getAttribute('tempo') || '0');
+            if (bpm > 0) {
+              tempoChangesMap.set(roundBeat(beatOffset), bpm);
+            }
+          }
         } else if (tagName === 'backup') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
@@ -193,12 +200,35 @@ function extractDetailedNotesFromXml(xmlDoc: Document): DetailedNote[][] {
             beatOffset = Math.max(beatOffset, currentVal + dur);
           }
         } else if (tagName === 'direction') {
+          let foundTempo = false;
           const soundNodes = el.getElementsByTagNameNS('*', 'sound');
           for (let s = 0; s < soundNodes.length; s++) {
             if (soundNodes[s].hasAttribute('tempo')) {
               const bpm = parseFloat(soundNodes[s].getAttribute('tempo') || '0');
               if (bpm > 0) {
                 tempoChangesMap.set(roundBeat(beatOffset), bpm);
+                foundTempo = true;
+              }
+            }
+          }
+
+          const metronomeNodes = el.getElementsByTagNameNS('*', 'metronome');
+          for (let mNode = 0; mNode < metronomeNodes.length; mNode++) {
+            const bpm = parseMetronomeBpm(metronomeNodes[mNode]);
+            if (bpm && bpm > 0) {
+              tempoChangesMap.set(roundBeat(beatOffset), bpm);
+              foundTempo = true;
+            }
+          }
+
+          if (!foundTempo) {
+            const wordsNodes = el.getElementsByTagNameNS('*', 'words');
+            for (let w = 0; w < wordsNodes.length; w++) {
+              const txt = wordsNodes[w].textContent || '';
+              const bpm = extractBpmFromText(txt);
+              if (bpm && bpm > 0) {
+                tempoChangesMap.set(roundBeat(beatOffset), bpm);
+                break;
               }
             }
           }

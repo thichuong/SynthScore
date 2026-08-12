@@ -111,6 +111,44 @@ export function resolveInstrumentAndChannel(
   return { program, channel };
 }
 
+export function extractBpmFromText(text: string): number | null {
+  const match = text.match(/(?:bpm|♩|q|\b)\s*=?\s*(\d+(?:\.\d+)?)/i) || text.match(/(\d+(?:\.\d+)?)/);
+  if (match) {
+    const val = parseFloat(match[1]);
+    if (val >= 1 && val <= 500) {
+      return val;
+    }
+  }
+  return null;
+}
+
+export function parseMetronomeBpm(metronomeNode: Element): number | null {
+  const perMinNode = metronomeNode.getElementsByTagNameNS('*', 'per-minute')[0];
+  if (!perMinNode || !perMinNode.textContent) return null;
+  const pmVal = extractBpmFromText(perMinNode.textContent.trim());
+  if (!pmVal) return null;
+
+  const beatUnitNode = metronomeNode.getElementsByTagNameNS('*', 'beat-unit')[0];
+  const unit = beatUnitNode?.textContent?.trim().toLowerCase() || 'quarter';
+  const hasDot = metronomeNode.getElementsByTagNameNS('*', 'beat-unit-dot').length > 0;
+
+  let mult = 1.0;
+  switch (unit) {
+    case 'eighth': mult = 0.5; break;
+    case 'quarter': mult = 1.0; break;
+    case 'half': mult = 2.0; break;
+    case 'whole': mult = 4.0; break;
+    case '16th':
+    case 'sixteenth': mult = 0.25; break;
+    case '32nd':
+    case 'thirty-second': mult = 0.125; break;
+    case '64th':
+    case 'sixty-fourth': mult = 0.0625; break;
+  }
+  if (hasDot) mult *= 1.5;
+  return pmVal * mult;
+}
+
 /**
  * Trình phân tích cú pháp MusicXML cơ bản sang MIDI Binary.
  * Hỗ trợ các khái niệm chính: pitch, alter, octave, duration, chord, rest, backup, forward, tempo, voice, ties.
@@ -279,6 +317,13 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
           if (divNode) {
             divisions = parseInt(divNode.textContent || '1', 10);
           }
+        } else if (tagName === 'sound') {
+          if (el.hasAttribute('tempo')) {
+            const bpm = parseFloat(el.getAttribute('tempo') || '0');
+            if (bpm > 0) {
+              tempoChangesMap.set(roundBeat(beatOffset), bpm);
+            }
+          }
         } else if (tagName === 'backup') {
           const durNode = el.getElementsByTagNameNS('*', 'duration')[0];
           if (durNode) {
@@ -309,12 +354,35 @@ export function parseMusicXmlToMidiBytes(xmlText: string): Uint8Array {
             beatOffset = Math.max(beatOffset, currentVal + dur);
           }
         } else if (tagName === 'direction') {
+          let foundTempo = false;
           const soundNodes = el.getElementsByTagNameNS('*', 'sound');
           for (let s = 0; s < soundNodes.length; s++) {
             if (soundNodes[s].hasAttribute('tempo')) {
               const bpm = parseFloat(soundNodes[s].getAttribute('tempo') || '0');
               if (bpm > 0) {
                 tempoChangesMap.set(roundBeat(beatOffset), bpm);
+                foundTempo = true;
+              }
+            }
+          }
+
+          const metronomeNodes = el.getElementsByTagNameNS('*', 'metronome');
+          for (let mNode = 0; mNode < metronomeNodes.length; mNode++) {
+            const bpm = parseMetronomeBpm(metronomeNodes[mNode]);
+            if (bpm && bpm > 0) {
+              tempoChangesMap.set(roundBeat(beatOffset), bpm);
+              foundTempo = true;
+            }
+          }
+
+          if (!foundTempo) {
+            const wordsNodes = el.getElementsByTagNameNS('*', 'words');
+            for (let w = 0; w < wordsNodes.length; w++) {
+              const txt = wordsNodes[w].textContent || '';
+              const bpm = extractBpmFromText(txt);
+              if (bpm && bpm > 0) {
+                tempoChangesMap.set(roundBeat(beatOffset), bpm);
+                break;
               }
             }
           }
