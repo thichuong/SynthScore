@@ -12,6 +12,15 @@
         class="search-input"
         @keydown.escape="emit('escape')"
       />
+      <button 
+        v-if="searchQuery" 
+        type="button" 
+        class="clear-btn" 
+        @click.stop.prevent="handleClear"
+        title="Xóa tìm kiếm"
+      >
+        <X class="clear-icon" />
+      </button>
     </div>
 
     <!-- Filter Tabs -->
@@ -31,7 +40,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Search } from 'lucide-vue-next';
+import { Search, X } from 'lucide-vue-next';
 
 defineProps<{
   searchQuery: string;
@@ -45,6 +54,11 @@ const emit = defineEmits<{
 }>();
 
 const searchInputRef = ref<HTMLInputElement | null>(null);
+
+function handleClear() {
+  emit('update:searchQuery', '');
+  searchInputRef.value?.focus();
+}
 
 defineExpose({
   focus: () => searchInputRef.value?.focus()
@@ -85,6 +99,29 @@ defineExpose({
   color: #ffffff;
   font-size: 0.88rem;
   outline: none;
+}
+
+.clear-btn {
+  background: none;
+  border: none;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8c8c9e;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.clear-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.clear-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .tag-filters {

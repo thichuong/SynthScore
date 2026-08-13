@@ -102,7 +102,6 @@ function toggleDropdown() {
 
 function openDropdown() {
   isOpen.value = true;
-  searchQuery.value = '';
   hoveredIndex.value = -1;
 
   nextTick(() => {
@@ -136,7 +135,11 @@ function scrollToPlaying() {
 }
 
 function handleClickOutside(e: MouseEvent) {
-  if (pickerRef.value && !pickerRef.value.contains(e.target as Node)) {
+  const target = e.target as Node | null;
+  if (!target) return;
+  // Bỏ qua nếu target đã bị xóa khỏi DOM (ví dụ nút clear vừa unmounted)
+  if (!document.body.contains(target)) return;
+  if (pickerRef.value && !pickerRef.value.contains(target)) {
     closeDropdown();
   }
 }
