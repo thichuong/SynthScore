@@ -118,8 +118,12 @@ export class TrackManager {
   public setTrackInstrument(synth: WorkletSynthesizer | null, channelIndex: number, programNumber: number): void {
     const track = this.tracks.find(t => t.channel === channelIndex);
     if (track) {
+      const oldInstrName = track.instrumentName;
       track.instrumentNumber = programNumber;
       track.instrumentName = GM_INSTRUMENTS[programNumber] || 'Unknown';
+      if (!track.name || track.name === oldInstrName || track.name.startsWith('Kênh ') || track.name.startsWith('Bè Kênh ') || track.name.startsWith('Kênh mới ')) {
+        track.name = track.instrumentName;
+      }
       if (synth) {
         synth.programChange(channelIndex, programNumber);
       }

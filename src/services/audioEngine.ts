@@ -536,6 +536,7 @@ class AudioEngineService {
     this.sequencer.currentTime = 0;
     this.currentTime = 0;
     this.isPlaying = false;
+    this.resetMixerSettings();
     this.stopTimeLoop();
     this.triggerStateChange();
     if (this.onTimeUpdateCallback) {
@@ -552,6 +553,7 @@ class AudioEngineService {
     if (!this.sequencer) return;
     this.sequencer.currentTime = seconds;
     this.currentTime = seconds;
+    this.resetMixerSettings();
     this.triggerStateChange();
     if (this.onTimeUpdateCallback) {
       this.onTimeUpdateCallback(seconds);
@@ -644,9 +646,9 @@ class AudioEngineService {
   // Thay đổi nhạc cụ cho một track cụ thể
   public async setTrackInstrument(channelIndex: number, programNumber: number): Promise<void> {
     const isDrum = channelIndex === 9;
-    await this.loadInstrumentSoundbank(programNumber, isDrum);
     this.trackMgr.setTrackInstrument(this.synth, channelIndex, programNumber);
     this.triggerStateChange();
+    await this.loadInstrumentSoundbank(programNumber, isDrum);
   }
 
   // Thiết lập hoặc khôi phục chế độ phát nhạc về nguyên bản
@@ -752,12 +754,12 @@ class AudioEngineService {
   public async addTrack(): Promise<void> {
     const newChan = await this.trackMgr.addTrack(this.synth);
     if (newChan !== null) {
+      this.triggerStateChange();
       const isDrum = newChan === 9;
       await this.loadInstrumentSoundbank(0, isDrum);
       if (this.synth) {
         this.synth.programChange(newChan, 0);
       }
-      this.triggerStateChange();
     }
   }
 

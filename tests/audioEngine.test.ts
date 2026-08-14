@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import { AudioEngine } from '../src/services/audioEngine';
 import { Midi } from '@tonejs/midi';
 
@@ -199,6 +199,62 @@ describe('audioEngine', () => {
     expect(AudioEngine.tracks[0].isSoloed).toBe(true);
   });
 
+  it('should update track instrument and trigger state change immediately before loading soundbank', async () => {
+    AudioEngine.tracks = [
+      {
+        channel: 0,
+        name: 'Piano',
+        instrumentName: 'Acoustic Grand Piano',
+        instrumentNumber: 0,
+        volume: 80,
+        isMuted: false,
+        isSoloed: false,
+        noteCount: 1,
+        pan: 0,
+        reverbSend: 50,
+        chorusSend: 0
+      }
+    ];
+
+    let stateChanged = false;
+    AudioEngine.onStateChange(() => {
+      stateChanged = true;
+    });
+
+    const setPromise = AudioEngine.setTrackInstrument(0, 40); // Violin
+
+    // Should be updated immediately without waiting for soundbank load
+    expect(AudioEngine.tracks[0].instrumentNumber).toBe(40);
+    expect(AudioEngine.tracks[0].instrumentName).toContain('Violin');
+    expect(stateChanged).toBe(true);
+
+    await setPromise;
+  });
+
+  it('should restore custom track instrument settings on synth channels when seeking', async () => {
+    // Mock MIDI song load
+    const midi = new Midi();
+    const track = midi.addTrack();
+    track.channel = 0;
+    track.addNote({ midi: 60, time: 0, duration: 5 });
+    const midiBytes = new Uint8Array(midi.toArray());
+
+    await AudioEngine.loadSong(midiBytes, 'Seek Test Song');
+
+    // Change instrument to Violin (40)
+    await AudioEngine.setTrackInstrument(0, 40);
+    expect(AudioEngine.tracks[0].instrumentNumber).toBe(40);
+
+    // Spy on synth.programChange
+    const programChangeSpy = vi.spyOn((AudioEngine as any).synth, 'programChange');
+
+    // Seek forward
+    AudioEngine.seek(2.5);
+
+    // Verify programChange was re-applied for channel 0 with program 40
+    expect(programChangeSpy).toHaveBeenCalledWith(0, 40);
+  });
+
   it('should switch playback mode (symphony, concerto, default)', async () => {
     const midi = new Midi();
     const track = midi.addTrack();
@@ -238,15 +294,21 @@ describe('audioEngine', () => {
     await AudioEngine.loadInstrumentSoundbank(40, false);
     expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Sonatina_Symphonic_Orchestra.sf3'));
     
-    // 3. Program 80 (Synth) -> FluidR3Mono_GM.sf3
+    // 3. Program 73 (Flute - Woodwind Pipe) -> MuseScore_General.sf3
+    (AudioEngine as any).loadedSoundfonts.clear();
+    (AudioEngine as any).soundfontCache.clear();
+    await AudioEngine.loadInstrumentSoundbank(73, false);
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('MuseScore_General.sf3'));
+
+    // 4. Program 80 (Synth) -> FluidR3Mono_GM.sf3
     await AudioEngine.loadInstrumentSoundbank(80, false);
     expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('FluidR3Mono_GM.sf3'));
     
-    // 4. Program 0, isDrum true -> Roland_SC-88.sf3
+    // 5. Program 0, isDrum true -> Roland_SC-88.sf3
     await AudioEngine.loadInstrumentSoundbank(0, true);
     expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Roland_SC-88.sf3'));
     
-    // 5. Program 115 -> Roland_SC-88.sf3
+    // 6. Program 115 -> Roland_SC-88.sf3
     await AudioEngine.loadInstrumentSoundbank(115, false);
     expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Roland_SC-88.sf3'));
   });
