@@ -294,11 +294,11 @@ describe('audioEngine', () => {
     await AudioEngine.loadInstrumentSoundbank(40, false);
     expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Sonatina_Symphonic_Orchestra.sf3'));
     
-    // 3. Program 73 (Flute - Woodwind Pipe) -> MuseScore_General.sf3
+    // 3. Program 73 (Flute - Woodwind Pipe) -> Sonatina_Symphonic_Orchestra.sf3
     (AudioEngine as any).loadedSoundfonts.clear();
     (AudioEngine as any).soundfontCache.clear();
     await AudioEngine.loadInstrumentSoundbank(73, false);
-    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('MuseScore_General.sf3'));
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Sonatina_Symphonic_Orchestra.sf3'));
 
     // 4. Program 80 (Synth) -> FluidR3Mono_GM.sf3
     await AudioEngine.loadInstrumentSoundbank(80, false);

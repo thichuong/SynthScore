@@ -213,8 +213,6 @@ export class SoundfontService {
       return 'Roland_SC-88.sf3';
     } else if (programNumber >= 80) {
       return 'FluidR3Mono_GM.sf3';
-    } else if (programNumber >= 64 && programNumber <= 79) {
-      return 'MuseScore_General.sf3';
     } else if (programNumber >= 40) {
       return 'Sonatina_Symphonic_Orchestra.sf3';
     } else {
