@@ -286,30 +286,39 @@ describe('audioEngine', () => {
     (AudioEngine as any).loadedSoundfonts.clear();
     (AudioEngine as any).soundfontCache.clear();
     
-    // Program 0 (Piano) -> Crisis GM sf3
+    // 1. Program 0 (Piano) -> Crisis_GM_0-39.sf3
     await AudioEngine.loadInstrumentSoundbank(0, false);
-    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3'));
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Crisis_GM_0-39.sf3'));
     
-    // Program 40 (Violin) -> Crisis GM sf3
-    (AudioEngine as any).loadedSoundfonts.clear();
-    (AudioEngine as any).soundfontCache.clear();
+    // 2. Program 40 (Violin) -> Crisis_GM_40-79.sf3
     await AudioEngine.loadInstrumentSoundbank(40, false);
-    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3'));
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Crisis_GM_40-79.sf3'));
     
-    // Program 0, isDrum true -> Crisis GM sf3
+    // 3. Program 80 (Synth) -> Crisis_GM_80-111.sf3
+    await AudioEngine.loadInstrumentSoundbank(80, false);
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Crisis_GM_80-111.sf3'));
+
+    // 4. Program 0, isDrum true -> Crisis_GM_112-127_Drums.sf3
+    await AudioEngine.loadInstrumentSoundbank(0, true);
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Crisis_GM_112-127_Drums.sf3'));
+
+    // 5. Program 115 -> Crisis_GM_112-127_Drums.sf3
     (AudioEngine as any).loadedSoundfonts.clear();
     (AudioEngine as any).soundfontCache.clear();
-    await AudioEngine.loadInstrumentSoundbank(0, true);
-    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3'));
+    await AudioEngine.loadInstrumentSoundbank(115, false);
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Crisis_GM_112-127_Drums.sf3'));
   });
 
-  it('should preload Crisis GM soundfont into soundfontCache when calling preloadAllSoundfonts', async () => {
+  it('should preload all 4 Crisis GM soundfonts into soundfontCache when calling preloadAllSoundfonts', async () => {
     (AudioEngine as any).soundfontCache.clear();
     await AudioEngine.preloadAllSoundfonts();
 
     const cachedKeys = Array.from(AudioEngine.soundfontCache.keys());
-    expect(cachedKeys.length).toBe(1);
-    expect(cachedKeys.some(k => k.includes('_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3'))).toBe(true);
+    expect(cachedKeys.length).toBe(4);
+    expect(cachedKeys.some(k => k.includes('Crisis_GM_0-39.sf3'))).toBe(true);
+    expect(cachedKeys.some(k => k.includes('Crisis_GM_40-79.sf3'))).toBe(true);
+    expect(cachedKeys.some(k => k.includes('Crisis_GM_80-111.sf3'))).toBe(true);
+    expect(cachedKeys.some(k => k.includes('Crisis_GM_112-127_Drums.sf3'))).toBe(true);
   });
 
   it('should handle concurrent soundfont loading requests for the same soundfont without duplicate loads/fetches', async () => {
@@ -323,21 +332,22 @@ describe('audioEngine', () => {
     fetchSpy.mockClear();
     addSoundBankSpy.mockClear();
 
-    // Call loadInstrumentSoundbank concurrently for two instruments that map to Crisis GM sf3:
+    // Call loadInstrumentSoundbank concurrently for two instruments that map to Crisis_GM_40-79.sf3:
+    // Program 40 (Violin) và Program 60 (French Horn)
     const loadPromise1 = AudioEngine.loadInstrumentSoundbank(40, false);
     const loadPromise2 = AudioEngine.loadInstrumentSoundbank(60, false);
 
     await Promise.all([loadPromise1, loadPromise2]);
 
-    // Check that fetch was called exactly once for Crisis GM sf3
+    // Check that fetch was called exactly once for Crisis_GM_40-79.sf3
     const matchingFetches = fetchSpy.mock.calls.filter(call => 
-      typeof call[0] === 'string' && call[0].includes('_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3')
+      typeof call[0] === 'string' && call[0].includes('Crisis_GM_40-79.sf3')
     );
     expect(matchingFetches.length).toBe(1);
 
-    // Check that addSoundBank was called exactly once for Crisis GM sf3
+    // Check that addSoundBank was called exactly once for Crisis_GM_40-79.sf3
     const matchingAddSoundBanks = addSoundBankSpy.mock.calls.filter(call => 
-      call[1] === '_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3'
+      call[1] === 'Crisis_GM_40-79.sf3'
     );
     expect(matchingAddSoundBanks.length).toBe(1);
   });

@@ -219,8 +219,11 @@ describe('SynthScore Comprehensive Benchmark Suite', () => {
 
     it('Benchmark 2.3: Soundfont Program Mapping & Resolution Throughput', () => {
       const INSTRUMENTS_COUNT = 20000;
-      const getSoundfontUrl = (_programNumber: number, _isDrum: boolean): string => {
-        return '/presets/instruments/_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3';
+      const getSoundfontUrl = (programNumber: number, isDrum: boolean): string => {
+        if (isDrum || programNumber >= 112) return '/presets/instruments/Crisis_GM_112-127_Drums.sf3';
+        if (programNumber >= 80) return '/presets/instruments/Crisis_GM_80-111.sf3';
+        if (programNumber >= 40) return '/presets/instruments/Crisis_GM_40-79.sf3';
+        return '/presets/instruments/Crisis_GM_0-39.sf3';
       };
 
       console.log(`======================================================`);

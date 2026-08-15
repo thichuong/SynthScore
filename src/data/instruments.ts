@@ -91,6 +91,13 @@ export function getInstrumentEmoji(programNumber: number): string {
   return INSTRUMENT_EMOJIS[programNumber] || '🎵';
 }
 
+const getSoundbankUrlForProgram = (num: number): string => {
+  if (num >= 112) return '/presets/instruments/Crisis_GM_112-127_Drums.sf3';
+  if (num >= 80) return '/presets/instruments/Crisis_GM_80-111.sf3';
+  if (num >= 40) return '/presets/instruments/Crisis_GM_40-79.sf3';
+  return '/presets/instruments/Crisis_GM_0-39.sf3';
+};
+
 const createInstruments = (start: number, end: number): InstrumentInfo[] => {
   return GM_INSTRUMENTS.slice(start, end).map((name, i) => {
     const num = start + i;
@@ -98,7 +105,7 @@ const createInstruments = (start: number, end: number): InstrumentInfo[] => {
       number: num,
       name,
       emoji: getInstrumentEmoji(num),
-      soundbankUrl: '/presets/instruments/_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3'
+      soundbankUrl: getSoundbankUrlForProgram(num)
     };
   });
 };

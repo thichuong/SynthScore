@@ -50,7 +50,7 @@ jobs:
       - name: Download Soundfonts
         run: |
           mkdir -p public/presets/instruments
-          for file in _SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3; do
+          for file in Crisis_GM_0-39.sf3 Crisis_GM_40-79.sf3 Crisis_GM_80-111.sf3 Crisis_GM_112-127_Drums.sf3; do
             curl -L -f -s -o public/presets/instruments/$file https://github.com/thichuong/SynthScore/releases/download/v1.0.0/$file || echo "Bỏ qua $file"
           done
 

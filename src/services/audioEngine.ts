@@ -246,8 +246,13 @@ class AudioEngineService {
           }
         });
 
-        // 6. Tải bộ âm thanh Soundfont Crisis GM chính vào Synthesizer Engine lúc khởi tạo
-        await this.soundfontService.loadInstrumentSoundbank(this.synth, 0, false);
+        // 6. Tải các bộ âm thanh Soundfont Crisis GM vào Synthesizer Engine lúc khởi tạo
+        await this.soundfontService.loadSongSoundbanks(this.synth, [
+          { channel: 0, instrumentNumber: 0 } as any,   // Crisis_GM_0-39.sf3
+          { channel: 1, instrumentNumber: 40 } as any,  // Crisis_GM_40-79.sf3
+          { channel: 2, instrumentNumber: 80 } as any,  // Crisis_GM_80-111.sf3
+          { channel: 9, instrumentNumber: 0 } as any,   // Crisis_GM_112-127_Drums.sf3 (Drums)
+        ]);
 
         const defaults = getDefaultTrackSettings(0, 0);
         this.tracks = [{
