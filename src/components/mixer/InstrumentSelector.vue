@@ -244,14 +244,14 @@ onBeforeUnmount(() => {
 
 .selector-trigger:hover {
   background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(0, 240, 255, 0.25);
-  box-shadow: 0 0 8px rgba(0, 240, 255, 0.15);
+  border-color: var(--track-color, rgba(0, 240, 255, 0.25));
+  box-shadow: 0 0 8px rgba(var(--track-rgb, 0, 240, 255), 0.15);
 }
 
 .selector-trigger.is-open {
-  border-color: #00f0ff;
-  background: rgba(0, 240, 255, 0.05);
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.15);
+  border-color: var(--track-color, #00f0ff);
+  background: rgba(var(--track-rgb, 0, 240, 255), 0.08);
+  box-shadow: 0 0 10px rgba(var(--track-rgb, 0, 240, 255), 0.2);
 }
 
 .trigger-icon {

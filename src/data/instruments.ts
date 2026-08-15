@@ -176,3 +176,44 @@ export const instrumentGroups: InstrumentGroup[] = [
     instruments: createInstruments(120, 128)
   }
 ];
+
+// Bảng màu 16 kênh MIDI chuẩn dùng chung cho Waterfall Canvas và Mixer
+export const TRACK_COLORS: string[] = [
+  '#3b82f6', // Kênh 0: Violin I / Grand Piano (Xanh dương)
+  '#60a5fa', // Kênh 1: Violin II (Xanh da trời)
+  '#8b5cf6', // Kênh 2: Viola (Tím)
+  '#a855f7', // Kênh 3: Cello (Tím thẫm)
+  '#d946ef', // Kênh 4: Contrabass (Hồng cánh sen)
+  '#06b6d4', // Kênh 5: Flute (Xanh ngọc)
+  '#14b8a6', // Kênh 6: Oboe (Xanh ngọc lục bảo)
+  '#10b981', // Kênh 7: Clarinet (Xanh lá)
+  '#f59e0b', // Kênh 8: French Horn (Vàng cam)
+  '#ef4444', // Kênh 9: Timpani / Bộ gõ (Đỏ tươi)
+  '#ec4899', // Kênh 10: Orchestral Harp (Hồng phớt)
+  '#f97316', // Kênh 11: Trumpet (Cam tươi)
+  '#eab308', // Kênh 12: Trombone (Vàng chanh)
+  '#84cc16', // Kênh 13: Synth Lead (Xanh lá chuối)
+  '#2dd4bf', // Kênh 14: Synth Pad (Xanh lơ)
+  '#c084fc', // Kênh 15: FX / Khác (Tím hoa oải hương)
+];
+
+export function getTrackColor(channel: number): string {
+  const index = ((channel % TRACK_COLORS.length) + TRACK_COLORS.length) % TRACK_COLORS.length;
+  return TRACK_COLORS[index];
+}
+
+export function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const cleaned = hex.replace('#', '');
+  const num = parseInt(cleaned, 16);
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255
+  };
+}
+
+export function getTrackColorRgb(channel: number): string {
+  const { r, g, b } = hexToRgb(getTrackColor(channel));
+  return `${r}, ${g}, ${b}`;
+}
+

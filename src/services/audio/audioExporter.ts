@@ -23,7 +23,7 @@ export interface ExportOptions {
  * sử dụng OfflineAudioContext và các thuật toán mã hóa (MP3, DSD modulation).
  */
 export class AudioExporter {
-  private readonly VOLUME_BOOST_FACTOR = 1.75;
+  private readonly VOLUME_BOOST_FACTOR = 2.5;
 
   constructor() {}
 

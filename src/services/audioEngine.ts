@@ -42,7 +42,7 @@ class AudioEngineService {
 
   private synth: WorkletSynthesizer | null = null;
   private sequencer: Sequencer | null = null;
-  private readonly VOLUME_BOOST_FACTOR = 1.75; // Tăng cường âm lượng đầu ra (~+5dB) cho bộ SoundFont Crisis GM 3.51
+  private readonly VOLUME_BOOST_FACTOR = 2.5; // Tăng cường âm lượng đầu ra (~+8dB) cho bộ SoundFont Crisis GM 3.51
 
   // Trạng thái công khai (Public state)
   public isReady = false;

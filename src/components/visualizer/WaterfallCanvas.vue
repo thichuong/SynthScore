@@ -19,6 +19,7 @@ import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { Midi } from '@tonejs/midi';
 import { Play, Pause } from 'lucide-vue-next';
 import { AudioEngine } from '../../services/audioEngine';
+import { TRACK_COLORS } from '../../data/instruments';
 
 const props = defineProps<{
   fileData: Uint8Array | string | null;
@@ -82,24 +83,8 @@ let maxMidi = 88;
 let minMidi = 36;
 let maxNoteDuration = 10.0;
 
-const NOTE_COLORS = [
-  '#3b82f6', // Kênh 0: Violin I / Grand Piano (Xanh dương)
-  '#60a5fa', // Kênh 1: Violin II (Xanh da trời)
-  '#8b5cf6', // Kênh 2: Viola (Tím)
-  '#a855f7', // Kênh 3: Cello (Tím thẫm)
-  '#d946ef', // Kênh 4: Contrabass (Hồng cánh sen)
-  '#06b6d4', // Kênh 5: Flute (Xanh ngọc)
-  '#14b8a6', // Kênh 6: Oboe (Xanh ngọc lục bảo)
-  '#10b981', // Kênh 7: Clarinet (Xanh lá)
-  '#f59e0b', // Kênh 8: French Horn (Vàng cam)
-  '#ef4444', // Kênh 9: Timpani / Bộ gõ (Đỏ tươi)
-  '#ec4899', // Kênh 10: Orchestral Harp (Hồng phớt)
-  '#f97316', // Kênh 11: Trumpet (Cam tươi)
-  '#eab308', // Kênh 12: Trombone (Vàng chanh)
-  '#84cc16', // Kênh 13: Synth Lead (Xanh lá chuối)
-  '#2dd4bf', // Kênh 14: Synth Pad (Xanh lơ)
-  '#c084fc', // Kênh 15: FX / Khác (Tím hoa oải hương)
-];
+const NOTE_COLORS = TRACK_COLORS;
+
 
 // Pre-computed lookup cho phím đen (O(1) access)
 const IS_BLACK_KEY = [false, true, false, true, false, false, true, false, true, false, true, false];

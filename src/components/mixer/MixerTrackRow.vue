@@ -8,6 +8,10 @@
       expanded: isExpanded,
       'dropdown-active': isDropdownActive
     }"
+    :style="{
+      '--track-color': trackColor,
+      '--track-rgb': trackRgb
+    }"
   >
     <!-- Cột hiển thị đèn tín hiệu nốt nhạc -->
     <div class="meter-container">
@@ -166,17 +170,21 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { Volume2, VolumeX, Trash2, Play, Sliders, RotateCcw } from 'lucide-vue-next';
 import InstrumentSelector from './InstrumentSelector.vue';
-import { getInstrumentEmoji } from '../../data/instruments';
+import { getInstrumentEmoji, getTrackColor, getTrackColorRgb } from '../../data/instruments';
 import type { TrackInfo } from '../../services/midiGenerator';
 
-defineProps<{
+const props = defineProps<{
   track: TrackInfo;
   liveVoices: number;
   isExpanded: boolean;
   isDropdownActive: boolean;
 }>();
+
+const trackColor = computed(() => getTrackColor(props.track.channel));
+const trackRgb = computed(() => getTrackColorRgb(props.track.channel));
 
 const emit = defineEmits<{
   (e: 'changeInstrument', instNum: number): void;
@@ -208,10 +216,17 @@ function formatPanValue(pan: number): string {
   display: flex;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 3.5px solid var(--track-color);
   border-radius: 12px;
   overflow: hidden;
   position: relative;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.track-card:hover {
+  border-color: rgba(var(--track-rgb), 0.3);
+  border-left-color: var(--track-color);
+  background: rgba(var(--track-rgb), 0.03);
 }
 
 .track-card.dropdown-active {
@@ -230,9 +245,12 @@ function formatPanValue(pan: number): string {
 }
 
 .track-card.active {
-  border-color: rgba(0, 240, 255, 0.4);
-  background: rgba(0, 240, 255, 0.04);
+  border-color: rgba(var(--track-rgb), 0.5);
+  border-left-color: var(--track-color);
+  background: rgba(var(--track-rgb), 0.07);
+  box-shadow: 0 0 16px rgba(var(--track-rgb), 0.2);
 }
+
 
 .meter-container {
   width: 24px;
@@ -247,10 +265,11 @@ function formatPanValue(pan: number): string {
 .meter-label {
   font-size: 0.55rem;
   font-weight: 700;
-  color: #8c8c9e;
+  color: var(--track-color);
   transform: rotate(-90deg);
   margin-bottom: 12px;
   white-space: nowrap;
+  text-shadow: 0 0 8px rgba(var(--track-rgb), 0.35);
 }
 
 .meter-bar-wrapper {
@@ -265,7 +284,8 @@ function formatPanValue(pan: number): string {
 
 .meter-bar-fill {
   width: 100%;
-  background: linear-gradient(0deg, #00f0ff 0%, #a855f7 70%, #ff007f 100%);
+  background: linear-gradient(0deg, var(--track-color) 0%, rgba(255, 255, 255, 0.95) 100%);
+  box-shadow: 0 0 8px var(--track-color);
   border-radius: 2px;
   transition: height 0.05s ease;
 }
@@ -309,11 +329,13 @@ function formatPanValue(pan: number): string {
 .voice-count-badge {
   font-size: 0.65rem;
   font-weight: 700;
-  color: #00f0ff;
-  background: rgba(0, 240, 255, 0.15);
+  color: var(--track-color);
+  background: rgba(var(--track-rgb), 0.15);
+  border: 1px solid rgba(var(--track-rgb), 0.3);
   padding: 2px 6px;
   border-radius: 4px;
   font-family: monospace;
+  box-shadow: 0 0 6px rgba(var(--track-rgb), 0.2);
 }
 
 .instrument-selector-container {
@@ -334,7 +356,8 @@ function formatPanValue(pan: number): string {
 .vol-icon {
   width: 14px;
   height: 14px;
-  color: #00f0ff;
+  color: var(--track-color);
+  filter: drop-shadow(0 0 4px rgba(var(--track-rgb), 0.4));
 }
 
 .vol-slider {
@@ -353,7 +376,8 @@ function formatPanValue(pan: number): string {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #00f0ff;
+  background: var(--track-color);
+  box-shadow: 0 0 6px rgba(var(--track-rgb), 0.6);
   cursor: pointer;
 }
 
@@ -392,9 +416,10 @@ function formatPanValue(pan: number): string {
 }
 
 .btn-test:hover { 
-  background: rgba(0, 240, 255, 0.15); 
-  border-color: rgba(0, 240, 255, 0.4); 
-  color: #00f0ff; 
+  background: rgba(var(--track-rgb), 0.15); 
+  border-color: rgba(var(--track-rgb), 0.4); 
+  color: var(--track-color); 
+  box-shadow: 0 0 8px rgba(var(--track-rgb), 0.25);
 }
 
 .btn-fx-toggle:hover:not(.active) {
