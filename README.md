@@ -118,6 +118,40 @@ SynthScore tích hợp sẵn hệ thống kiểm thử tự động toàn diện
 *   Tiến hành phân tích ngược note-by-note (đối chiếu cao độ nốt, thời điểm bắt đầu, thời lượng giây) giữa file XML gốc và file MIDI xuất ra để phát hiện lỗi mất nốt hoặc lệch nhịp.
 *   Xuất báo cáo Markdown chi tiết tại file [tests-report.md](file:///home/exblackhole/Desktop/SynthScore/tests-report.md) hiển thị độ khớp nốt tuyệt đối của từng bản nhạc.
 
+## 🧰 Công cụ Tối ưu hóa SoundFont 3 (SF3 Trimmer & Optimizer Tool)
+
+SynthScore đi kèm script tiện ích độc lập **[scripts/trim_sf3.py](file:///home/exblackhole/Desktop/SynthScore/scripts/trim_sf3.py)** viết bằng Python thuần (chỉ dùng thư viện chuẩn `struct`, `os`, `sys`, `argparse`, không cần cài thêm package nào) giúp phân tích, cắt gọt và tối ưu hóa các tệp SoundFont 3 (`.sf3`).
+
+### 🌟 Ưu điểm nổi bật
+* **Không nén lại (Zero Lossy Transcoding):** Cắt trực tiếp các gói bitstream Ogg Vorbis gốc trong chunk `smpl`, giữ nguyên 100% chất lượng âm thanh và hoàn thành chỉ trong **vài trăm mili-giây**.
+* **Dọn rác triệt để (Deep Garbage Collection):** Tự động truy vết và loại bỏ hoàn toàn các `Instrument`, `Sample`, `Generator`, `Modulator` mồ côi không còn được sử dụng bởi các Preset đã lọc.
+* **Bảo toàn cặp Stereo:** Tự động giữ và định tuyến lại liên kết (`wSampleLink`) của các mẫu âm thanh nổi (Stereo Linked Samples).
+* **Tự động xác thực tính toàn vẹn (Integrity Check):** Tự động kiểm tra cấu trúc khối RIFF, magic bytes `OggS` và các bản ghi kết thúc `EOP`, `EOI`, `EOS`.
+
+### 📋 Hướng dẫn sử dụng CLI
+
+```bash
+# 1. Kiểm tra thông tin chi tiết và danh sách Presets trong file SF3
+python3 scripts/trim_sf3.py public/presets/instruments/Sonatina_Symphonic_Orchestra.sf3 --info
+
+# 2. Cắt gọt và giữ lại dải nhạc cụ giao hưởng (Program 40 đến 79)
+python3 scripts/trim_sf3.py input.sf3 output.sf3 --min 40 --max 79
+
+# 3. Tối ưu bộ Piano, Organ, Guitar, Bass (Program 0 đến 39)
+python3 scripts/trim_sf3.py input.sf3 output.sf3 --min 0 --max 39
+
+# 4. Chỉ giữ lại duy nhất bộ Trống (Drum Kits - Bank 128)
+python3 scripts/trim_sf3.py input.sf3 output.sf3 --drums-only
+
+# 5. Giữ danh sách các Program chỉ định (vd: 0, 40, 73)
+python3 scripts/trim_sf3.py input.sf3 output.sf3 --programs 0,40,73
+
+# 6. Lọc preset theo tên hoặc biểu thức chính quy (Regex)
+python3 scripts/trim_sf3.py input.sf3 output.sf3 --filter-name "Violin|Cello"
+```
+
+---
+
 ## 🏗️ Kiến trúc & Cấu trúc Thư mục Dự án
 
 Toàn bộ tài liệu chi tiết về sơ đồ kiến trúc hệ thống và cây cấu trúc thư mục dự án SynthScore đã được chuyển sang tệp riêng:

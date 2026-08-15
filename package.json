@@ -8,7 +8,8 @@
     "build:wasm": "cargo build --target wasm32-unknown-unknown --release --manifest-path crates/synthscore-wasm/Cargo.toml && wasm-bindgen crates/synthscore-wasm/target/wasm32-unknown-unknown/release/synthscore_wasm.wasm --out-dir src/wasm --target web",
     "build": "npm run build:wasm && vue-tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "trim:sf3": "python3 scripts/trim_sf3.py"
   },
   "dependencies": {
     "@lucide/vue": "^1.23.0",

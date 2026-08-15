@@ -92,6 +92,8 @@ SynthScore/
 │   ├── App.vue                 # Giao diện chính của ứng dụng
 │   ├── main.ts                 # Điểm khởi tạo Vue App
 │   └── style.css               # CSS toàn cục
+├── scripts/                    # Các script tiện ích (Tối ưu hóa SoundFont SF3, chuyển đổi audio)
+│   └── trim_sf3.py             # Công cụ CLI cắt gọt & dọn rác SoundFont 3 độc lập
 ├── tests/                      # Bộ kiểm thử tự động (Vitest & JSDOM)
 ├── package.json                # Đăng ký script và thư viện dự án
 ├── tsconfig.json               # Cấu hình TypeScript
