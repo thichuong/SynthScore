@@ -52,7 +52,7 @@ describe('midiGenerator', () => {
   describe('parseMidiTracks', () => {
     it('should parse tracks correctly from MIDI array buffer', () => {
       const originalMidiBytes = createTestMidi();
-      const tracksInfo = parseMidiTracks(originalMidiBytes.buffer);
+      const tracksInfo = parseMidiTracks(originalMidiBytes);
       
       expect(tracksInfo.length).toBe(2);
       
@@ -85,7 +85,7 @@ describe('midiGenerator', () => {
       
       expect(symphonyBytes).toBeInstanceOf(Uint8Array);
       
-      const midi = new Midi(symphonyBytes.buffer);
+      const midi = new Midi(symphonyBytes);
       expect(midi.name).toContain('(Symphony)');
       expect(midi.tracks.length).toBe(11);
       
@@ -108,7 +108,7 @@ describe('midiGenerator', () => {
       
       expect(concertoBytes).toBeInstanceOf(Uint8Array);
       
-      const midi = new Midi(concertoBytes.buffer);
+      const midi = new Midi(concertoBytes);
       expect(midi.name).toContain('(Piano Concerto)');
       expect(midi.tracks.length).toBe(9);
       

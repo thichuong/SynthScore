@@ -98,7 +98,7 @@ const createInstruments = (start: number, end: number): InstrumentInfo[] => {
       number: num,
       name,
       emoji: getInstrumentEmoji(num),
-      soundbankUrl: `/presets/instruments/${num}.sf3`
+      soundbankUrl: '/presets/instruments/_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3'
     };
   });
 };

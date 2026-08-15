@@ -72,7 +72,7 @@ describe('midiWorker', () => {
     expect(result.success).toBe(true);
     
     // Verifying it has been transformed (should contain 11 tracks)
-    const resultMidi = new Midi(result.payload.buffer);
+    const resultMidi = new Midi(result.payload);
     expect(resultMidi.tracks.length).toBe(11);
   });
 

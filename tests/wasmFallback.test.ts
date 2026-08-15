@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterAll } from 'vitest';
 import { parseMusicXmlToMidiBytes } from '../src/services/musicXmlParser';
 import { parseMidiTracks, generateSymphonyMidi, generateConcertoMidi } from '../src/services/midiGenerator';
 import { AudioExporter } from '../src/services/audio/audioExporter';
@@ -52,7 +52,7 @@ describe('TS/JS Fallback Engine (WASM Disabled/Unavailable)', () => {
     expect(String.fromCharCode(midiResultBytes[0], midiResultBytes[1], midiResultBytes[2], midiResultBytes[3])).toBe('MThd');
 
     // Parse resulting MIDI back using Tonejs Midi to verify notes
-    const parsed = new Midi(midiResultBytes.buffer);
+    const parsed = new Midi(midiResultBytes);
     expect(parsed.name).toContain('Fallback Test Song');
     expect(parsed.tracks.length).toBeGreaterThan(0);
     const parsedTrack = parsed.tracks[0];
@@ -64,7 +64,7 @@ describe('TS/JS Fallback Engine (WASM Disabled/Unavailable)', () => {
   });
 
   it('should parse MIDI tracks using JS fallback (parseMidiTracks)', () => {
-    const tracks = parseMidiTracks(sampleMidiBytes.buffer);
+    const tracks = parseMidiTracks(sampleMidiBytes);
     expect(Array.isArray(tracks)).toBe(true);
     expect(tracks.length).toBe(1);
     expect(tracks[0].channel).toBe(0);
@@ -74,7 +74,7 @@ describe('TS/JS Fallback Engine (WASM Disabled/Unavailable)', () => {
   });
 
   it('should fallback to 16 default tracks when JS parseMidiTracks encounters corrupted data', () => {
-    const corruptedBuffer = new Uint8Array([0, 1, 2, 3]).buffer;
+    const corruptedBuffer = new Uint8Array([0, 1, 2, 3]);
     const tracks = parseMidiTracks(corruptedBuffer);
     expect(Array.isArray(tracks)).toBe(true);
     expect(tracks.length).toBe(16);
@@ -86,7 +86,7 @@ describe('TS/JS Fallback Engine (WASM Disabled/Unavailable)', () => {
     expect(symBytes instanceof Uint8Array).toBe(true);
     expect(symBytes.length).toBeGreaterThan(0);
 
-    const parsedSym = new Midi(symBytes.buffer);
+    const parsedSym = new Midi(symBytes);
     expect(parsedSym.name).toContain('(Symphony)');
     expect(parsedSym.tracks.length).toBe(11); // 11 orchestra tracks
   });
@@ -96,7 +96,7 @@ describe('TS/JS Fallback Engine (WASM Disabled/Unavailable)', () => {
     expect(concBytes instanceof Uint8Array).toBe(true);
     expect(concBytes.length).toBeGreaterThan(0);
 
-    const parsedConc = new Midi(concBytes.buffer);
+    const parsedConc = new Midi(concBytes);
     expect(parsedConc.name).toContain('(Piano Concerto)');
     expect(parsedConc.tracks.length).toBe(9); // 9 concerto tracks
   });
@@ -147,8 +147,8 @@ describe('TS/JS Fallback Engine (WASM Disabled/Unavailable)', () => {
     const jsSymBytes = generateSymphonyMidi(sampleMidiBytes);
     const wasmSymBytes = wasm.generate_symphony_midi_wasm(sampleMidiBytes);
 
-    const jsSym = new Midi(jsSymBytes.buffer);
-    const wasmSym = new Midi(wasmSymBytes.buffer);
+    const jsSym = new Midi(jsSymBytes);
+    const wasmSym = new Midi(wasmSymBytes);
 
     expect(jsSym.tracks.length).toBe(wasmSym.tracks.length);
     let jsTotalSymNotes = 0;
@@ -164,8 +164,8 @@ describe('TS/JS Fallback Engine (WASM Disabled/Unavailable)', () => {
     const jsConcBytes = generateConcertoMidi(sampleMidiBytes);
     const wasmConcBytes = wasm.generate_concerto_midi_wasm(sampleMidiBytes);
 
-    const jsConc = new Midi(jsConcBytes.buffer);
-    const wasmConc = new Midi(wasmConcBytes.buffer);
+    const jsConc = new Midi(jsConcBytes);
+    const wasmConc = new Midi(wasmConcBytes);
 
     expect(jsConc.tracks.length).toBe(wasmConc.tracks.length);
     let jsTotalConcNotes = 0;

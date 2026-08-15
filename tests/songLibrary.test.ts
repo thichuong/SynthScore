@@ -488,7 +488,7 @@ describe('Song Library Note Reading Audit', () => {
         const midiBytes = parseMusicXmlToMidiBytes(xmlText);
         
         // Parse MIDI notes using ToneJS Midi
-        const midi = new Midi(midiBytes.buffer);
+        const midi = new Midi(midiBytes);
         
         let isMatch = true;
         let diffCount = 0;

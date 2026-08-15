@@ -89,9 +89,9 @@ export const concertoTracksInfo = [
 ];
 
 // Phân tích danh sách bè của bài nhạc bằng @tonejs/midi
-export function parseMidiTracks(arrayBuffer: ArrayBuffer): TrackInfo[] {
+export function parseMidiTracks(input: ArrayBufferLike | ArrayLike<number>): TrackInfo[] {
   try {
-    const midi = new Midi(arrayBuffer);
+    const midi = new Midi(input as (ArrayBuffer | ArrayLike<number>));
     
     // Tạo bản đồ lưu trữ các track có nốt nhạc theo kênh (channel)
     const channelNotes = new Map<number, { name: string; instrName: string; instrNum: number; count: number }>();
@@ -157,7 +157,7 @@ export function parseMidiTracks(arrayBuffer: ArrayBuffer): TrackInfo[] {
 // (Phiên bản tối ưu hiệu năng: Note Thinning + Alternation + Polyphony Limit)
 export function generateSymphonyMidi(originalMidiBytes: Uint8Array): Uint8Array {
   try {
-    const originalMidi = new Midi(originalMidiBytes.buffer as ArrayBuffer);
+    const originalMidi = new Midi(originalMidiBytes);
     const symphonyMidi = new Midi();
     symphonyMidi.name = originalMidi.name + " (Symphony)";
 
@@ -257,7 +257,7 @@ export function generateSymphonyMidi(originalMidiBytes: Uint8Array): Uint8Array 
 // Tự động phân tách và chuyển bài nhạc thành cấu hình Piano Concerto (Solo Piano + Dàn nhạc đệm)
 export function generateConcertoMidi(originalMidiBytes: Uint8Array): Uint8Array {
   try {
-    const originalMidi = new Midi(originalMidiBytes.buffer as ArrayBuffer);
+    const originalMidi = new Midi(originalMidiBytes);
     const concertoMidi = new Midi();
     concertoMidi.name = originalMidi.name + " (Piano Concerto)";
 

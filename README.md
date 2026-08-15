@@ -150,6 +150,18 @@ python3 scripts/trim_sf3.py input.sf3 output.sf3 --programs 0,40,73
 python3 scripts/trim_sf3.py input.sf3 output.sf3 --filter-name "Violin|Cello"
 ```
 
+### 🔄 Chuyển đổi SoundFont 2 sang SoundFont 3 (SF2 ➔ SF3 Converter)
+
+SynthScore tích hợp công cụ chuyển đổi tệp SoundFont 2 (`.sf2`) sang SoundFont 3 (`.sf3`) nén Vorbis đa luồng: **[scripts/convert_sf2_to_sf3.py](file:///home/exblackhole/Desktop/SynthScore/scripts/convert_sf2_to_sf3.py)**.
+
+```bash
+# Chuyển đổi file SF2 sang SF3:
+python3 scripts/convert_sf2_to_sf3.py public/presets/instruments/MySoundfont.sf2
+
+# Tùy chỉnh mức chất lượng Vorbis (mặc định 3) và số luồng CPU:
+python3 scripts/convert_sf2_to_sf3.py input.sf2 output.sf3 -q 4 -j 8
+```
+
 ---
 
 ## 🏗️ Kiến trúc & Cấu trúc Thư mục Dự án

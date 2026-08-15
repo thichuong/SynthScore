@@ -43,11 +43,11 @@ export class AudioContextManager {
         this.analyser = ctx.createAnalyser();
         this.analyser.fftSize = 256;
 
-        // Khởi tạo DynamicsCompressorNode làm Limiter để tránh vỡ tiếng
+        // Khởi tạo DynamicsCompressorNode làm Limiter để tránh vỡ tiếng và giữ âm lượng to rõ
         this.compressor = ctx.createDynamicsCompressor();
-        this.compressor.threshold.setValueAtTime(-12, ctx.currentTime);
+        this.compressor.threshold.setValueAtTime(-8, ctx.currentTime);
         this.compressor.knee.setValueAtTime(10, ctx.currentTime);
-        this.compressor.ratio.setValueAtTime(4, ctx.currentTime);
+        this.compressor.ratio.setValueAtTime(3.5, ctx.currentTime);
         this.compressor.attack.setValueAtTime(0.005, ctx.currentTime);
         this.compressor.release.setValueAtTime(0.1, ctx.currentTime);
 

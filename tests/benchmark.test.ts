@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import { generateSymphonyMidi, generateConcertoMidi, parseMidiTracks } from '../src/services/midiGenerator';
 import { parseMusicXmlToMidiBytes } from '../src/services/musicXmlParser';
 import { parseMxl } from '../src/services/mxlParser';
@@ -118,7 +118,7 @@ describe('SynthScore Comprehensive Benchmark Suite', () => {
       console.log(`======================================================`);
 
       const startJs = performance.now();
-      const tracksJs = parseMidiTracks(midiBytes.buffer);
+      const tracksJs = parseMidiTracks(midiBytes);
       const durationJs = performance.now() - startJs;
       console.log(`⏱️  JS @tonejs/midi Exec Time : ${durationJs.toFixed(2)} ms (${tracksJs.length} tracks detected)`);
 
@@ -219,11 +219,8 @@ describe('SynthScore Comprehensive Benchmark Suite', () => {
 
     it('Benchmark 2.3: Soundfont Program Mapping & Resolution Throughput', () => {
       const INSTRUMENTS_COUNT = 20000;
-      const getSoundfontUrl = (programNumber: number, isDrum: boolean): string => {
-        if (isDrum) return '/presets/instruments/Roland_SC-88.sf3';
-        if (programNumber >= 40 && programNumber <= 47) return '/presets/instruments/Sonatina_Symphonic_Orchestra.sf3';
-        if (programNumber >= 80 && programNumber <= 95) return '/presets/instruments/FluidR3Mono_GM.sf3';
-        return '/presets/instruments/MuseScore_General.sf3';
+      const getSoundfontUrl = (_programNumber: number, _isDrum: boolean): string => {
+        return '/presets/instruments/_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3';
       };
 
       console.log(`======================================================`);

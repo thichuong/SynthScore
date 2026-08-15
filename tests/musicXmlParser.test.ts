@@ -67,7 +67,7 @@ describe('parseMusicXmlToMidiBytes', () => {
     expect(midiBytes).toBeInstanceOf(Uint8Array);
     expect(midiBytes.length).toBeGreaterThan(0);
 
-    const midi = new Midi(midiBytes.buffer);
+    const midi = new Midi(midiBytes);
     
     // Verify header and track
     expect(midi.name).toBe('Basic Test Song');
@@ -126,7 +126,7 @@ describe('parseMusicXmlToMidiBytes', () => {
     </score-partwise>`;
 
     const midiBytes = parseMusicXmlToMidiBytes(xmlText);
-    const midi = new Midi(midiBytes.buffer);
+    const midi = new Midi(midiBytes);
     const notes = midi.tracks[0].notes;
     
     // Tied notes should be merged into 1 single note of 8 divisions (4 beats at 120bpm = 2s total duration)
@@ -168,7 +168,7 @@ describe('parseMusicXmlToMidiBytes', () => {
     </score-partwise>`;
 
     const midiBytes = parseMusicXmlToMidiBytes(xmlText);
-    const midi = new Midi(midiBytes.buffer);
+    const midi = new Midi(midiBytes);
     const notes = midi.tracks[0].notes;
 
     expect(notes.length).toBe(3); // C4 at 0s (dur 4), E4 at 0s (dur 2), G4 at 1s (dur 2)
@@ -250,7 +250,7 @@ describe('parseMusicXmlToMidiBytes', () => {
     </score-partwise>`;
 
     const midiBytes = parseMusicXmlToMidiBytes(xmlText);
-    const midi = new Midi(midiBytes.buffer);
+    const midi = new Midi(midiBytes);
 
     expect(midi.tracks.length).toBe(3);
 

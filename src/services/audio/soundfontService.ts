@@ -13,6 +13,8 @@ export interface SoundfontProgress {
   isFallback: boolean;      // Có tệp nào dùng fallback GitHub Pages URL không
 }
 
+export const DEFAULT_SOUNDFONT_FILE = '_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3';
+
 /**
  * Quản lý tải, bộ nhớ đệm (cả IndexedDB và RAM)
  * và nạp bộ âm thanh Soundfont vào Synthesizer.
@@ -207,17 +209,9 @@ export class SoundfontService {
     await nextInQueue;
   }
 
-  // Ánh xạ nhạc cụ sang file Soundfont gốc tương ứng
-  public getSoundfontFileName(programNumber: number, isDrum: boolean = false): string {
-    if (isDrum || programNumber >= 112) {
-      return 'Roland_SC-88.sf3';
-    } else if (programNumber >= 80) {
-      return 'FluidR3Mono_GM.sf3';
-    } else if (programNumber >= 40) {
-      return 'Sonatina_Symphonic_Orchestra.sf3';
-    } else {
-      return 'MuseScore_General.sf3';
-    }
+  // Ánh xạ nhạc cụ sang file Soundfont gốc tương ứng (Dùng SoundFont Crisis GM duy nhất)
+  public getSoundfontFileName(_programNumber?: number, _isDrum?: boolean): string {
+    return DEFAULT_SOUNDFONT_FILE;
   }
 
   // Tiền tải (preload) soundfont vào cache (IndexedDB & Memory cache)
@@ -285,22 +279,11 @@ export class SoundfontService {
     return loadPromise.then(() => {});
   }
 
-  // Tiền tải tất cả 4 bộ âm thanh Soundfont vào bộ nhớ đệm (IndexedDB & Memory cache)
+  // Tiền tải bộ âm thanh Soundfont vào bộ nhớ đệm (IndexedDB & Memory cache)
   public async preloadAllSoundfonts(): Promise<void> {
-    const soundfontSpecs = [
-      { programNumber: 0, isDrum: false },   // MuseScore_General.sf3
-      { programNumber: 40, isDrum: false },  // Sonatina_Symphonic_Orchestra.sf3
-      { programNumber: 80, isDrum: false },  // FluidR3Mono_GM.sf3
-      { programNumber: 0, isDrum: true }     // Roland_SC-88.sf3
-    ];
-
-    await Promise.all(
-      soundfontSpecs.map(sf =>
-        this.preloadSoundfont(sf.programNumber, sf.isDrum).catch(err => {
-          console.warn(`[SoundfontService] Lỗi tiền tải soundfont cho program ${sf.programNumber} (isDrum: ${sf.isDrum}):`, err);
-        })
-      )
-    );
+    await this.preloadSoundfont(0, false).catch(err => {
+      console.warn(`[SoundfontService] Lỗi tiền tải soundfont Crisis GM:`, err);
+    });
   }
 
   // Nạp bộ âm thanh nhạc cụ (.sf3) động cho synthesizer

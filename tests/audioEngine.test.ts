@@ -286,43 +286,30 @@ describe('audioEngine', () => {
     (AudioEngine as any).loadedSoundfonts.clear();
     (AudioEngine as any).soundfontCache.clear();
     
-    // 1. Program 0 (Piano) -> MuseScore_General.sf3
+    // Program 0 (Piano) -> Crisis GM sf3
     await AudioEngine.loadInstrumentSoundbank(0, false);
-    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('MuseScore_General.sf3'));
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3'));
     
-    // 2. Program 40 (Violin) -> Sonatina_Symphonic_Orchestra.sf3
-    await AudioEngine.loadInstrumentSoundbank(40, false);
-    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Sonatina_Symphonic_Orchestra.sf3'));
-    
-    // 3. Program 73 (Flute - Woodwind Pipe) -> Sonatina_Symphonic_Orchestra.sf3
+    // Program 40 (Violin) -> Crisis GM sf3
     (AudioEngine as any).loadedSoundfonts.clear();
     (AudioEngine as any).soundfontCache.clear();
-    await AudioEngine.loadInstrumentSoundbank(73, false);
-    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Sonatina_Symphonic_Orchestra.sf3'));
-
-    // 4. Program 80 (Synth) -> FluidR3Mono_GM.sf3
-    await AudioEngine.loadInstrumentSoundbank(80, false);
-    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('FluidR3Mono_GM.sf3'));
+    await AudioEngine.loadInstrumentSoundbank(40, false);
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3'));
     
-    // 5. Program 0, isDrum true -> Roland_SC-88.sf3
+    // Program 0, isDrum true -> Crisis GM sf3
+    (AudioEngine as any).loadedSoundfonts.clear();
+    (AudioEngine as any).soundfontCache.clear();
     await AudioEngine.loadInstrumentSoundbank(0, true);
-    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Roland_SC-88.sf3'));
-    
-    // 6. Program 115 -> Roland_SC-88.sf3
-    await AudioEngine.loadInstrumentSoundbank(115, false);
-    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('Roland_SC-88.sf3'));
+    expect(fetchSpy).toHaveBeenLastCalledWith(expect.stringContaining('_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3'));
   });
 
-  it('should preload all 4 soundfonts into soundfontCache when calling preloadAllSoundfonts', async () => {
+  it('should preload Crisis GM soundfont into soundfontCache when calling preloadAllSoundfonts', async () => {
     (AudioEngine as any).soundfontCache.clear();
     await AudioEngine.preloadAllSoundfonts();
 
     const cachedKeys = Array.from(AudioEngine.soundfontCache.keys());
-    expect(cachedKeys.length).toBe(4);
-    expect(cachedKeys.some(k => k.includes('MuseScore_General.sf3'))).toBe(true);
-    expect(cachedKeys.some(k => k.includes('Sonatina_Symphonic_Orchestra.sf3'))).toBe(true);
-    expect(cachedKeys.some(k => k.includes('FluidR3Mono_GM.sf3'))).toBe(true);
-    expect(cachedKeys.some(k => k.includes('Roland_SC-88.sf3'))).toBe(true);
+    expect(cachedKeys.length).toBe(1);
+    expect(cachedKeys.some(k => k.includes('_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3'))).toBe(true);
   });
 
   it('should handle concurrent soundfont loading requests for the same soundfont without duplicate loads/fetches', async () => {
@@ -336,23 +323,21 @@ describe('audioEngine', () => {
     fetchSpy.mockClear();
     addSoundBankSpy.mockClear();
 
-    // Call loadInstrumentSoundbank concurrently for two instruments that map to the same file:
-    // Program 40 -> Sonatina_Symphonic_Orchestra.sf3
-    // Program 60 -> Sonatina_Symphonic_Orchestra.sf3
+    // Call loadInstrumentSoundbank concurrently for two instruments that map to Crisis GM sf3:
     const loadPromise1 = AudioEngine.loadInstrumentSoundbank(40, false);
     const loadPromise2 = AudioEngine.loadInstrumentSoundbank(60, false);
 
     await Promise.all([loadPromise1, loadPromise2]);
 
-    // Check that fetch was called exactly once for Sonatina_Symphonic_Orchestra.sf3
+    // Check that fetch was called exactly once for Crisis GM sf3
     const matchingFetches = fetchSpy.mock.calls.filter(call => 
-      typeof call[0] === 'string' && call[0].includes('Sonatina_Symphonic_Orchestra.sf3')
+      typeof call[0] === 'string' && call[0].includes('_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3')
     );
     expect(matchingFetches.length).toBe(1);
 
-    // Check that addSoundBank was called exactly once for Sonatina_Symphonic_Orchestra.sf3
+    // Check that addSoundBank was called exactly once for Crisis GM sf3
     const matchingAddSoundBanks = addSoundBankSpy.mock.calls.filter(call => 
-      call[1] === 'Sonatina_Symphonic_Orchestra.sf3'
+      call[1] === '_SF2__GM_SoundFonts__shared_by_ZSF__-_Crisis_GM_3.51_ZSF_Edit.sf3'
     );
     expect(matchingAddSoundBanks.length).toBe(1);
   });

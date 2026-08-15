@@ -18,11 +18,7 @@ describe('Local Presets Parsing Audit', () => {
 
     const fileBuffer = fs.readFileSync(filePath);
     const uint8Buf = new Uint8Array(fileBuffer);
-    const arrayBuffer = uint8Buf.buffer.slice(
-      uint8Buf.byteOffset,
-      uint8Buf.byteOffset + uint8Buf.byteLength
-    );
-    const midi = new Midi(arrayBuffer);
+    const midi = new Midi(uint8Buf);
 
     expect(midi.tracks.length).toBeGreaterThanOrEqual(12);
 
@@ -51,7 +47,7 @@ describe('Local Presets Parsing Audit', () => {
     expect(midiBytes).toBeInstanceOf(Uint8Array);
     expect(midiBytes.length).toBeGreaterThan(100);
 
-    const midi = new Midi(midiBytes.buffer);
+    const midi = new Midi(midiBytes);
     expect(midi.tracks.length).toBeGreaterThan(0);
 
     let totalNotes = 0;
@@ -71,7 +67,7 @@ describe('Local Presets Parsing Audit', () => {
     expect(midiBytes).toBeInstanceOf(Uint8Array);
     expect(midiBytes.length).toBeGreaterThan(100);
 
-    const midi = new Midi(midiBytes.buffer);
+    const midi = new Midi(midiBytes);
     expect(midi.tracks.length).toBeGreaterThan(0);
 
     let totalNotes = 0;
@@ -107,8 +103,7 @@ describe('Local Presets Parsing Audit', () => {
     expect(uint8[2]).toBe(104); // 'h'
     expect(uint8[3]).toBe(100); // 'd'
 
-    const arrayBuffer = uint8.buffer.slice(uint8.byteOffset, uint8.byteOffset + uint8.byteLength);
-    const midi = new Midi(arrayBuffer);
+    const midi = new Midi(uint8);
 
     expect(midi.tracks.length).toBeGreaterThan(0);
     let totalNotes = 0;

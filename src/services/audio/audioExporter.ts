@@ -23,7 +23,7 @@ export interface ExportOptions {
  * sử dụng OfflineAudioContext và các thuật toán mã hóa (MP3, DSD modulation).
  */
 export class AudioExporter {
-  private readonly VOLUME_BOOST_FACTOR = 1.2;
+  private readonly VOLUME_BOOST_FACTOR = 1.75;
 
   constructor() {}
 
@@ -82,9 +82,9 @@ export class AudioExporter {
 
     // Tạo DynamicsCompressorNode cho offline context để đồng bộ giới hạn âm lượng và ngăn vỡ tiếng
     const offlineCompressor = offlineCtx.createDynamicsCompressor();
-    offlineCompressor.threshold.setValueAtTime(-12, 0);
+    offlineCompressor.threshold.setValueAtTime(-8, 0);
     offlineCompressor.knee.setValueAtTime(10, 0);
-    offlineCompressor.ratio.setValueAtTime(4, 0);
+    offlineCompressor.ratio.setValueAtTime(3.5, 0);
     offlineCompressor.attack.setValueAtTime(0.005, 0);
     offlineCompressor.release.setValueAtTime(0.1, 0);
 

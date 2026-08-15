@@ -42,7 +42,7 @@ class AudioEngineService {
 
   private synth: WorkletSynthesizer | null = null;
   private sequencer: Sequencer | null = null;
-  private readonly VOLUME_BOOST_FACTOR = 1.2; // Mặc định boost thêm ~4dB (1.6x) để cân bằng âm lượng trình duyệt
+  private readonly VOLUME_BOOST_FACTOR = 1.75; // Tăng cường âm lượng đầu ra (~+5dB) cho bộ SoundFont Crisis GM 3.51
 
   // Trạng thái công khai (Public state)
   public isReady = false;
@@ -246,13 +246,8 @@ class AudioEngineService {
           }
         });
 
-        // 6. Tải tất cả các bộ âm thanh Soundfont chính vào Synthesizer Engine lúc khởi tạo
-        await this.soundfontService.loadSongSoundbanks(this.synth, [
-          { channel: 0, instrumentNumber: 0 } as any,   // MuseScore_General.sf3
-          { channel: 1, instrumentNumber: 40 } as any,  // Sonatina_Symphonic_Orchestra.sf3
-          { channel: 2, instrumentNumber: 80 } as any,  // FluidR3Mono_GM.sf3
-          { channel: 9, instrumentNumber: 0 } as any,   // Roland_SC-88.sf3 (Drums)
-        ]);
+        // 6. Tải bộ âm thanh Soundfont Crisis GM chính vào Synthesizer Engine lúc khởi tạo
+        await this.soundfontService.loadInstrumentSoundbank(this.synth, 0, false);
 
         const defaults = getDefaultTrackSettings(0, 0);
         this.tracks = [{

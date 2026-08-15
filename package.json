@@ -9,7 +9,8 @@
     "build": "npm run build:wasm && vue-tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "trim:sf3": "python3 scripts/trim_sf3.py"
+    "trim:sf3": "python3 scripts/trim_sf3.py",
+    "convert:sf3": "python3 scripts/convert_sf2_to_sf3.py"
   },
   "dependencies": {
     "@lucide/vue": "^1.23.0",

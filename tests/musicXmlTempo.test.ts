@@ -30,7 +30,7 @@ describe('MusicXML Tempo & Metronome Parsing', () => {
     </score-partwise>`;
 
     const midiBytes = parseMusicXmlToMidiBytes(xmlText);
-    const midi = new Midi(midiBytes.buffer);
+    const midi = new Midi(midiBytes);
 
     expect(midi.header.tempos.length).toBeGreaterThan(0);
     expect(Math.round(midi.header.tempos[0].bpm)).toBe(152);
@@ -39,7 +39,7 @@ describe('MusicXML Tempo & Metronome Parsing', () => {
     const wasm = await getWasmModule();
     if (wasm && typeof wasm.parse_musicxml_to_midi_wasm === 'function') {
       const wasmBytes = wasm.parse_musicxml_to_midi_wasm(xmlText);
-      const wasmMidi = new Midi(wasmBytes.buffer);
+      const wasmMidi = new Midi(wasmBytes);
       expect(wasmMidi.header.tempos.length).toBeGreaterThan(0);
       expect(Math.round(wasmMidi.header.tempos[0].bpm)).toBe(152);
     }
@@ -71,7 +71,7 @@ describe('MusicXML Tempo & Metronome Parsing', () => {
     </score-partwise>`;
 
     const midiBytes = parseMusicXmlToMidiBytes(xmlText);
-    const midi = new Midi(midiBytes.buffer);
+    const midi = new Midi(midiBytes);
 
     expect(midi.header.tempos.length).toBeGreaterThan(0);
     expect(Math.round(midi.header.tempos[0].bpm)).toBe(60);
@@ -79,7 +79,7 @@ describe('MusicXML Tempo & Metronome Parsing', () => {
     const wasm = await getWasmModule();
     if (wasm && typeof wasm.parse_musicxml_to_midi_wasm === 'function') {
       const wasmBytes = wasm.parse_musicxml_to_midi_wasm(xmlText);
-      const wasmMidi = new Midi(wasmBytes.buffer);
+      const wasmMidi = new Midi(wasmBytes);
       expect(wasmMidi.header.tempos.length).toBeGreaterThan(0);
       expect(Math.round(wasmMidi.header.tempos[0].bpm)).toBe(60);
     }
@@ -111,7 +111,7 @@ describe('MusicXML Tempo & Metronome Parsing', () => {
     </score-partwise>`;
 
     const midiBytes = parseMusicXmlToMidiBytes(xmlText);
-    const midi = new Midi(midiBytes.buffer);
+    const midi = new Midi(midiBytes);
 
     expect(midi.header.tempos.length).toBeGreaterThanOrEqual(2);
     expect(Math.round(midi.header.tempos[0].bpm)).toBe(120);
@@ -120,7 +120,7 @@ describe('MusicXML Tempo & Metronome Parsing', () => {
     const wasm = await getWasmModule();
     if (wasm && typeof wasm.parse_musicxml_to_midi_wasm === 'function') {
       const wasmBytes = wasm.parse_musicxml_to_midi_wasm(xmlText);
-      const wasmMidi = new Midi(wasmBytes.buffer);
+      const wasmMidi = new Midi(wasmBytes);
       expect(wasmMidi.header.tempos.length).toBeGreaterThanOrEqual(2);
       expect(Math.round(wasmMidi.header.tempos[0].bpm)).toBe(120);
       expect(Math.round(wasmMidi.header.tempos[1].bpm)).toBe(160);
