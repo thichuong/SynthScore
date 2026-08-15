@@ -20,6 +20,7 @@ import { Midi } from '@tonejs/midi';
 import { Play, Pause } from 'lucide-vue-next';
 import { AudioEngine } from '../../services/audioEngine';
 import { TRACK_COLORS } from '../../data/instruments';
+import type { TrackInfo } from '../../services/midiGenerator';
 
 const props = defineProps<{
   fileData: Uint8Array | string | null;
@@ -29,6 +30,7 @@ const props = defineProps<{
   isPlaying?: boolean;
   isActive: boolean;
   isReady?: boolean;
+  tracks?: TrackInfo[];
 }>();
 
 const overlayIcon = ref<'play' | 'pause' | null>(null);
@@ -145,9 +147,14 @@ async function parseMidiForVisualizer() {
     const midi = new Midi(arrayBuffer);
     let tempMin = 127;
     let tempMax = 0;
+    const activeChannels = props.tracks && props.tracks.length > 0 
+      ? new Set(props.tracks.map(t => t.channel)) 
+      : null;
 
     midi.tracks.forEach((track, trackIndex) => {
       const channel = track.channel !== undefined ? track.channel : trackIndex;
+      if (activeChannels && !activeChannels.has(channel)) return;
+
       track.notes.forEach(note => {
         midiNotes.push({
           midi: note.midi,
@@ -167,11 +174,16 @@ async function parseMidiForVisualizer() {
     // Sắp xếp midiNotes theo thời gian bắt đầu tăng dần để tìm kiếm nhị phân chính xác
     midiNotes.sort((a, b) => a.time - b.time);
 
-    minMidi = Math.max(21, tempMin - 5);
-    maxMidi = Math.min(108, tempMax + 5);
-    if (minMidi >= maxMidi) {
+    if (midiNotes.length === 0) {
       minMidi = 36;
       maxMidi = 88;
+    } else {
+      minMidi = Math.max(21, tempMin - 5);
+      maxMidi = Math.min(108, tempMax + 5);
+      if (minMidi >= maxMidi) {
+        minMidi = 36;
+        maxMidi = 88;
+      }
     }
 
     // Vẽ lại nền tĩnh sau khi dải phím (minMidi / maxMidi) thay đổi
@@ -469,6 +481,12 @@ watch(() => props.fileData, () => {
     startAnimation();
   }
 });
+
+watch(() => props.tracks, () => {
+  if (props.isActive) {
+    parseMidiForVisualizer();
+  }
+}, { deep: true });
 
 watch(() => props.isActive, (active) => {
   if (active) {

@@ -7,6 +7,7 @@ import DesktopHeader from '../src/layouts/desktop/DesktopHeader.vue';
 import DesktopPresentation from '../src/layouts/desktop/DesktopPresentation.vue';
 import DesktopControls from '../src/layouts/desktop/DesktopControls.vue';
 import PlaybackControls from '../src/components/controls/PlaybackControls.vue';
+import WaterfallCanvas from '../src/components/visualizer/WaterfallCanvas.vue';
 
 describe('UI Architecture & Responsiveness', () => {
   it('should toggle isMobile state based on userAgent', () => {
@@ -28,6 +29,7 @@ describe('UI Architecture & Responsiveness', () => {
     expect(DesktopPresentation).toBeDefined();
     expect(DesktopControls).toBeDefined();
     expect(PlaybackControls).toBeDefined();
+    expect(WaterfallCanvas).toBeDefined();
 
     expect(typeof MobileHeader).toBe('object');
     expect(typeof MobilePresentation).toBe('object');
@@ -36,5 +38,7 @@ describe('UI Architecture & Responsiveness', () => {
     expect(typeof DesktopPresentation).toBe('object');
     expect(typeof DesktopControls).toBe('object');
     expect(typeof PlaybackControls).toBe('object');
+    expect(typeof WaterfallCanvas).toBe('object');
   });
 });
+

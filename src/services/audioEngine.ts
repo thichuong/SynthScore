@@ -5,6 +5,9 @@ import {
   parseMidiTracks,
   generateSymphonyMidi,
   generateConcertoMidi,
+  deleteChannelFromMidi,
+  addChannelToMidi,
+  updateChannelInstrumentInMidi,
   symphonicTracksInfo,
   concertoTracksInfo,
   getDefaultTrackSettings
@@ -647,6 +650,9 @@ class AudioEngineService {
   public async setTrackInstrument(channelIndex: number, programNumber: number): Promise<void> {
     const isDrum = channelIndex === 9;
     this.trackMgr.setTrackInstrument(this.synth, channelIndex, programNumber);
+    if (this.activeMidiBytes) {
+      this.activeMidiBytes = updateChannelInstrumentInMidi(this.activeMidiBytes, channelIndex, programNumber);
+    }
     this.triggerStateChange();
     await this.loadInstrumentSoundbank(programNumber, isDrum);
   }
@@ -754,6 +760,9 @@ class AudioEngineService {
   public async addTrack(): Promise<void> {
     const newChan = await this.trackMgr.addTrack(this.synth);
     if (newChan !== null) {
+      if (this.activeMidiBytes) {
+        this.activeMidiBytes = addChannelToMidi(this.activeMidiBytes, newChan, 0);
+      }
       this.triggerStateChange();
       const isDrum = newChan === 9;
       await this.loadInstrumentSoundbank(0, isDrum);
@@ -766,6 +775,28 @@ class AudioEngineService {
   // Xóa một nhạc cụ khỏi danh sách
   public deleteTrack(channelIndex: number): void {
     this.trackMgr.deleteTrack(this.synth, channelIndex);
+
+    // Cập nhật tệp MIDI nhị phân để loại bỏ hoàn toàn track và nốt của channel này
+    if (this.activeMidiBytes) {
+      this.activeMidiBytes = deleteChannelFromMidi(this.activeMidiBytes, channelIndex);
+
+      // Cập nhật Sequencer nếu đang có bản nhạc được nạp
+      if (this.sequencer) {
+        const wasPlaying = this.isPlaying;
+        const savedTime = this.currentTime;
+        const arrayBuffer = (this.activeMidiBytes.buffer as ArrayBuffer).slice(
+          this.activeMidiBytes.byteOffset,
+          this.activeMidiBytes.byteOffset + this.activeMidiBytes.byteLength
+        );
+        this.sequencer.loadNewSongList([{ binary: arrayBuffer, fileName: this.currentSongName }]);
+        this.seek(savedTime);
+        if (wasPlaying) {
+          this.play();
+        }
+        this.resetMixerSettings();
+      }
+    }
+
     this.triggerStateChange();
   }
 

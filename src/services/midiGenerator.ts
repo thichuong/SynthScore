@@ -336,3 +336,78 @@ export function generateConcertoMidi(originalMidiBytes: Uint8Array): Uint8Array 
     return originalMidiBytes;
   }
 }
+
+// Xóa bỏ một kênh (channel) khỏi tệp MIDI nhị phân
+export function deleteChannelFromMidi(midiBytes: Uint8Array, channelIndex: number): Uint8Array {
+  try {
+    const midi = new Midi(midiBytes);
+    midi.tracks = midi.tracks.filter(track => track.channel !== channelIndex);
+    if (midi.tracks.length === 0) {
+      const fallbackTrack = midi.addTrack();
+      fallbackTrack.channel = 0;
+      fallbackTrack.instrument.number = 0;
+    }
+    return midi.toArray();
+  } catch (e) {
+    console.error(`Lỗi khi xóa kênh ${channelIndex} khỏi MIDI:`, e);
+    return midiBytes;
+  }
+}
+
+// Thêm một kênh mới vào tệp MIDI nhị phân
+export function addChannelToMidi(
+  midiBytes: Uint8Array,
+  channelIndex: number,
+  programNumber = 0,
+  name?: string
+): Uint8Array {
+  try {
+    const midi = new Midi(midiBytes);
+    const existing = midi.tracks.find(t => t.channel === channelIndex);
+    if (existing) {
+      existing.instrument.number = programNumber;
+      existing.instrument.name = GM_INSTRUMENTS[programNumber] || 'Piano';
+      if (name) existing.name = name;
+    } else {
+      const track = midi.addTrack();
+      track.channel = channelIndex;
+      track.instrument.number = programNumber;
+      track.instrument.name = GM_INSTRUMENTS[programNumber] || 'Piano';
+      track.name = name || GM_INSTRUMENTS[programNumber] || `Kênh ${channelIndex + 1}`;
+    }
+    return midi.toArray();
+  } catch (e) {
+    console.error(`Lỗi khi thêm kênh ${channelIndex} vào MIDI:`, e);
+    return midiBytes;
+  }
+}
+
+// Cập nhật mã nhạc cụ (program change) cho một kênh trong tệp MIDI nhị phân
+export function updateChannelInstrumentInMidi(
+  midiBytes: Uint8Array,
+  channelIndex: number,
+  programNumber: number
+): Uint8Array {
+  try {
+    const midi = new Midi(midiBytes);
+    let found = false;
+    midi.tracks.forEach(track => {
+      if (track.channel === channelIndex) {
+        track.instrument.number = programNumber;
+        track.instrument.name = GM_INSTRUMENTS[programNumber] || 'Unknown';
+        found = true;
+      }
+    });
+    if (!found) {
+      const track = midi.addTrack();
+      track.channel = channelIndex;
+      track.instrument.number = programNumber;
+      track.instrument.name = GM_INSTRUMENTS[programNumber] || 'Unknown';
+      track.name = GM_INSTRUMENTS[programNumber] || `Kênh ${channelIndex + 1}`;
+    }
+    return midi.toArray();
+  } catch (e) {
+    console.error(`Lỗi khi cập nhật nhạc cụ kênh ${channelIndex} trong MIDI:`, e);
+    return midiBytes;
+  }
+}

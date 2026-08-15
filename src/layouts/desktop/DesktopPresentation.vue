@@ -78,6 +78,7 @@
           :isPlaying="isPlaying"
           :isReady="isReady"
           :isActive="activeTab === 'visualizer' || !hasSheet"
+          :tracks="tracks"
         />
       </div>
     </div>

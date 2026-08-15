@@ -65,6 +65,7 @@
           :isPlaying="isPlaying"
           :isReady="isReady"
           :isActive="currentView === 'visualizer' || !hasSheet"
+          :tracks="tracks"
         />
       </div>
 

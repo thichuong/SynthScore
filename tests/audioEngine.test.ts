@@ -231,6 +231,90 @@ describe('audioEngine', () => {
     await setPromise;
   });
 
+  it('should delete a track and update activeMidiBytes and trigger state change', async () => {
+    const midi = new Midi();
+    const track1 = midi.addTrack();
+    track1.channel = 0;
+    track1.addNote({ midi: 60, time: 0, duration: 1 });
+    const track2 = midi.addTrack();
+    track2.channel = 1;
+    track2.addNote({ midi: 64, time: 0, duration: 1 });
+    const midiBytes = new Uint8Array(midi.toArray());
+
+    await AudioEngine.loadSong(midiBytes, 'Multi-Track Song');
+    AudioEngine.tracks = [
+      {
+        channel: 0,
+        name: 'Piano Track',
+        instrumentName: 'Piano',
+        instrumentNumber: 0,
+        volume: 80,
+        isMuted: false,
+        isSoloed: false,
+        noteCount: 1,
+        pan: 0,
+        reverbSend: 50,
+        chorusSend: 0
+      },
+      {
+        channel: 1,
+        name: 'Bass Track',
+        instrumentName: 'Bass',
+        instrumentNumber: 32,
+        volume: 80,
+        isMuted: false,
+        isSoloed: false,
+        noteCount: 1,
+        pan: 0,
+        reverbSend: 50,
+        chorusSend: 0
+      }
+    ];
+    expect(AudioEngine.tracks.length).toBe(2);
+
+    let stateChanged = false;
+    AudioEngine.onStateChange(() => {
+      stateChanged = true;
+    });
+
+    AudioEngine.deleteTrack(1);
+
+    expect(AudioEngine.tracks.length).toBe(1);
+    expect(AudioEngine.tracks[0].channel).toBe(0);
+    expect(stateChanged).toBe(true);
+
+    // Verify activeMidiBytes was updated to remove channel 1
+    expect(AudioEngine.activeMidiBytes).not.toBeNull();
+    const updatedMidi = new Midi(AudioEngine.activeMidiBytes!);
+    expect(updatedMidi.tracks.some(t => t.channel === 1)).toBe(false);
+  });
+
+  it('should add a track and update activeMidiBytes and trigger state change', async () => {
+    const midi = new Midi();
+    const track1 = midi.addTrack();
+    track1.channel = 0;
+    track1.addNote({ midi: 60, time: 0, duration: 1 });
+    const midiBytes = new Uint8Array(midi.toArray());
+
+    await AudioEngine.loadSong(midiBytes, 'Single-Track Song');
+    expect(AudioEngine.tracks.length).toBe(1);
+
+    let stateChanged = false;
+    AudioEngine.onStateChange(() => {
+      stateChanged = true;
+    });
+
+    await AudioEngine.addTrack();
+
+    expect(AudioEngine.tracks.length).toBe(2);
+    expect(stateChanged).toBe(true);
+
+    // Verify activeMidiBytes was updated
+    expect(AudioEngine.activeMidiBytes).not.toBeNull();
+    const updatedMidi = new Midi(AudioEngine.activeMidiBytes!);
+    expect(updatedMidi.tracks.length).toBeGreaterThanOrEqual(2);
+  });
+
   it('should restore custom track instrument settings on synth channels when seeking', async () => {
     // Mock MIDI song load
     const midi = new Midi();

@@ -4,7 +4,10 @@ import {
   getDefaultTrackSettings,
   parseMidiTracks,
   generateSymphonyMidi,
-  generateConcertoMidi
+  generateConcertoMidi,
+  deleteChannelFromMidi,
+  addChannelToMidi,
+  updateChannelInstrumentInMidi
 } from '../src/services/midiGenerator';
 
 // Helper to create a basic Midi object with some notes
@@ -123,4 +126,50 @@ describe('midiGenerator', () => {
       expect(midi.tracks[4].channel).toBe(4);
     });
   });
+
+  describe('deleteChannelFromMidi', () => {
+    it('should remove the specified channel from MIDI and preserve remaining tracks', () => {
+      const originalMidiBytes = createTestMidi();
+      const updatedBytes = deleteChannelFromMidi(originalMidiBytes, 1);
+
+      const midi = new Midi(updatedBytes);
+      expect(midi.tracks.length).toBe(1);
+      expect(midi.tracks[0].channel).toBe(0);
+      expect(midi.tracks[0].notes.length).toBe(3);
+    });
+
+    it('should handle deleting all channels cleanly with fallback', () => {
+      const originalMidiBytes = createTestMidi();
+      let updatedBytes = deleteChannelFromMidi(originalMidiBytes, 0);
+      updatedBytes = deleteChannelFromMidi(updatedBytes, 1);
+
+      const midi = new Midi(updatedBytes);
+      expect(midi.tracks.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('addChannelToMidi', () => {
+    it('should add a new track with specified channel and instrument', () => {
+      const originalMidiBytes = createTestMidi();
+      const updatedBytes = addChannelToMidi(originalMidiBytes, 5, 73, 'Flute');
+
+      const midi = new Midi(updatedBytes);
+      const fluteTrack = midi.tracks.find(t => t.name === 'Flute');
+      expect(fluteTrack).toBeDefined();
+      expect(fluteTrack?.instrument.number).toBe(73);
+      expect(fluteTrack?.name).toBe('Flute');
+    });
+  });
+
+  describe('updateChannelInstrumentInMidi', () => {
+    it('should update instrument program on an existing channel', () => {
+      const originalMidiBytes = createTestMidi();
+      const updatedBytes = updateChannelInstrumentInMidi(originalMidiBytes, 0, 40); // Change Piano to Violin
+
+      const midi = new Midi(updatedBytes);
+      const track = midi.tracks.find(t => t.channel === 0);
+      expect(track?.instrument.number).toBe(40);
+    });
+  });
 });
+
